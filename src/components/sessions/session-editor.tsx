@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react';
 import {
   deleteSession,
+  transitionSession,
   updateSession,
   type SessionRecord,
 } from '@/lib/firebase/sessions';
@@ -29,8 +30,36 @@ export default function SessionEditor({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState(false);
+  const [status, setStatus] = useState(record.session.status);
+  const [problemCount, setProblemCount] = useState(record.problemCount);
+  const [transitionPending, setTransitionPending] = useState(false);
+  const [transitionError, setTransitionError] = useState(false);
   const busy = useRef(false);
   const dirty = title !== saved.title || date !== saved.date;
+
+  async function transition(nextStatus: 'live' | 'ended') {
+    if (busy.current || dirty) return;
+    if (
+      nextStatus === 'ended' &&
+      !window.confirm(
+        `End “${title}”? Members can still access this session according to its publication and answer visibility settings.`,
+      )
+    ) {
+      return;
+    }
+    busy.current = true;
+    setTransitionPending(true);
+    setTransitionError(false);
+    try {
+      await transitionSession(record.id, nextStatus);
+      setStatus(nextStatus);
+    } catch {
+      setTransitionError(true);
+    } finally {
+      busy.current = false;
+      setTransitionPending(false);
+    }
+  }
 
   async function save() {
     if (!dirty || busy.current) return;
@@ -93,8 +122,12 @@ export default function SessionEditor({
           Back to session
         </button>
         <h1>{title}</h1>
-        <p className={styles.status}>{record.session.status}</p>
-        <OfficerProblems sessionId={record.id} onBusyChange={setProblemBusy} />
+        <p className={styles.status}>{status}</p>
+        <OfficerProblems
+          sessionId={record.id}
+          onBusyChange={setProblemBusy}
+          onProblemCountChange={setProblemCount}
+        />
       </section>
     );
 
@@ -103,12 +136,12 @@ export default function SessionEditor({
       <button
         className={styles.button}
         onClick={onClose}
-        disabled={dirty || saving || deleting}
+        disabled={dirty || saving || deleting || transitionPending}
       >
         Back to Sessions
       </button>
       <h2>{record.session.title}</h2>
-      <p className={styles.status}>{record.session.status}</p>
+      <p className={styles.status}>{status}</p>
       <p role="status">
         {saving
           ? 'Saving…'
@@ -124,11 +157,44 @@ export default function SessionEditor({
           <button
             className={styles.button}
             onClick={() => void save()}
-            disabled={saving || deleting}
+            disabled={saving || deleting || transitionPending}
           >
             Retry save
           </button>
         </div>
+      )}
+      {status === 'draft' && (
+        <div>
+          <button
+            className={styles.button}
+            onClick={() => void transition('live')}
+            disabled={
+              problemCount === 0 ||
+              dirty ||
+              saving ||
+              deleting ||
+              transitionPending
+            }
+          >
+            {transitionPending ? 'Starting…' : 'Go Live'}
+          </button>
+          {problemCount === 0 && <p>Add a Problem before going live.</p>}
+        </div>
+      )}
+      {status === 'live' && (
+        <button
+          className={styles.button}
+          onClick={() => void transition('ended')}
+          disabled={dirty || saving || deleting || transitionPending}
+        >
+          {transitionPending ? 'Ending…' : 'End Session'}
+        </button>
+      )}
+      {transitionError && (
+        <p role="alert">
+          Session status could not be changed. Check your connection and try
+          again.
+        </p>
       )}
       <label className={styles.field}>
         Session title
@@ -136,7 +202,7 @@ export default function SessionEditor({
           value={title}
           onChange={(event) => setTitle(event.target.value)}
           onBlur={() => void save()}
-          disabled={saving || deleting}
+          disabled={saving || deleting || transitionPending}
           required
         />
       </label>
@@ -147,7 +213,7 @@ export default function SessionEditor({
           value={date}
           onChange={(event) => setDate(event.target.value)}
           onBlur={() => void save()}
-          disabled={saving || deleting}
+          disabled={saving || deleting || transitionPending}
           required
         />
       </label>
@@ -157,7 +223,7 @@ export default function SessionEditor({
       </p>
       <button
         className={styles.button}
-        disabled={dirty || saving || deleting}
+        disabled={dirty || saving || deleting || transitionPending}
         onClick={() => setProblemsOpen(true)}
       >
         Manage problems
@@ -165,7 +231,7 @@ export default function SessionEditor({
       <button
         className={styles.button}
         onClick={() => void remove()}
-        disabled={saving || deleting || dirty}
+        disabled={saving || deleting || transitionPending || dirty}
       >
         {deleting ? 'Deleting…' : 'Delete session'}
       </button>

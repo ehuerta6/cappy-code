@@ -16,9 +16,11 @@ import OfficerSolutions from '../solutions/officer-solutions';
 export default function OfficerProblems({
   sessionId,
   onBusyChange,
+  onProblemCountChange,
 }: {
   sessionId: string;
   onBusyChange: (busy: boolean) => void;
+  onProblemCountChange: (count: number) => void;
 }) {
   const [records, setRecords] = useState<ProblemRecord[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -41,6 +43,10 @@ export default function OfficerProblems({
   useEffect(() => {
     onBusyChange(blocked);
   }, [blocked, onBusyChange]);
+
+  useEffect(() => {
+    if (!loading && !loadError) onProblemCountChange(records.length);
+  }, [loadError, loading, onProblemCountChange, records.length]);
 
   useEffect(() => {
     let cancelled = false;

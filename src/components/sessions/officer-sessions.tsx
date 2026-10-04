@@ -83,6 +83,23 @@ export default function OfficerSessions() {
     );
   }
 
+  const groups = [
+    {
+      label: 'Live',
+      records: records.filter((record) => record.session.status === 'live'),
+    },
+    {
+      label: 'Upcoming',
+      records: records.filter((record) => record.session.status === 'draft'),
+    },
+    {
+      label: 'Past Sessions',
+      records: records
+        .filter((record) => record.session.status === 'ended')
+        .reverse(),
+    },
+  ];
+
   return (
     <section className={styles.sessions} aria-label="Officer sessions">
       <div className={styles.heading}>
@@ -113,23 +130,47 @@ export default function OfficerSessions() {
       ) : records.length === 0 ? (
         <p>No Sessions yet</p>
       ) : (
-        <ul className={styles.list}>
-          {records.map((record) => (
-            <li key={record.id}>
-              <button
-                className={styles.row}
-                onClick={() => setSelectedId(record.id)}
-                disabled={creating}
-              >
-                <span>{record.session.title}</span>
-                <time dateTime={record.session.date}>
-                  {record.session.date}
-                </time>
-                <span className={styles.status}>{record.session.status}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
+        groups.map(
+          ({ label, records: groupRecords }) =>
+            groupRecords.length > 0 && (
+              <section key={label} aria-label={label}>
+                <h2>{label}</h2>
+                <ul className={styles.list}>
+                  {groupRecords.map((record) => (
+                    <li key={record.id}>
+                      <button
+                        className={styles.row}
+                        onClick={() => setSelectedId(record.id)}
+                        disabled={creating}
+                      >
+                        <span className={styles.rowTitle}>
+                          {record.session.title}
+                        </span>
+                        <span className={styles.rowMetadata}>
+                          <time dateTime={record.session.date}>
+                            {new Intl.DateTimeFormat('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              timeZone: 'UTC',
+                            }).format(
+                              new Date(`${record.session.date}T00:00:00Z`),
+                            )}
+                          </time>
+                          <span>
+                            {record.problemCount}{' '}
+                            {record.problemCount === 1 ? 'Problem' : 'Problems'}
+                          </span>
+                        </span>
+                        <span className={styles.status}>
+                          {record.session.status}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ),
+        )
       )}
     </section>
   );

@@ -4,7 +4,9 @@ import {
   addDoc,
   collection,
   doc,
+  getCountFromServer,
   getDocsFromServer,
+  runTransaction,
   serverTimestamp,
   Timestamp,
   updateDoc,
@@ -23,6 +25,7 @@ import { appendProblemDeletion } from './problems';
 export interface SessionRecord {
   id: string;
   session: Session;
+  problemCount: number;
 }
 
 function officerDb() {
@@ -49,49 +52,96 @@ export async function createSession(
 }
 
 export async function listSessions(): Promise<SessionRecord[]> {
-  const snapshot = await getDocsFromServer(collection(officerDb(), 'sessions'));
-  const records = snapshot.docs.map((document): SessionRecord => {
-    // A server read can still include local pending writes. Never invent timestamps.
-    if (document.metadata.hasPendingWrites) {
-      throw new Error(
-        'Session changes are still awaiting confirmation. Retry when connected.',
+  const db = officerDb();
+  const snapshot = await getDocsFromServer(collection(db, 'sessions'));
+  const records = await Promise.all(
+    snapshot.docs.map(async (document): Promise<SessionRecord> => {
+      // A server read can still include local pending writes. Never invent timestamps.
+      if (document.metadata.hasPendingWrites) {
+        throw new Error(
+          'Session changes are still awaiting confirmation. Retry when connected.',
+        );
+      }
+      const data = document.data();
+      if (
+        typeof data.title !== 'string' ||
+        typeof data.date !== 'string' ||
+        !['draft', 'live', 'ended'].includes(data.status) ||
+        !(
+          data.activeProblemId === null ||
+          typeof data.activeProblemId === 'string'
+        ) ||
+        !(data.createdAt instanceof Timestamp) ||
+        !(data.updatedAt instanceof Timestamp)
+      ) {
+        throw new Error(
+          'A stored session has invalid fields. Check its Firestore document.',
+        );
+      }
+      const metadata = validateSessionMetadata({
+        title: data.title,
+        date: data.date,
+      });
+      const problems = await getCountFromServer(
+        collection(db, `${sessionPath(document.id)}/problems`),
       );
-    }
-    const data = document.data();
-    if (
-      typeof data.title !== 'string' ||
-      typeof data.date !== 'string' ||
-      !['draft', 'live', 'ended'].includes(data.status) ||
-      !(
-        data.activeProblemId === null ||
-        typeof data.activeProblemId === 'string'
-      ) ||
-      !(data.createdAt instanceof Timestamp) ||
-      !(data.updatedAt instanceof Timestamp)
-    ) {
-      throw new Error(
-        'A stored session has invalid fields. Check its Firestore document.',
-      );
-    }
-    const metadata = validateSessionMetadata({
-      title: data.title,
-      date: data.date,
-    });
-    return {
-      id: document.id,
-      session: {
-        ...metadata,
-        status: data.status,
-        activeProblemId: data.activeProblemId,
-        createdAt: data.createdAt,
-        updatedAt: data.updatedAt,
-      },
-    };
-  });
+      return {
+        id: document.id,
+        problemCount: problems.data().count,
+        session: {
+          ...metadata,
+          status: data.status,
+          activeProblemId: data.activeProblemId,
+          createdAt: data.createdAt,
+          updatedAt: data.updatedAt,
+        },
+      };
+    }),
+  );
   return records.sort(
     (a, b) =>
       a.session.date.localeCompare(b.session.date) || a.id.localeCompare(b.id),
   );
+}
+
+export async function transitionSession(
+  id: string,
+  nextStatus: 'live' | 'ended',
+): Promise<void> {
+  if (nextStatus !== 'live' && nextStatus !== 'ended') {
+    throw new Error('Unsupported session status transition.');
+  }
+  const db = officerDb();
+  const reference = doc(db, sessionPath(id));
+
+  if (nextStatus === 'live') {
+    const problems = await getDocsFromServer(
+      collection(db, `${sessionPath(id)}/problems`),
+    );
+    if (problems.empty) {
+      throw new Error('Add at least one problem before going live.');
+    }
+  }
+
+  await runTransaction(db, async (transaction) => {
+    const snapshot = await transaction.get(reference);
+    if (!snapshot.exists()) {
+      throw new Error('This session no longer exists.');
+    }
+    const currentStatus = snapshot.data().status;
+    const expectedStatus = nextStatus === 'live' ? 'draft' : 'live';
+    if (currentStatus !== expectedStatus) {
+      throw new Error(
+        nextStatus === 'live'
+          ? 'Only draft sessions can go live.'
+          : 'Only live sessions can be ended.',
+      );
+    }
+    transaction.update(reference, {
+      status: nextStatus,
+      updatedAt: serverTimestamp(),
+    });
+  });
 }
 
 export async function updateSession(
