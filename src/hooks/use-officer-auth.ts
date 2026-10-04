@@ -19,7 +19,9 @@ export function useOfficerAuth(): OfficerAuthState {
         getOfficerAuth(),
         (user) => {
           setState(
-            user ? { status: 'authenticated', user } : { status: 'anonymous' },
+            user && !user.isAnonymous
+              ? { status: 'authenticated', user }
+              : { status: 'anonymous' },
           );
         },
         () => setState({ status: 'unavailable' }),

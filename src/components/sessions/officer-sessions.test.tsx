@@ -6,7 +6,6 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react';
-import type { User } from 'firebase/auth';
 import { Timestamp } from 'firebase/firestore';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -19,7 +18,6 @@ const api = vi.hoisted(() => ({
 vi.mock('@/lib/firebase/sessions', () => api);
 import OfficerSessions from './officer-sessions';
 
-const user = { uid: 'officer', isAnonymous: false } as User;
 const record = {
   id: 'session-id',
   session: {
@@ -45,20 +43,11 @@ afterEach(() => {
 });
 
 async function openEditor() {
-  render(<OfficerSessions user={user} />);
+  render(<OfficerSessions />);
   fireEvent.click(await screen.findByRole('button', { name: /Arrays/ }));
 }
 
-describe('isolated Officer Sessions surface', () => {
-  it.each([null, { ...user, isAnonymous: true } as User])(
-    'provides no write controls without an officer (%s)',
-    (identity) => {
-      render(<OfficerSessions user={identity} />);
-      expect(screen.queryByRole('button')).toBeNull();
-      expect(api.listSessions).not.toHaveBeenCalled();
-    },
-  );
-
+describe('Officer Sessions surface', () => {
   it('shows loading until Firestore responds, then lists persisted metadata', async () => {
     let resolve!: (records: (typeof record)[]) => void;
     api.listSessions.mockReturnValue(
@@ -66,7 +55,7 @@ describe('isolated Officer Sessions surface', () => {
         resolve = done;
       }),
     );
-    render(<OfficerSessions user={user} />);
+    render(<OfficerSessions />);
     expect(screen.getByRole('status').textContent).toBe('Loading sessions…');
     resolve([record]);
     expect(
@@ -78,7 +67,7 @@ describe('isolated Officer Sessions surface', () => {
     api.listSessions
       .mockRejectedValueOnce(new Error('offline'))
       .mockResolvedValueOnce([]);
-    render(<OfficerSessions user={user} />);
+    render(<OfficerSessions />);
     expect(await screen.findByRole('alert')).toBeTruthy();
     expect(screen.queryByText('No Sessions yet')).toBeNull();
     fireEvent.click(
@@ -95,7 +84,7 @@ describe('isolated Officer Sessions surface', () => {
         session: { ...record.session, title: 'Untitled Session' },
       },
     ]);
-    render(<OfficerSessions user={user} />);
+    render(<OfficerSessions />);
     await screen.findByText('No Sessions yet');
     fireEvent.click(screen.getByRole('button', { name: '+ New session' }));
     expect(
@@ -110,7 +99,7 @@ describe('isolated Officer Sessions surface', () => {
   it('shows create errors without adding a fake row', async () => {
     api.listSessions.mockResolvedValue([]);
     api.createSession.mockRejectedValue(new Error('denied'));
-    render(<OfficerSessions user={user} />);
+    render(<OfficerSessions />);
     await screen.findByText('No Sessions yet');
     fireEvent.click(screen.getByRole('button', { name: '+ New session' }));
     expect((await screen.findByRole('alert')).textContent).toContain(
@@ -125,7 +114,7 @@ describe('isolated Officer Sessions surface', () => {
     api.listSessions
       .mockResolvedValueOnce([])
       .mockRejectedValueOnce(new Error('offline'));
-    render(<OfficerSessions user={user} />);
+    render(<OfficerSessions />);
     await screen.findByText('No Sessions yet');
     fireEvent.click(screen.getByRole('button', { name: '+ New session' }));
     expect((await screen.findByRole('alert')).textContent).toContain(
@@ -222,13 +211,5 @@ describe('isolated Officer Sessions surface', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Delete session' }));
     expect(await screen.findByText('No Sessions yet')).toBeTruthy();
     expect(api.deleteSession).toHaveBeenLastCalledWith('session-id');
-  });
-
-  it('removes metadata and controls when the auth surface signs out', async () => {
-    const view = render(<OfficerSessions user={user} />);
-    fireEvent.click(await screen.findByRole('button', { name: /Arrays/ }));
-    view.rerender(<OfficerSessions user={null} />);
-    expect(screen.queryByLabelText('Session title')).toBeNull();
-    expect(screen.queryByRole('button')).toBeNull();
   });
 });

@@ -8,7 +8,6 @@ const sdk = vi.hoisted(() => ({
       isAnonymous: boolean;
     } | null,
   },
-  app: {},
   db: {},
   addDoc: vi.fn(),
   getDocsFromServer: vi.fn(),
@@ -17,10 +16,9 @@ const sdk = vi.hoisted(() => ({
 }));
 vi.mock('client-only', () => ({}));
 vi.mock('./client', () => ({
-  getFirebaseApp: () => sdk.app,
   getFirestoreDb: () => sdk.db,
 }));
-vi.mock('firebase/auth', () => ({ getAuth: vi.fn(() => sdk.user) }));
+vi.mock('./auth', () => ({ getOfficerAuth: vi.fn(() => sdk.user) }));
 vi.mock('firebase/firestore', async (importOriginal) => ({
   ...(await importOriginal<typeof import('firebase/firestore')>()),
   collection: vi.fn((_db, path) => ({ path })),
@@ -31,7 +29,7 @@ vi.mock('firebase/firestore', async (importOriginal) => ({
   updateDoc: sdk.updateDoc,
   deleteDoc: sdk.deleteDoc,
 }));
-import { getAuth } from 'firebase/auth';
+import { getOfficerAuth } from './auth';
 import {
   createSession,
   deleteSession,
@@ -66,7 +64,7 @@ describe('officer session persistence', () => {
     expect(await createSession({ ...metadata, title: ' Arrays ' })).toBe(
       'new-session',
     );
-    expect(getAuth).toHaveBeenCalledWith(sdk.app);
+    expect(getOfficerAuth).toHaveBeenCalledWith();
     expect(sdk.addDoc).toHaveBeenCalledWith(
       { path: 'sessions' },
       {

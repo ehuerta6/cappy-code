@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import type { User } from 'firebase/auth';
 import {
   createSession,
   listSessions,
@@ -11,14 +10,7 @@ import { todayCalendarDate } from '@/lib/session-metadata';
 import SessionEditor from './session-editor';
 import styles from './sessions.module.css';
 
-// Mount from #37's client auth surface; do not pass Firebase User through an RSC boundary.
-export default function OfficerSessions({ user }: { user: User | null }) {
-  if (!user || user.isAnonymous)
-    return <p>Sign in to Officer Mode to manage sessions.</p>;
-  return <SessionManagement key={user.uid} />;
-}
-
-function SessionManagement() {
+export default function OfficerSessions() {
   const [records, setRecords] = useState<SessionRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);

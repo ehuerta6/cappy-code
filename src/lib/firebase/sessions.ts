@@ -1,6 +1,5 @@
 import 'client-only';
 
-import { getAuth } from 'firebase/auth';
 import {
   addDoc,
   collection,
@@ -16,7 +15,8 @@ import {
   validateSessionMetadata,
   type SessionMetadata,
 } from '../session-metadata';
-import { getFirebaseApp, getFirestoreDb } from './client';
+import { getOfficerAuth } from './auth';
+import { getFirestoreDb } from './client';
 import { sessionPath } from './paths';
 
 export interface SessionRecord {
@@ -25,7 +25,7 @@ export interface SessionRecord {
 }
 
 function officerDb() {
-  const user = getAuth(getFirebaseApp()).currentUser;
+  const user = getOfficerAuth().currentUser;
   if (!user || user.isAnonymous) {
     throw new Error('Sign in to Officer Mode to manage sessions.');
   }

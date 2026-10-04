@@ -4,7 +4,7 @@
 
 1. Create or select a Firebase project in the [Firebase Console](https://console.firebase.google.com/).
 2. Register a Web app under **Project settings → General → Your apps**. Copy its SDK configuration values. The [official Web SDK setup guide](https://firebase.google.com/docs/web/setup) describes these steps.
-3. Create the default Cloud Firestore database under **Build → Firestore Database**, using production mode. Keep its initial access restrictions; application permission rules belong to Issue #42.
+3. Create the default Cloud Firestore database under **Build → Firestore Database**, using production mode. Keep its initial access restrictions until deploying the baseline Session rules below; public access and answer reveal rules belong to Issue #42.
 4. Copy the checked-in environment example at the repository root:
 
    ```bash
@@ -39,7 +39,7 @@ import { problemPath } from '@/lib/firebase/paths';
 const problemRef = doc(getFirestoreDb(), problemPath(sessionId, problemId));
 ```
 
-The public workspace does not call these accessors or persist editor content. Builds and unit tests require no live Firebase project. Tests exercise SDK initialization and paths locally, and mock authentication interactions without reading or writing the network. Content workflows, realtime updates, and permission rules remain for later issues.
+The public workspace does not call these accessors or persist editor content. Builds and unit tests require no live Firebase project. Tests exercise SDK initialization and paths locally, and mock authentication interactions without reading or writing the network. Session preparation is described below; Problem/Solution workflows, realtime updates, and public access rules remain for later issues.
 
 ## Officer authentication
 
@@ -49,7 +49,13 @@ The secondary **Officer Login** link opens `/officer`. Its layout uses `OfficerA
 
 `getOfficerAuth()` in `src/lib/firebase/auth.ts` uses `getAuth(getFirebaseApp())`, reusing the existing default app. Firebase owns browser persistence; no custom session storage or persistence override is added. Login success alone does not open the gate: the Firebase observer remains authoritative. See [Firebase auth persistence](https://firebase.google.com/docs/auth/web/auth-state-persistence).
 
-For Issue #38, place officer pages under `src/app/officer/` to inherit the gate. Client data workflows can use `useOfficerAuth()` when they need the confirmed Firebase `User` and `getFirestoreDb()` for the same app's authenticated Firestore connection. Call SDK accessors from effects/event handlers. Do not pass protected data through server-rendered children: this browser gate does not authorize server responses. It also does not authorize Firestore writes; backend Security Rules must independently enforce access. Existing production-mode restrictions remain unchanged; authenticated data writes require the later rules work.
+Officer pages under `src/app/officer/` inherit the gate. `/officer` renders
+`OfficerSessions` only through this authenticated surface. Session management does
+not accept a Firebase User prop or subscribe to Auth; the gate owns auth rendering.
+Each persistence operation rechecks `getOfficerAuth().currentUser` before obtaining
+Firestore. Call SDK accessors from effects/event handlers. Do not pass protected
+data through server-rendered children: this browser gate does not authorize server
+responses. Firestore Security Rules independently enforce backend access.
 
 ## Persisted model
 
@@ -81,17 +87,9 @@ This foundation does not implement those rules or decide publication policy for 
 `src/lib/firebase/sessions.ts` provides `createSession`, `listSessions`,
 `updateSession`, and `deleteSession`, using the foundation's `Session` type and
 `sessionPath`. Each operation checks the current user from
-`getAuth(getFirebaseApp())`; signed-out and anonymous-auth users are rejected
+`getOfficerAuth()`; signed-out and anonymous-auth users are rejected
 before Firestore access. Firebase sends the actual Auth token to Firestore;
 Security Rules remain the backend boundary.
-
-The isolated `OfficerSessions` client component accepts the Firebase `User | null`
-from #37's auth surface. It does not subscribe to Auth, implement login, or create
-an Officer shell. It must be mounted **inside the final authenticated client
-surface from #37**, never passed a Firebase User from a Server Component.
-Currently #37 has not merged and this component is intentionally not routed.
-Before finalizing the #38 PR, merge #37 first, update this branch from `main`,
-mount the component in that surface, review the integration, and rerun all checks.
 
 Creation writes `Untitled Session`, the browser's current local calendar date,
 `draft`, `activeProblemId: null`, and server timestamps. It creates no Problems.
@@ -120,7 +118,7 @@ and does not use `ended` as an archive flag.
 `firebase.json` points to `firestore.rules`. The baseline permits Session document
 reads/writes only for non-anonymous Firebase Auth users, under the POC assumption
 that provisioned authenticated users are officers. Configure the shared officer
-account through #37; there is no member account or signup workflow. All other
+account as described above; there is no member account or signup workflow. All other
 paths, including future Problem/Solution subcollections, are denied by default.
 No public Session reads or publication policy are introduced.
 
