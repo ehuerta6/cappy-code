@@ -1,10 +1,5 @@
-import { appInfo } from '@/lib/app-info';
+import CodeWorkspace from '@/components/code-workspace';
 
 export default function Home() {
-  return (
-    <main>
-      <h1>{appInfo.name}</h1>
-      <p>{appInfo.description}</p>
-    </main>
-  );
+  return <CodeWorkspace />;
 }
