@@ -34,6 +34,7 @@ import {
   deleteProblem,
   listProblems,
   reorderProblems,
+  setAnswersVisible,
   updateProblem,
 } from './problems';
 const content = {
@@ -100,6 +101,13 @@ describe('officer problem persistence', () => {
       content,
     );
   });
+  it('updates only the selected problem reveal field', async () => {
+    await setAnswersVisible('session', 'problem', true);
+    expect(sdk.updateDoc).toHaveBeenCalledExactlyOnceWith(
+      { path: 'sessions/session/problems/problem' },
+      { answersVisible: true },
+    );
+  });
   it('sorts server metadata by order then ID with no solution fields', async () => {
     sdk.getDocsFromServer.mockResolvedValue({
       docs: [
@@ -163,6 +171,7 @@ describe('officer problem persistence', () => {
         () => createProblem('s'),
         () => listProblems('s'),
         () => updateProblem('s', 'p', content),
+        () => setAnswersVisible('s', 'p', true),
         () => reorderProblems('s', []),
         () => deleteProblem('s', 'p'),
       ])

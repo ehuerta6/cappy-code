@@ -115,6 +115,16 @@ export async function updateProblem(
   });
 }
 
+export async function setAnswersVisible(
+  sessionId: string,
+  problemId: string,
+  visible: boolean,
+): Promise<void> {
+  await updateDoc(doc(officerDb(), problemPath(sessionId, problemId)), {
+    answersVisible: visible,
+  });
+}
+
 export async function reorderProblems(
   sessionId: string,
   orderedIds: string[],

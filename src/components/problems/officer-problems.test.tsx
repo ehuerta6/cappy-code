@@ -13,6 +13,7 @@ const api = vi.hoisted(() => ({
   listProblems: vi.fn(),
   updateProblem: vi.fn(),
   reorderProblems: vi.fn(),
+  setAnswersVisible: vi.fn(),
   deleteProblem: vi.fn(),
   getSolutionsForProblem: vi.fn(),
   updateSolution: vi.fn(),
@@ -93,6 +94,7 @@ beforeEach(() => {
   });
   api.updateProblem.mockResolvedValue(undefined);
   api.reorderProblems.mockResolvedValue(undefined);
+  api.setAnswersVisible.mockResolvedValue(undefined);
   api.deleteProblem.mockResolvedValue(undefined);
   api.getSolutionsForProblem.mockResolvedValue({
     python: { code: 'python source', output: '' },
@@ -147,6 +149,45 @@ describe('Officer Problem workspace', () => {
     fireEvent.keyDown(firstTab, { key: 'End' });
     expect(document.activeElement).toBe(secondTab);
     expect(api.updateProblem).not.toHaveBeenCalled();
+  });
+  it('reveals answers only after confirmation and hides only the selected problem', async () => {
+    await loaded();
+    let confirm!: () => void;
+    api.setAnswersVisible.mockReturnValueOnce(
+      new Promise<void>((resolve) => {
+        confirm = resolve;
+      }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Show Answers' }));
+    expect(screen.getByText('Showing answers…')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Show Answers' })).toBeTruthy();
+    confirm();
+    expect(
+      await screen.findByRole('button', { name: 'Hide Answers' }),
+    ).toBeTruthy();
+    expect(api.setAnswersVisible).toHaveBeenCalledExactlyOnceWith(
+      'session',
+      'first',
+      true,
+    );
+    expect(api.updateSolution).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('tab', { name: 'Anagram' }));
+    expect(screen.getByRole('button', { name: 'Show Answers' })).toBeTruthy();
+    expect(api.setAnswersVisible).toHaveBeenCalledTimes(1);
+  });
+  it('retains confirmed reveal state when a hide write fails', async () => {
+    api.listProblems.mockResolvedValue([
+      { ...first, problem: { ...first.problem, answersVisible: true } },
+      second,
+    ]);
+    api.setAnswersVisible.mockRejectedValueOnce(new Error('offline'));
+    await loaded();
+    fireEvent.click(screen.getByRole('button', { name: 'Hide Answers' }));
+    expect((await screen.findByRole('alert')).textContent).toContain(
+      'Hiding answers failed',
+    );
+    expect(screen.getByRole('button', { name: 'Hide Answers' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Show Answers' })).toBeNull();
   });
   it('creates and selects confirmed metadata while creation is visibly pending', async () => {
     let resolve!: (record: typeof first) => void;

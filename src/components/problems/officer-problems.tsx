@@ -6,6 +6,7 @@ import {
   deleteProblem,
   listProblems,
   reorderProblems,
+  setAnswersVisible,
   type ProblemRecord,
 } from '@/lib/firebase/problems';
 import ProblemEditor from './problem-editor';
@@ -155,6 +156,24 @@ export default function OfficerProblems({
       setConfirmDelete(false);
       setActionsOpen(false);
       focusProblem(next);
+    });
+  }
+
+  function toggleAnswers() {
+    if (!selected) return;
+    const visible = !selected.problem.answersVisible;
+    void act(visible ? 'Showing answers' : 'Hiding answers', async () => {
+      await setAnswersVisible(sessionId, selected.id, visible);
+      setRecords((records) =>
+        records.map((record) =>
+          record.id === selected.id
+            ? {
+                ...record,
+                problem: { ...record.problem, answersVisible: visible },
+              }
+            : record,
+        ),
+      );
     });
   }
 
@@ -333,6 +352,22 @@ export default function OfficerProblems({
               )}
               {selected && (
                 <>
+                  <div className={styles.reveal}>
+                    <p>
+                      Answers are{' '}
+                      {selected.problem.answersVisible ? 'visible' : 'hidden'}{' '}
+                      to members for this problem.
+                    </p>
+                    <button
+                      className={styles.button}
+                      disabled={blocked}
+                      onClick={toggleAnswers}
+                    >
+                      {selected.problem.answersVisible
+                        ? 'Hide Answers'
+                        : 'Show Answers'}
+                    </button>
+                  </div>
                   <ProblemEditor
                     key={selected.id}
                     sessionId={sessionId}

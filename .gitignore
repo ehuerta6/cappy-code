@@ -18,6 +18,7 @@
 
 # Logs
 npm-debug.log*
+firebase-debug.log
 yarn-debug.log*
 pnpm-debug.log*
 
