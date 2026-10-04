@@ -132,4 +132,29 @@ describe('presentation state hooks', () => {
       isFollowing: true,
     });
   });
+
+  it('keeps the initial fallback local and follows the latest pointer when re-enabled', () => {
+    let state = createFollowPresenterState(null);
+    state = reduceFollowPresenterState(state, {
+      type: 'initial_selection_resolved',
+      problemId: 'first',
+    });
+    state = reduceFollowPresenterState(state, {
+      type: 'unfollow_presenter',
+    });
+    state = reduceFollowPresenterState(state, {
+      type: 'presenter_changed',
+      problemId: 'second',
+    });
+    expect(state).toMatchObject({
+      activeProblemId: 'second',
+      selectedProblemId: 'first',
+      isFollowing: false,
+    });
+    state = reduceFollowPresenterState(state, { type: 'follow_presenter' });
+    expect(state).toMatchObject({
+      selectedProblemId: 'second',
+      isFollowing: true,
+    });
+  });
 });

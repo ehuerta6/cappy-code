@@ -133,9 +133,52 @@
 
 .tabs {
   display: flex;
+  flex: 1 1 24rem;
+  min-width: 0;
   gap: 0.25rem;
   overflow-x: auto;
   border-bottom: 1px solid #dce2e8;
+}
+
+.problemNavigation {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  border-bottom: 1px solid #dce2e8;
+}
+
+.followControl {
+  display: flex;
+  flex: 0 1 auto;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  padding: 0.25rem 0;
+}
+
+.followControl label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.followControl input {
+  width: 1rem;
+  height: 1rem;
+  accent-color: #2563eb;
+}
+
+.followControl button {
+  min-height: 2.5rem;
+  padding: 0.375rem 0.625rem;
+  border: 1px solid #b8c2cc;
+  border-radius: 4px;
+  background: #fff;
+  color: inherit;
+  cursor: pointer;
 }
 
 .tabs button {
@@ -280,6 +323,16 @@
   .examples {
     grid-template-columns: minmax(0, 1fr);
   }
+
+  .problemNavigation {
+    align-items: stretch;
+    flex-wrap: wrap;
+    gap: 0.25rem 0.75rem;
+  }
+
+  .followControl {
+    width: 100%;
+  }
 }
 
 @media (prefers-color-scheme: dark) {
@@ -310,7 +363,8 @@
   }
 
   .sessionGroup li + li,
-  .tabs {
+  .tabs,
+  .problemNavigation {
     border-color: #28313b;
   }
 
@@ -329,8 +383,19 @@
   }
 
   .tabs button:hover,
-  .notice button:hover {
+  .notice button:hover,
+  .followControl button:hover {
     background: #202731;
+  }
+
+  .followControl input {
+    accent-color: #4d8dff;
+  }
+
+  .followControl button {
+    border-color: #35404c;
+    background: #151a20;
+    color: #e6ebf0;
   }
 
   .examples pre {

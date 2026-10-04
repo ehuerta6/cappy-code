@@ -22,8 +22,9 @@ function asError(error: unknown): Error {
 
 export function useActiveProblemId(
   sessionId: string | null,
+  retryVersion = 0,
 ): RealtimeValue<string | null> {
-  const key = sessionId === null ? '' : `session:${sessionId}`;
+  const key = sessionId === null ? '' : `session:${sessionId}:${retryVersion}`;
   const [stored, setStored] = useState<KeyedRealtimeValue<string | null>>({
     key: '',
     state: { status: 'loading' },
@@ -45,7 +46,7 @@ export function useActiveProblemId(
     } catch (error) {
       setStored({ key, state: { status: 'error', error: asError(error) } });
     }
-  }, [key, sessionId]);
+  }, [key, retryVersion, sessionId]);
 
   return stored.key === key ? stored.state : { status: 'loading' };
 }
@@ -53,11 +54,12 @@ export function useActiveProblemId(
 export function useAnswersVisible(
   sessionId: string | null,
   problemId: string | null,
+  retryVersion = 0,
 ): RealtimeValue<boolean> {
   const key =
     sessionId === null || problemId === null
       ? ''
-      : `problem:${JSON.stringify([sessionId, problemId])}`;
+      : `problem:${JSON.stringify([sessionId, problemId, retryVersion])}`;
   const [stored, setStored] = useState<KeyedRealtimeValue<boolean>>({
     key: '',
     state: { status: 'loading' },
@@ -80,7 +82,7 @@ export function useAnswersVisible(
     } catch (error) {
       setStored({ key, state: { status: 'error', error: asError(error) } });
     }
-  }, [key, problemId, sessionId]);
+  }, [key, problemId, retryVersion, sessionId]);
 
   return stored.key === key ? stored.state : { status: 'loading' };
 }
@@ -92,8 +94,10 @@ export interface FollowPresenterState {
 }
 
 export type FollowPresenterAction =
+  | { type: 'initial_selection_resolved'; problemId: string | null }
   | { type: 'presenter_changed'; problemId: string | null }
   | { type: 'select_problem'; problemId: string }
+  | { type: 'unfollow_presenter' }
   | { type: 'follow_presenter' };
 
 export function createFollowPresenterState(
@@ -110,6 +114,8 @@ export function reduceFollowPresenterState(
   state: FollowPresenterState,
   action: FollowPresenterAction,
 ): FollowPresenterState {
+  if (action.type === 'initial_selection_resolved')
+    return { ...state, selectedProblemId: action.problemId };
   if (action.type === 'presenter_changed')
     return {
       ...state,
@@ -124,6 +130,8 @@ export function reduceFollowPresenterState(
       selectedProblemId: action.problemId,
       isFollowing: false,
     };
+  if (action.type === 'unfollow_presenter')
+    return { ...state, isFollowing: false };
   return {
     ...state,
     selectedProblemId: state.activeProblemId,

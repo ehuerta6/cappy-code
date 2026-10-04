@@ -138,8 +138,17 @@ npx firebase-tools deploy --only firestore:rules --project YOUR_PROJECT_ID
 Do not deploy with public/test-mode rules. The Rules test suite exercises these
 permissions in the Firestore Emulator; deploying rules to a production project
 is an operator task.
-#44 owns lifecycle transitions and the richer dashboard/history UI; the #38 list
-is a flat preparation surface showing existing status without changing it.
+
+## Session lifecycle and history (#44)
+
+`src/lib/firebase/sessions.ts` provides `transitionSession`, which accepts only
+`live` or `ended` as requested targets and uses a Firestore transaction to verify
+that the persisted Session is currently `draft` or `live`, respectively, before
+updating status. Go Live also requires at least one Problem. The Officer
+dashboard groups rows by persisted status: live, draft (Upcoming), and ended
+(Past Sessions). Dates sort rows within each group but do not determine status.
+Ended Sessions remain editable and public under the existing Rules; ending does
+not alter any Problem's `answersVisible` value.
 
 Normal unit tests mock Firebase and require no project. Rules tests use the actual
 emulator to verify officer access, public status access, answer reveal/revocation,
@@ -228,6 +237,30 @@ Only when `answersVisible` is true does the page request the fixed language
 documents, and Firestore Rules independently deny a hidden or no-longer-public
 read. The reusable `SolutionWorkspace` renders only those returned records in
 read-only Monaco panels with their prepared output.
+
+## Realtime presenter state (#43)
+
+`src/lib/firebase/presentation.ts` provides `setActiveProblem`, which requires a
+non-anonymous Officer and verifies a non-null Problem ID exists under the target
+Session before writing `Session.activeProblemId`. Officers explicitly choose
+**Present this problem** from the live Problem workspace; changing the local
+Problem editing selection does not change the presenter pointer. Draft and ended
+Sessions do not show this control.
+
+`subscribeToActiveProblem` listens to the Session document, and
+`subscribeToAnswersVisible` listens to the viewed Problem document. The small
+hooks in `src/hooks/use-presentation-state.ts` track one Session/Problem at a
+time and unsubscribe on change or unmount. Members start with Follow Presenter
+enabled, use the persisted active pointer on initial load when it names an
+available Problem, and otherwise use the first ordered Problem as the initial
+fallback. Manual selection disables following; re-enabling follows the current
+pointer immediately. Follow preference and independent selection remain local.
+
+The member view fetches fixed Solution documents only after the reveal listener
+confirms `answersVisible: true`. When it reports false, the revealed-Solution
+component unmounts and clears its loaded data. Listener and permission failures
+show generic retry states; raw Firebase errors are not rendered. Realtime reads
+continue to rely on the existing Firestore Rules, which are unchanged by #43.
 
 ## Firestore Rules tests
 

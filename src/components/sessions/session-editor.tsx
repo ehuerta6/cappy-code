@@ -125,6 +125,7 @@ export default function SessionEditor({
         <p className={styles.status}>{status}</p>
         <OfficerProblems
           sessionId={record.id}
+          sessionStatus={status}
           onBusyChange={setProblemBusy}
           onProblemCountChange={setProblemCount}
         />

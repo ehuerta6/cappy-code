@@ -1,9 +1,15 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import type { ProblemSolutions } from '@/lib/firebase/solutions';
 import SolutionWorkspace from '@/components/solutions/solution-workspace';
+import {
+  createFollowPresenterState,
+  reduceFollowPresenterState,
+  useActiveProblemId,
+  useAnswersVisible,
+} from '@/hooks/use-presentation-state';
 import styles from './public-session-ui.module.css';
 
 export interface PublicSessionSummary {
@@ -11,6 +17,7 @@ export interface PublicSessionSummary {
   title: string;
   date: string;
   status: 'live' | 'ended';
+  activeProblemId?: string | null;
 }
 
 export interface PublicProblem {
@@ -153,7 +160,7 @@ export function PublicSessionView({ state }: { state: SessionState }) {
           <Link href="/">Back to sessions</Link>
         </section>
       ) : (
-        <SessionContent state={state} />
+        <SessionContent key={state.session.id} state={state} />
       )}
     </main>
   );
@@ -173,14 +180,73 @@ function SessionContent({
         : [],
     [state.problems],
   );
-  const [selectedProblemId, setSelectedProblemId] = useState('');
-  const selectedProblem =
-    problems.find((problem) => problem.id === selectedProblemId) ?? problems[0];
+  const [presenterState, dispatchPresenter] = useReducer(
+    reduceFollowPresenterState,
+    state.session.activeProblemId ?? null,
+    createFollowPresenterState,
+  );
+  const [selectionInitialized, setSelectionInitialized] = useState(false);
+  const [presentationRetry, setPresentationRetry] = useState(0);
+  const observedPresenterId = useRef(state.session.activeProblemId ?? null);
+  const presenter = useActiveProblemId(state.session.id, presentationRetry);
+  const activeProblemId =
+    presenter.status === 'ready'
+      ? presenter.value
+      : presenterState.activeProblemId;
+  const selectedProblem = problems.find(
+    (problem) => problem.id === presenterState.selectedProblemId,
+  );
 
   useEffect(() => {
-    if (selectedProblem && selectedProblemId !== selectedProblem.id)
-      setSelectedProblemId(selectedProblem.id);
-  }, [selectedProblem, selectedProblemId]);
+    if (state.problems.status !== 'ready' || selectionInitialized) return;
+    const initialActiveId =
+      presenter.status === 'ready'
+        ? presenter.value
+        : (state.session.activeProblemId ?? null);
+    const initialProblem = problems.find(
+      (problem) => problem.id === initialActiveId,
+    );
+    observedPresenterId.current = initialActiveId;
+    dispatchPresenter({
+      type: 'initial_selection_resolved',
+      problemId: initialProblem?.id ?? problems[0]?.id ?? null,
+    });
+    setSelectionInitialized(true);
+  }, [
+    problems,
+    presenter,
+    selectionInitialized,
+    state.problems.status,
+    state.session.activeProblemId,
+  ]);
+
+  useEffect(() => {
+    if (
+      !selectionInitialized ||
+      presenter.status !== 'ready' ||
+      observedPresenterId.current === presenter.value
+    ) {
+      return;
+    }
+    observedPresenterId.current = presenter.value;
+    dispatchPresenter({
+      type: 'presenter_changed',
+      problemId: presenter.value,
+    });
+  }, [presenter, selectionInitialized]);
+
+  function selectProblem(problemId: string) {
+    if (problemId === presenterState.selectedProblemId) return;
+    dispatchPresenter({ type: 'select_problem', problemId });
+  }
+
+  function followPresenter() {
+    dispatchPresenter({
+      type: 'presenter_changed',
+      problemId: activeProblemId,
+    });
+    dispatchPresenter({ type: 'follow_presenter' });
+  }
 
   return (
     <section className={styles.content}>
@@ -216,11 +282,48 @@ function SessionContent({
         </p>
       ) : (
         <>
-          <ProblemTabs
-            problems={problems}
-            selectedId={selectedProblem?.id ?? ''}
-            onSelect={setSelectedProblemId}
-          />
+          <div className={styles.problemNavigation}>
+            <ProblemTabs
+              problems={problems}
+              selectedId={presenterState.selectedProblemId ?? ''}
+              onSelect={selectProblem}
+            />
+            <div className={styles.followControl}>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={presenterState.isFollowing}
+                  onChange={(event) =>
+                    event.target.checked
+                      ? followPresenter()
+                      : dispatchPresenter({ type: 'unfollow_presenter' })
+                  }
+                />
+                Follow presenter
+              </label>
+              <span
+                className={styles.quiet}
+                aria-live="polite"
+                aria-atomic="true"
+              >
+                {presenter.status === 'error'
+                  ? 'Presenter updates are unavailable.'
+                  : presenterState.isFollowing
+                    ? selectedProblem
+                      ? `Following ${selectedProblem.title}.`
+                      : 'No Problem is currently selected by the presenter.'
+                    : 'Browsing Problems independently.'}
+              </span>
+              {presenter.status === 'error' ? (
+                <button
+                  type="button"
+                  onClick={() => setPresentationRetry((value) => value + 1)}
+                >
+                  Retry sync
+                </button>
+              ) : null}
+            </div>
+          </div>
           {selectedProblem ? (
             <ProblemContent
               key={selectedProblem.id}
@@ -228,7 +331,13 @@ function SessionContent({
               problem={selectedProblem}
               loadRevealedSolutions={state.loadRevealedSolutions}
             />
-          ) : null}
+          ) : (
+            <p className={styles.quiet} role="status">
+              {presenter.status === 'ready' && presenter.value
+                ? 'The presenter’s Problem is not available in this session.'
+                : 'The presenter has not selected a Problem.'}
+            </p>
+          )}
         </>
       )}
     </section>
@@ -294,41 +403,8 @@ function ProblemContent({
   problem: PublicProblem;
   loadRevealedSolutions: (problemId: string) => Promise<ProblemSolutions>;
 }) {
-  const [solutions, setSolutions] = useState<ProblemSolutions | null>(null);
-  const [solutionsStatus, setSolutionsStatus] = useState<
-    'idle' | 'loading' | 'error'
-  >('idle');
-  const [retryCount, setRetryCount] = useState(0);
-
-  useEffect(() => {
-    let current = true;
-    setSolutions(null);
-    if (!problem.answersVisible) {
-      setSolutionsStatus('idle');
-      return () => {
-        current = false;
-      };
-    }
-
-    setSolutionsStatus('loading');
-    void loadRevealedSolutions(problem.id).then(
-      (result) => {
-        if (current) {
-          setSolutions(result);
-          setSolutionsStatus('idle');
-        }
-      },
-      () => {
-        if (current) {
-          setSolutions(null);
-          setSolutionsStatus('error');
-        }
-      },
-    );
-    return () => {
-      current = false;
-    };
-  }, [loadRevealedSolutions, problem.answersVisible, problem.id, retryCount]);
+  const [visibilityRetry, setVisibilityRetry] = useState(0);
+  const visibility = useAnswersVisible(session.id, problem.id, visibilityRetry);
 
   return (
     <article
@@ -354,7 +430,19 @@ function ProblemContent({
       </div>
       <section className={styles.solutions} aria-labelledby="solutions-heading">
         <h2 id="solutions-heading">Solutions</h2>
-        {!problem.answersVisible ? (
+        {visibility.status === 'loading' ? (
+          <p role="status">Syncing answer visibility…</p>
+        ) : visibility.status === 'error' ? (
+          <div className={styles.notice} role="status">
+            <p>Answer visibility could not be synchronized.</p>
+            <button
+              type="button"
+              onClick={() => setVisibilityRetry((value) => value + 1)}
+            >
+              Retry sync
+            </button>
+          </div>
+        ) : !visibility.value ? (
           <div className={styles.answerGate}>
             <h3>Answers hidden</h3>
             <p>
@@ -363,25 +451,70 @@ function ProblemContent({
                 : 'Waiting for the officer to reveal the solution…'}
             </p>
           </div>
-        ) : solutionsStatus === 'loading' ? (
-          <p role="status">Loading solutions…</p>
-        ) : solutionsStatus === 'error' ? (
-          <div className={styles.notice} role="alert">
-            <p>Solutions could not be loaded.</p>
-            <button
-              type="button"
-              onClick={() => setRetryCount((count) => count + 1)}
-            >
-              Retry solutions
-            </button>
-          </div>
-        ) : solutions ? (
-          <SolutionWorkspace
-            solutions={solutions}
-            modelPath={`member/${session.id}/${problem.id}`}
+        ) : (
+          <RevealedSolutions
+            key={`${session.id}/${problem.id}`}
+            sessionId={session.id}
+            problemId={problem.id}
+            loadRevealedSolutions={loadRevealedSolutions}
           />
-        ) : null}
+        )}
       </section>
     </article>
+  );
+}
+
+function RevealedSolutions({
+  sessionId,
+  problemId,
+  loadRevealedSolutions,
+}: {
+  sessionId: string;
+  problemId: string;
+  loadRevealedSolutions: (problemId: string) => Promise<ProblemSolutions>;
+}) {
+  const [solutions, setSolutions] = useState<ProblemSolutions | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    setSolutions(null);
+    setFailed(false);
+    void loadRevealedSolutions(problemId).then(
+      (result) => {
+        if (active) setSolutions(result);
+      },
+      () => {
+        if (active) {
+          setSolutions(null);
+          setFailed(true);
+        }
+      },
+    );
+    return () => {
+      active = false;
+    };
+  }, [loadRevealedSolutions, problemId, retryCount]);
+
+  if (failed) {
+    return (
+      <div className={styles.notice} role="alert">
+        <p>Solutions could not be loaded.</p>
+        <button
+          type="button"
+          onClick={() => setRetryCount((count) => count + 1)}
+        >
+          Retry solutions
+        </button>
+      </div>
+    );
+  }
+  if (!solutions) return <p role="status">Loading solutions…</p>;
+  return (
+    <SolutionWorkspace
+      solutions={solutions}
+      modelPath={`member/${sessionId}/${problemId}`}
+    />
   );
 }
