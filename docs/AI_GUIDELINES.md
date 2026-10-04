@@ -8,7 +8,7 @@ Follow the repository instructions in root [AGENTS.md](../AGENTS.md), the curren
 
 CappyCode is **a live solution showcase platform for CIC Intro sessions**. CIC officers authenticate to Officer Mode, prepare ordered problems and their Python, Java, and C++ solutions, and present them to members in a live session. One shared officer account is used for the proof of concept. Members use an anonymous, read-only public view.
 
-Firestore is canonical persistence. Sessions have `draft`, `live`, and `ended` states and support session history. Session-level `activeProblemId` and answer reveal state synchronize in realtime. Public problem metadata is stored separately from protected solution documents. Firestore Security Rules enforce hidden-answer access; UI hiding alone is not sufficient.
+Firestore is canonical persistence. Sessions have `draft`, `live`, and `ended` states and support session history. Session-level `activeProblemId` and problem-level `answersVisible` synchronize in realtime. Draft sessions are officer-only; member reads of problem metadata follow the session status/publication rules, including for published ended sessions. Problem metadata is stored separately from protected solution documents. Firestore Security Rules permit solution reads only when the parent problem's `answersVisible` and the session's member-access rules allow them; UI hiding alone is not sufficient.
 
 Officers prepare problem descriptions, examples, source code, and static output for Python, Java, and C++ ahead of time. Monaco is editable in Officer Mode and read-only in Member Mode. There is no source-language selection, translation, code generation, compilation, or execution. Members can use **Follow Presenter** to follow the officer's active problem. Keep the interface readable and presentation-focused.
 
@@ -19,8 +19,8 @@ When implementing an issue:
 1. Follow the issue's acceptance criteria and keep the change focused.
 2. Preserve the anonymous, read-only member experience and authenticated officer management model.
 3. Treat Firestore as the source of truth and Security Rules as the answer permission boundary.
-4. Keep public problem metadata separate from protected solution documents.
-5. Preserve manual officer control over the active problem and answer reveal.
+4. Keep problem metadata separate from protected solution documents and apply session publication rules to member reads.
+5. Preserve session-level `activeProblemId` for presenter navigation and problem-level `answersVisible` for answer reveal.
 6. Avoid product or architecture features outside the issue's scope.
 
 Do not introduce runtime AI or LLM functionality, coding-model providers or credentials, translation APIs, source-language selection, Tree-sitter, parsers, AST translation, an intermediate representation, emitters, transpilers, code execution, compilers, interpreters, online judging, sandboxing, or `localStorage` as canonical persistence.
