@@ -1,0 +1,31 @@
+:root {
+  color-scheme: light;
+  font-family: Arial, Helvetica, sans-serif;
+  background: #fff;
+  color: #171717;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+main {
+  width: min(100% - 2rem, 48rem);
+  margin: 5rem auto;
+}
+
+h1 {
+  margin-bottom: 0.75rem;
+  font-size: 2rem;
+}
+
+p {
+  max-width: 38rem;
+  color: #525252;
+  line-height: 1.6;
+}
