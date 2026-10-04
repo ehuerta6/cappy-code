@@ -14,7 +14,15 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - Read `README.md` and relevant files in `docs/` for project source of truth. Follow `docs/GIT_CONVENTIONS.md` for branches, commits, and PRs.
 - Never develop directly on `main`. Start from the latest `main` and use a short-lived branch.
 - Run the repository checks before opening a PR: `npm run lint`, `npm run typecheck`, `npm test`, `npm run format:check`, and `npm run build`.
-- AI/LLMs are development tools only; runtime translation uses the deterministic parser, IR, and emitter pipeline.
+- CappyCode is a live solution showcase platform for CIC Intro sessions. AI and LLMs are outside the product runtime and architecture.
+- CIC Intro officers authenticate to Officer Mode and manage sessions; anonymous members use a public, read-only view.
+- Use Firebase Authentication for Officer Mode only, with one shared CIC officer account for the proof of concept. Firestore is canonical persistence.
+- Sessions have `draft`, `live`, and `ended` states, contain multiple ordered problems, and remain available in session history.
+- Keep public problem descriptions and examples separate from protected solution documents. Officers manually prepare Python, Java, and C++ source plus static output for each language.
+- Monaco editors are editable in Officer Mode and read-only in Member Mode. Show all three languages together; there is no source language or translation flow.
+- Firestore Security Rules enforce hidden-answer access. Realtime presentation state includes session-level `activeProblemId` and answer reveal; members can use Follow Presenter.
+- Provide an officer dashboard and a responsive, presentation-focused interface that stays readable when projected.
+- Do not add runtime AI, translation, code execution, compilers/interpreters, online judging, or browser `localStorage` as canonical persistence.
 
 ## Code quality
 
