@@ -4,6 +4,8 @@ This document provides project context and guardrails for AI coding assistants w
 
 AI tools should follow the same repository rules as human contributors.
 
+AI coding assistants may help develop CappyCode, but AI/LLMs are not part of the runtime product or translation pipeline. POC translation is deterministic and uses language parsers, the CappyCode IR, and target-language emitters.
+
 ## Product Context
 
 CappyCode is an educational web app for the **Coding Interview Club Intro branch**.
@@ -80,11 +82,7 @@ Avoid premature abstraction.
 
 Do not create a generalized translation platform when the project only needs three supported languages and interview-style code.
 
-Keep API keys and model credentials server-side.
-
 Do not place secrets in client-side code or commit them to the repository.
-
-Validate external/model output before relying on it.
 
 Generated code should be treated as untrusted text when rendered in the browser.
 
