@@ -10,7 +10,12 @@ const sdk = vi.hoisted(() => ({
   },
   db: {},
   addDoc: vi.fn(),
+  getCountFromServer: vi.fn(),
   getDocsFromServer: vi.fn(),
+  runTransaction: vi.fn(),
+  transactionGet: vi.fn(),
+  transactionUpdate: vi.fn(),
+  transactionStatus: 'draft' as string,
   updateDoc: vi.fn(),
   batchDelete: vi.fn(),
   batchCommit: vi.fn(),
@@ -27,6 +32,8 @@ vi.mock('firebase/firestore', async (importOriginal) => ({
   serverTimestamp: () => 'SERVER_TIMESTAMP',
   addDoc: sdk.addDoc,
   getDocsFromServer: sdk.getDocsFromServer,
+  getCountFromServer: sdk.getCountFromServer,
+  runTransaction: sdk.runTransaction,
   updateDoc: sdk.updateDoc,
   writeBatch: () => ({ delete: sdk.batchDelete, commit: sdk.batchCommit }),
 }));
@@ -35,6 +42,7 @@ import {
   createSession,
   deleteSession,
   listSessions,
+  transitionSession,
   updateSession,
 } from './sessions';
 
@@ -57,7 +65,20 @@ beforeEach(() => {
   sdk.addDoc.mockResolvedValue({ id: 'new-session' });
   sdk.updateDoc.mockResolvedValue(undefined);
   sdk.batchCommit.mockResolvedValue(undefined);
-  sdk.getDocsFromServer.mockResolvedValue({ docs: [document()] });
+  sdk.transactionStatus = 'draft';
+  sdk.transactionGet.mockImplementation(async () => ({
+    exists: () => true,
+    data: () => ({ ...session, status: sdk.transactionStatus }),
+  }));
+  sdk.runTransaction.mockImplementation(async (_db, callback) =>
+    callback({ get: sdk.transactionGet, update: sdk.transactionUpdate }),
+  );
+  sdk.getCountFromServer.mockResolvedValue({ data: () => ({ count: 1 }) });
+  sdk.getDocsFromServer.mockImplementation(async (reference) =>
+    reference.path === 'sessions'
+      ? { docs: [document()] }
+      : { docs: [], empty: false },
+  );
 });
 
 describe('officer session persistence', () => {
@@ -97,6 +118,7 @@ describe('officer session persistence', () => {
     });
     const records = await listSessions();
     expect(records.map((record) => record.id)).toEqual(['earlier', 'later']);
+    expect(records[0].problemCount).toBe(1);
     expect(records[1].session).toEqual(session);
     expect(records[1].session).not.toHaveProperty('id');
     expect(sdk.getDocsFromServer).toHaveBeenCalledWith({ path: 'sessions' });
@@ -119,6 +141,64 @@ describe('officer session persistence', () => {
   it('returns an empty list from an empty Firestore collection', async () => {
     sdk.getDocsFromServer.mockResolvedValue({ docs: [] });
     expect(await listSessions()).toEqual([]);
+  });
+
+  it('goes live in a transaction only for a draft with at least one Problem', async () => {
+    sdk.getDocsFromServer.mockResolvedValueOnce({
+      docs: [document('problem')],
+    });
+    await transitionSession('session-id', 'live');
+    expect(sdk.runTransaction).toHaveBeenCalledOnce();
+    expect(sdk.transactionGet).toHaveBeenCalledWith({
+      path: 'sessions/session-id',
+    });
+    expect(sdk.transactionUpdate).toHaveBeenCalledWith(
+      { path: 'sessions/session-id' },
+      { status: 'live', updatedAt: 'SERVER_TIMESTAMP' },
+    );
+    expect(sdk.updateDoc).not.toHaveBeenCalled();
+  });
+
+  it('ends only a live Session and changes no Problem answer visibility', async () => {
+    sdk.transactionStatus = 'live';
+    await transitionSession('session-id', 'ended');
+    expect(sdk.getDocsFromServer).not.toHaveBeenCalled();
+    expect(sdk.transactionUpdate).toHaveBeenCalledWith(
+      { path: 'sessions/session-id' },
+      { status: 'ended', updatedAt: 'SERVER_TIMESTAMP' },
+    );
+    expect(sdk.transactionUpdate.mock.calls[0][1]).not.toHaveProperty(
+      'answersVisible',
+    );
+  });
+
+  it('rejects empty Go Live attempts and invalid state transitions before commit', async () => {
+    sdk.getDocsFromServer.mockResolvedValueOnce({ docs: [], empty: true });
+    await expect(transitionSession('session-id', 'live')).rejects.toThrow(
+      'Add at least one problem',
+    );
+    expect(sdk.runTransaction).not.toHaveBeenCalled();
+    sdk.transactionStatus = 'ended';
+    await expect(transitionSession('session-id', 'live')).rejects.toThrow(
+      'Only draft sessions can go live',
+    );
+    expect(sdk.transactionUpdate).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['draft', 'draft'],
+    ['draft', 'ended'],
+    ['live', 'draft'],
+    ['live', 'live'],
+    ['ended', 'draft'],
+    ['ended', 'live'],
+    ['ended', 'ended'],
+  ])('rejects unsupported transition %s → %s', async (current, next) => {
+    sdk.transactionStatus = current;
+    await expect(
+      transitionSession('session-id', next as 'live' | 'ended'),
+    ).rejects.toThrow();
+    expect(sdk.transactionUpdate).not.toHaveBeenCalled();
   });
 
   it('atomically deletes known solutions, child problems and the session without changing status', async () => {

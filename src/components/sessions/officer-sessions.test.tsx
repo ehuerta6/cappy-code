@@ -13,6 +13,7 @@ const api = vi.hoisted(() => ({
   createSession: vi.fn(),
   listSessions: vi.fn(),
   updateSession: vi.fn(),
+  transitionSession: vi.fn(),
   deleteSession: vi.fn(),
   listProblems: vi.fn(),
   updateProblem: vi.fn(),
@@ -52,6 +53,7 @@ import OfficerSessions from './officer-sessions';
 
 const record = {
   id: 'session-id',
+  problemCount: 1,
   session: {
     title: 'Arrays',
     date: '2026-10-08',
@@ -80,6 +82,7 @@ beforeEach(() => {
   api.updateSolution.mockResolvedValue(undefined);
   api.createSession.mockResolvedValue('new-session');
   api.updateSession.mockResolvedValue(undefined);
+  api.transitionSession.mockResolvedValue(undefined);
   api.deleteSession.mockResolvedValue(undefined);
 });
 afterEach(() => {
@@ -105,7 +108,9 @@ describe('Officer Sessions surface', () => {
     expect(screen.getByRole('status').textContent).toBe('Loading sessions…');
     resolve([record]);
     expect(
-      await screen.findByRole('button', { name: /Arrays.*2026-10-08.*draft/ }),
+      await screen.findByRole('button', {
+        name: /Arrays.*Oct 8.*1 Problem.*draft/,
+      }),
     ).toBeTruthy();
   });
 
@@ -154,6 +159,131 @@ describe('Officer Sessions surface', () => {
     expect(
       screen.queryByRole('heading', { name: 'Untitled Session' }),
     ).toBeNull();
+  });
+
+  it('groups persisted sessions and keeps past history newest first', async () => {
+    api.listSessions.mockResolvedValue([
+      { ...record, session: { ...record.session, date: '2025-01-01' } },
+      {
+        ...record,
+        id: 'live-id',
+        session: { ...record.session, status: 'live', date: '2026-01-01' },
+      },
+      {
+        ...record,
+        id: 'older-ended',
+        session: { ...record.session, status: 'ended', date: '2027-09-01' },
+      },
+      {
+        ...record,
+        id: 'newer-ended',
+        session: { ...record.session, status: 'ended', date: '2027-10-01' },
+      },
+    ]);
+    render(<OfficerSessions />);
+    await screen.findByRole('heading', { name: 'Past Sessions' });
+    expect(screen.getByRole('heading', { name: 'Live' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Upcoming' })).toBeTruthy();
+    expect(
+      screen
+        .getByRole('region', { name: 'Upcoming' })
+        .querySelector('time')
+        ?.getAttribute('datetime'),
+    ).toBe('2025-01-01');
+    expect(
+      screen
+        .getByRole('region', { name: 'Live' })
+        .querySelector('time')
+        ?.getAttribute('datetime'),
+    ).toBe('2026-01-01');
+    const pastRows = screen
+      .getByRole('region', { name: 'Past Sessions' })
+      .querySelectorAll('button');
+    expect(pastRows[0].textContent).toContain('Oct 1');
+    expect(pastRows[1].textContent).toContain('Sep 1');
+    expect(pastRows[0].textContent).toContain('1 Problem');
+  });
+
+  it('starts a draft session with pending and error states and keeps empty sessions disabled', async () => {
+    api.listSessions.mockResolvedValueOnce([{ ...record, problemCount: 0 }]);
+    await openEditor();
+    expect(
+      (screen.getByRole('button', { name: 'Go Live' }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
+    expect(screen.getByText('Add a Problem before going live.')).toBeTruthy();
+
+    api.listSessions.mockResolvedValueOnce([record]);
+    cleanup();
+    await openEditor();
+    let resolve!: () => void;
+    api.transitionSession.mockReturnValue(
+      new Promise<void>((done) => {
+        resolve = done;
+      }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Go Live' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Starting…' }));
+    expect(api.transitionSession).toHaveBeenCalledOnce();
+    expect(screen.getByRole('button', { name: 'Starting…' })).toBeTruthy();
+    resolve();
+    await screen.findByText('live');
+    expect(api.transitionSession).toHaveBeenCalledWith('session-id', 'live');
+  });
+
+  it('keeps the current status and offers retry after a lifecycle write fails', async () => {
+    api.transitionSession.mockRejectedValueOnce(new Error('offline'));
+    await openEditor();
+    fireEvent.click(screen.getByRole('button', { name: 'Go Live' }));
+    expect((await screen.findByRole('alert')).textContent).toContain(
+      'status could not be changed',
+    );
+    expect(screen.getByText('draft')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Go Live' })).toBeTruthy();
+  });
+
+  it('confirms ending a live session and leaves the session editable in history', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    api.listSessions
+      .mockResolvedValueOnce([
+        { ...record, session: { ...record.session, status: 'live' } },
+      ])
+      .mockResolvedValueOnce([
+        {
+          ...record,
+          session: { ...record.session, status: 'ended' },
+        },
+      ]);
+    await openEditor();
+    fireEvent.click(screen.getByRole('button', { name: 'End Session' }));
+    expect(confirm).toHaveBeenCalledWith(
+      expect.stringContaining('End “Arrays”'),
+    );
+    expect(api.transitionSession).toHaveBeenCalledWith('session-id', 'ended');
+    await screen.findByText('ended');
+    expect(screen.getByLabelText('Session title')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'End Session' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Go Live' })).toBeNull();
+    fireEvent.change(screen.getByLabelText('Session title'), {
+      target: { value: 'Edited archive' },
+    });
+    fireEvent.blur(screen.getByLabelText('Session title'));
+    await waitFor(() =>
+      expect(api.updateSession).toHaveBeenCalledWith('session-id', {
+        title: 'Edited archive',
+        date: '2026-10-08',
+      }),
+    );
+    await waitFor(() =>
+      expect(screen.getByRole('status').textContent).toBe('Saved ✓'),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Back to Sessions' }));
+    expect(
+      await screen.findByRole('heading', { name: 'Past Sessions' }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole('button', { name: /Arrays.*Oct 8.*1 Problem.*ended/ }),
+    ).toBeTruthy();
   });
 
   it('does not report successful creation as failed when the subsequent read fails', async () => {

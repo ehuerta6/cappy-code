@@ -66,10 +66,16 @@
   padding: 1rem 0.75rem;
 }
 
-.row span:first-child {
+.rowTitle {
   flex: 1 1 16rem;
   font-weight: 600;
   overflow-wrap: anywhere;
+}
+
+.rowMetadata {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
 }
 
 .status {
