@@ -8,6 +8,7 @@ import {
 } from '@firebase/rules-unit-testing';
 import {
   collection,
+  deleteDoc,
   doc,
   getDoc,
   getDocs,
@@ -49,6 +50,7 @@ beforeEach(async () => {
       ['draft', 'draft', 'revealed', true],
       ['live', 'live', 'hidden', false],
       ['live', 'live', 'revealed', true],
+      ['ended', 'ended', 'hidden', false],
       ['ended', 'ended', 'revealed', true],
     ] as const;
     const writes = records.flatMap(
@@ -73,6 +75,7 @@ beforeEach(async () => {
       'sessions/draft/problems/revealed',
       'sessions/live/problems/hidden',
       'sessions/live/problems/revealed',
+      'sessions/ended/problems/hidden',
       'sessions/ended/problems/revealed',
     ];
     for (const parentPath of solutionPaths) {
@@ -119,6 +122,9 @@ describe('Firestore security rules', () => {
         status: 'draft',
       }),
     );
+    await assertSucceeds(
+      updateDoc(doc(db, 'sessions/draft'), { activeProblemId: 'revealed' }),
+    );
     await assertSucceeds(getDoc(doc(db, 'sessions/draft/problems/revealed')));
     await assertSucceeds(
       updateDoc(doc(db, 'sessions/draft/problems/revealed'), {
@@ -138,22 +144,13 @@ describe('Firestore security rules', () => {
     );
   });
 
-  it('denies anonymous draft Session reads and all anonymous Session writes', async () => {
+  it('denies anonymous draft Session reads', async () => {
     const db = anonymousDb();
     await assertFails(getDoc(doc(db, 'sessions/draft')));
     await assertSucceeds(getDoc(doc(db, 'sessions/live')));
     await assertSucceeds(getDoc(doc(db, 'sessions/ended')));
-    await assertFails(
-      setDoc(doc(db, 'sessions/live'), { title: 'forbidden', status: 'live' }),
-    );
     const anonymousAuth = anonymousAuthDb();
     await assertFails(getDoc(doc(anonymousAuth, 'sessions/draft')));
-    await assertFails(
-      setDoc(doc(anonymousAuth, 'sessions/draft'), {
-        title: 'forbidden',
-        status: 'draft',
-      }),
-    );
   });
 
   it('allows anonymous Problem reads only beneath live or ended Sessions', async () => {
@@ -161,9 +158,31 @@ describe('Firestore security rules', () => {
     await assertFails(getDoc(doc(db, 'sessions/draft/problems/revealed')));
     await assertSucceeds(getDoc(doc(db, 'sessions/live/problems/hidden')));
     await assertSucceeds(getDoc(doc(db, 'sessions/ended/problems/revealed')));
-    await assertFails(
-      updateDoc(doc(db, 'sessions/live/problems/hidden'), { title: 'write' }),
-    );
+  });
+
+  it('denies anonymous and Firebase-anonymous writes to Sessions, Problems, and Solutions', async () => {
+    for (const db of [anonymousDb(), anonymousAuthDb()]) {
+      const session = doc(db, 'sessions/live');
+      const problem = doc(db, 'sessions/live/problems/revealed');
+      const solution = doc(
+        db,
+        'sessions/live/problems/revealed/solutions/python',
+      );
+
+      await assertFails(setDoc(session, { title: 'forbidden' }));
+      await assertFails(updateDoc(session, { title: 'forbidden' }));
+      await assertFails(deleteDoc(session));
+      await assertFails(
+        setDoc(doc(db, 'sessions/live/problems/new'), {
+          title: 'forbidden',
+        }),
+      );
+      await assertFails(updateDoc(problem, { title: 'forbidden' }));
+      await assertFails(deleteDoc(problem));
+      await assertFails(setDoc(solution, { code: 'forbidden', output: '' }));
+      await assertFails(updateDoc(solution, { code: 'forbidden' }));
+      await assertFails(deleteDoc(solution));
+    }
   });
 
   it('permits public discovery queries only when they prove each Session is public', async () => {
@@ -196,14 +215,11 @@ describe('Firestore security rules', () => {
         ),
       );
       await assertFails(
-        getDoc(
-          doc(db, `sessions/draft/problems/revealed/solutions/${language}`),
-        ),
+        getDoc(doc(db, `sessions/ended/problems/hidden/solutions/${language}`)),
       );
       await assertFails(
-        setDoc(
-          doc(db, `sessions/live/problems/revealed/solutions/${language}`),
-          { code: 'write', output: '' },
+        getDoc(
+          doc(db, `sessions/draft/problems/revealed/solutions/${language}`),
         ),
       );
     }
