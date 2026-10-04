@@ -43,7 +43,8 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await environment.clearFirestore();
-  await environment.withSecurityRulesDisabled(async ({ firestore }) => {
+  await environment.withSecurityRulesDisabled(async (context) => {
+    const database = context.firestore();
     const records = [
       ['draft', 'draft', 'revealed', true],
       ['live', 'live', 'hidden', false],
@@ -52,7 +53,6 @@ beforeEach(async () => {
     ] as const;
     const writes = records.flatMap(
       ([sessionId, status, problemId, visible]) => {
-        const database = firestore();
         return [
           setDoc(doc(database, `sessions/${sessionId}`), {
             title: sessionId,
@@ -78,7 +78,7 @@ beforeEach(async () => {
     for (const parentPath of solutionPaths) {
       for (const language of ['python', 'java', 'cpp']) {
         writes.push(
-          setDoc(doc(firestore(), `${parentPath}/solutions/${language}`), {
+          setDoc(doc(database, `${parentPath}/solutions/${language}`), {
             code: `${language} source`,
             output: `${language} output`,
           }),
