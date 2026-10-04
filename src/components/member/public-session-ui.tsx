@@ -196,6 +196,9 @@ function SessionContent({
   const selectedProblem = problems.find(
     (problem) => problem.id === presenterState.selectedProblemId,
   );
+  const presenterProblem = problems.find(
+    (problem) => problem.id === presenterState.activeProblemId,
+  );
 
   useEffect(() => {
     if (state.problems.status !== 'ready' || selectionInitialized) return;
@@ -309,9 +312,11 @@ function SessionContent({
                 {presenter.status === 'error'
                   ? 'Presenter updates are unavailable.'
                   : presenterState.isFollowing
-                    ? selectedProblem
-                      ? `Following ${selectedProblem.title}.`
-                      : 'No Problem is currently selected by the presenter.'
+                    ? presenterProblem
+                      ? `Following ${presenterProblem.title}.`
+                      : presenterState.activeProblemId
+                        ? 'The presenter’s Problem is not available in this session.'
+                        : 'No Problem is currently selected by the presenter.'
                     : 'Browsing Problems independently.'}
               </span>
               {presenter.status === 'error' ? (

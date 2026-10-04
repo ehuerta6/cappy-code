@@ -168,6 +168,45 @@ describe('Member realtime presentation', () => {
     expect(await screen.findByText('Second description')).toBeTruthy();
   });
 
+  it('describes a null initial presenter pointer without attributing the fallback Problem to the presenter', async () => {
+    member.getMemberSession.mockResolvedValueOnce({
+      ...session,
+      session: { ...session.session, activeProblemId: null },
+    });
+    render(<MemberSessionPage sessionId="session" />);
+
+    expect(await screen.findByText('First description')).toBeTruthy();
+    expect(
+      await screen.findByText(
+        'No Problem is currently selected by the presenter.',
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText('Following First problem.')).toBeNull();
+    expect(
+      (
+        screen.getByRole('checkbox', {
+          name: 'Follow presenter',
+        }) as HTMLInputElement
+      ).checked,
+    ).toBe(true);
+  });
+
+  it('describes an unavailable initial presenter pointer while showing the local fallback', async () => {
+    member.getMemberSession.mockResolvedValueOnce({
+      ...session,
+      session: { ...session.session, activeProblemId: 'missing-problem' },
+    });
+    render(<MemberSessionPage sessionId="session" />);
+
+    expect(await screen.findByText('First description')).toBeTruthy();
+    expect(
+      await screen.findByText(
+        'The presenter’s Problem is not available in this session.',
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText('Following First problem.')).toBeNull();
+  });
+
   it('turns following off on manual navigation and jumps to the current presenter when re-enabled', async () => {
     await openSession();
     act(() => listeners.active[0].onValue('second'));
@@ -199,10 +238,10 @@ describe('Member realtime presentation', () => {
 
     act(() => listeners.active[0].onValue('missing-problem'));
     expect(
-      await screen.findByText(
+      screen.getAllByText(
         'The presenter’s Problem is not available in this session.',
       ),
-    ).toBeTruthy();
+    ).toHaveLength(2);
   });
 
   it('loads Solutions only after realtime reveal and removes them after Hide Answers', async () => {
