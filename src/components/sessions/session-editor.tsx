@@ -8,6 +8,7 @@ import {
 } from '@/lib/firebase/sessions';
 import { validateSessionMetadata } from '@/lib/session-metadata';
 import styles from './sessions.module.css';
+import OfficerProblems from '../problems/officer-problems';
 
 export default function SessionEditor({
   record,
@@ -16,6 +17,8 @@ export default function SessionEditor({
   record: SessionRecord;
   onClose: () => void;
 }) {
+  const [problemsOpen, setProblemsOpen] = useState(false);
+  const [problemBusy, setProblemBusy] = useState(false);
   const [title, setTitle] = useState(record.session.title);
   const [date, setDate] = useState(record.session.date);
   const [saved, setSaved] = useState({
@@ -61,7 +64,7 @@ export default function SessionEditor({
     if (
       busy.current ||
       !window.confirm(
-        `Delete “${title}”? This permanently removes the session document.`,
+        `Delete “${title}”? This permanently removes the session, its problems, and all prepared solutions.`,
       )
     )
       return;
@@ -78,6 +81,22 @@ export default function SessionEditor({
       setDeleting(false);
     }
   }
+
+  if (problemsOpen)
+    return (
+      <section className={styles.editor} aria-label="Officer session workspace">
+        <button
+          className={styles.button}
+          disabled={problemBusy}
+          onClick={() => setProblemsOpen(false)}
+        >
+          Back to session
+        </button>
+        <h1>{title}</h1>
+        <p className={styles.status}>{record.session.status}</p>
+        <OfficerProblems sessionId={record.id} onBusyChange={setProblemBusy} />
+      </section>
+    );
 
   return (
     <section className={styles.editor} aria-label="Session metadata">
@@ -136,6 +155,13 @@ export default function SessionEditor({
         Title and date save when you leave a field. Finish saving before
         returning to Sessions.
       </p>
+      <button
+        className={styles.button}
+        disabled={dirty || saving || deleting}
+        onClick={() => setProblemsOpen(true)}
+      >
+        Manage problems
+      </button>
       <button
         className={styles.button}
         onClick={() => void remove()}

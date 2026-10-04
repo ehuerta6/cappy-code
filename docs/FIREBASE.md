@@ -39,7 +39,7 @@ import { problemPath } from '@/lib/firebase/paths';
 const problemRef = doc(getFirestoreDb(), problemPath(sessionId, problemId));
 ```
 
-The public workspace does not call these accessors or persist editor content. Builds and unit tests require no live Firebase project. Tests exercise SDK initialization and paths locally, and mock authentication interactions without reading or writing the network. Session preparation is described below; Problem/Solution workflows, realtime updates, and public access rules remain for later issues.
+The public workspace does not call these accessors or persist editor content. Builds and unit tests require no live Firebase project. Tests exercise SDK initialization and paths locally and mock authentication interactions without network reads or writes. The concrete Session and Problem operations are described below; Solution editing, realtime updates, and public access rules remain for later issues.
 
 ## Officer authentication
 
@@ -71,10 +71,10 @@ responses. Firestore Security Rules independently enforce backend access.
 - `SessionStatus` is `draft | live | ended`.
 - `date` is a calendar date string in `YYYY-MM-DD` format. `createdAt` and `updatedAt` are Firestore `Timestamp` values in resolved persisted records; later write workflows can use SDK `serverTimestamp()` and must handle pending timestamp snapshots if needed.
 - `activeProblemId` is a problem document ID or `null` when no problem is selected.
-- `order` is a numeric sort key within the session. Problem CRUD will define how reordering writes it.
+- `order` is a numeric sort key within the session. Problem reordering writes dense zero-based integers; ties on reads sort by document ID.
 - `output` is officer-prepared static text, not an execution result.
 
-`sessionPath`, `problemPath`, and `solutionPath` centralize the nested document paths to avoid inconsistent strings. They reject empty IDs and IDs containing `/`. They return strings for SDK `doc()` calls; collection access can use SDK `collection()` with `sessions`, or a document reference and its subcollection name. No CRUD services, converters, or unchecked typed snapshot casts are introduced. These TypeScript types describe the intended shape; they do not validate incoming Firestore data.
+`sessionPath`, `problemPath`, and `solutionPath` centralize nested document paths and reject empty IDs or IDs containing `/`. They return strings for SDK `doc()` calls; collection access can use SDK `collection()` with `sessions`, or a document reference and its subcollection name. Session and Problem CRUD use small concrete Firestore functions. No generic repositories, converters, or unchecked typed snapshot casts are introduced. These TypeScript types describe the intended shape; they do not validate incoming Firestore data.
 
 ## Access boundary for later issues
 
@@ -107,19 +107,29 @@ until edits are saved. Lists distinguish loading, empty, failed, and populated
 states. A successfully created document followed by a failed list refresh is
 reported as a read failure, preventing an erroneous creation retry.
 
-Deletion requires a browser confirmation naming the Session and hard deletes
-only `sessions/{sessionId}`. **Firestore document deletion does not recursively
-delete subcollections.** Before #39 adds Problems, revisit deletion so child
-Problems/Solutions are not orphaned. This issue adds no recursive infrastructure
-and does not use `ended` as an archive flag.
+Deletion requires a browser confirmation naming the Session and its child content.
+`deleteSession` reads the child Problem IDs from the server, then commits one
+atomic batch deleting each Problem's fixed Python/Java/C++ Solution documents,
+each Problem, and the Session. Missing Solution documents are safe delete targets.
+The cascade rejects more than 499 child writes before issuing any writes; this
+supports up to 124 Problems and comfortably covers the expected 1–3. A failed
+read or commit remains a deletion error. Firestore does not recursively delete
+subcollections; this explicit fixed-path cleanup adds no recursive infrastructure
+and does not use `ended` as an archive flag. Preparation assumes one shared officer
+is editing a Session at a time; concurrent child creation during a deletion is not
+serialized by this small client-side cascade.
 
 ### Baseline Session Security Rules
 
 `firebase.json` points to `firestore.rules`. The baseline permits Session document
 reads/writes only for non-anonymous Firebase Auth users, under the POC assumption
 that provisioned authenticated users are officers. Configure the shared officer
-account as described above; there is no member account or signup workflow. All other
-paths, including future Problem/Solution subcollections, are denied by default.
+account as described above; there is no member account or signup workflow. Problem
+documents also permit Officer reads/writes. Solution reads, creates, and updates
+remain denied until #40. The only exception is Officer **delete**
+permission on the exact `python`, `java`, and `cpp` Solution documents, needed
+for atomic Problem/Session cleanup. Other Solution IDs and all other paths are
+denied by default.
 No public Session reads or publication policy are introduced.
 
 Deploy these rules to the intended Firebase project **before using Session CRUD**:
@@ -140,5 +150,47 @@ current Auth guards, and UI persistence failures/retry/confirmation. Rules emula
 validation has not run: this development machine has no Java runtime or existing
 Rules test infrastructure. Before deploying, validate with the Firestore Emulator
 or Firebase Rules Playground: officer Session CRUD allowed; signed-out and
-anonymous-auth Session reads/writes denied; nested Problem/Solution reads/writes
-denied. #46 owns comprehensive permission test coverage.
+anonymous-auth Session reads/writes denied; Officer Problem CRUD allowed; Officer
+deletes on the three fixed Solution paths allowed (including missing documents);
+all Solution reads/creates/updates and other-language deletes denied; signed-out
+and anonymous-auth Problem and Solution reads/writes denied. #46 owns comprehensive
+permission test coverage.
+
+## Officer Problem preparation (#39)
+
+`src/lib/firebase/problems.ts` provides `createProblem`, `listProblems`,
+`updateProblem`, `reorderProblems`, and `deleteProblem`. Every operation checks
+the current non-anonymous Officer Auth session before accessing Firestore.
+Creation reads the current order from the server and writes only `Untitled Problem`,
+empty description/examples, the next order, and `answersVisible: false`.
+No Solution documents or Solution fields are created in Problem metadata.
+Server reads validate the existing `Problem` model and reject pending writes.
+Content updates write only title, description, example input and example output;
+reordering checks the current complete ID list and writes dense orders in one batch.
+Problem deletion commits the three known Solution deletes and metadata delete
+in one atomic batch, without reading protected source or output.
+
+From a selected Session, **Manage problems** opens the preparation workspace.
+Problem tabs use local Officer selection and never mutate `Session.activeProblemId`
+or reveal state. Arrow keys/Home/End move focus, and Enter/Space activate tabs.
+A compact contextual action group supports Rename, Delete and Move earlier/later;
+Move actions replace drag infrastructure with a keyboard-accessible interaction.
+Deletion uses a named confirmation with Cancel, keyboard dismissal, and focus
+restoration to a remaining tab or Add problem. Empty Sessions show the Add first
+problem state; loading and read failure remain distinct.
+
+Problem content commits on blur with unsaved, saving, confirmed saved and retryable
+failure states. Failed edits remain visible; navigation, creation, ordering and
+deletion are blocked until content is saved. The Session workspace cannot close
+while a child write/edit is pending. Creation uses the backend-confirmed record
+directly rather than retrying a successful write after a failed refresh.
+Operation errors offer a list reload, including when a remote list change prevents
+reordering. Firestore is authoritative; no localStorage or member/public fetching
+is added. There is no constraints field in the persisted model.
+
+Unit tests mock Firebase, cover CRUD, ordering, fixed cleanup/cascade, authentication,
+selection, save failures and loading/error/empty states, and require no production
+project. **Rules emulator validation has not run:** `java -version` reports that no
+Java Runtime is installed. Mocked tests are not a substitute for deployed Rules
+validation; run the permission cases above in the Firestore Emulator or Rules
+Playground before deployment. No rules were deployed by this change.

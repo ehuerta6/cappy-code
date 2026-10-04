@@ -3,12 +3,12 @@ import 'client-only';
 import {
   addDoc,
   collection,
-  deleteDoc,
   doc,
   getDocsFromServer,
   serverTimestamp,
   Timestamp,
   updateDoc,
+  writeBatch,
 } from 'firebase/firestore';
 import type { Session } from '../domain';
 import {
@@ -18,6 +18,7 @@ import {
 import { getOfficerAuth } from './auth';
 import { getFirestoreDb } from './client';
 import { sessionPath } from './paths';
+import { appendProblemDeletion } from './problems';
 
 export interface SessionRecord {
   id: string;
@@ -104,7 +105,17 @@ export async function updateSession(
   });
 }
 
-// Firestore does not recursively delete subcollections; #39 must revisit this policy.
 export async function deleteSession(id: string): Promise<void> {
-  await deleteDoc(doc(officerDb(), sessionPath(id)));
+  const db = officerDb();
+  const problems = await getDocsFromServer(
+    collection(db, `${sessionPath(id)}/problems`),
+  );
+  // Keep the entire cascade atomic within Firestore's 500-write batch limit.
+  if (problems.docs.length * 4 + 1 > 500)
+    throw new Error('Too many problems to delete this session in one batch.');
+  const batch = writeBatch(db);
+  for (const problem of problems.docs)
+    appendProblemDeletion(batch, db, id, problem.id);
+  batch.delete(doc(db, sessionPath(id)));
+  await batch.commit();
 }

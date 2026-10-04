@@ -1,0 +1,289 @@
+// @vitest-environment jsdom
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+const api = vi.hoisted(() => ({
+  createProblem: vi.fn(),
+  listProblems: vi.fn(),
+  updateProblem: vi.fn(),
+  reorderProblems: vi.fn(),
+  deleteProblem: vi.fn(),
+}));
+vi.mock('@/lib/firebase/problems', async (original) => ({
+  ...(await original<typeof import('@/lib/firebase/problems')>()),
+  ...api,
+}));
+vi.mock('client-only', () => ({}));
+import OfficerProblems from './officer-problems';
+const first = {
+  id: 'first',
+  problem: {
+    title: 'Two Sum',
+    description: 'Find pair',
+    exampleInput: '1 2',
+    exampleOutput: '3',
+    order: 0,
+    answersVisible: false,
+  },
+};
+const second = {
+  id: 'second',
+  problem: {
+    ...first.problem,
+    title: 'Anagram',
+    description: 'Compare letters',
+    order: 1,
+  },
+};
+const onBusyChange = vi.fn();
+function start() {
+  render(<OfficerProblems sessionId="session" onBusyChange={onBusyChange} />);
+}
+beforeEach(() => {
+  vi.resetAllMocks();
+  api.listProblems.mockResolvedValue([first, second]);
+  api.createProblem.mockResolvedValue({
+    id: 'new',
+    problem: {
+      ...first.problem,
+      title: 'Untitled Problem',
+      description: '',
+      exampleInput: '',
+      exampleOutput: '',
+      order: 2,
+    },
+  });
+  api.updateProblem.mockResolvedValue(undefined);
+  api.reorderProblems.mockResolvedValue(undefined);
+  api.deleteProblem.mockResolvedValue(undefined);
+});
+afterEach(() => cleanup());
+async function loaded() {
+  start();
+  await screen.findByRole('tab', { name: 'Two Sum' });
+}
+function actions() {
+  fireEvent.click(screen.getByRole('button', { name: 'Problem actions' }));
+}
+describe('Officer Problem workspace', () => {
+  it('distinguishes loading, failed reads with retry and empty state', async () => {
+    api.listProblems
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockResolvedValueOnce([]);
+    start();
+    expect(screen.getByRole('status').textContent).toBe('Loading problems…');
+    await screen.findByRole('alert');
+    expect(screen.queryByText('No problems yet')).toBeNull();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Retry loading problems' }),
+    );
+    expect(await screen.findByText('No problems yet')).toBeTruthy();
+    expect(
+      screen.getByText('Add the first problem to this session.'),
+    ).toBeTruthy();
+  });
+  it('selects Problems by click and keyboard without writing presenter state', async () => {
+    await loaded();
+    const firstTab = screen.getByRole('tab', { name: 'Two Sum' });
+    const secondTab = screen.getByRole('tab', { name: 'Anagram' });
+    expect(firstTab.getAttribute('aria-selected')).toBe('true');
+    fireEvent.keyDown(firstTab, { key: 'ArrowRight' });
+    expect(document.activeElement).toBe(secondTab);
+    expect(firstTab.getAttribute('aria-selected')).toBe('true');
+    fireEvent.click(secondTab);
+    expect(secondTab.getAttribute('aria-selected')).toBe('true');
+    expect(
+      (screen.getByLabelText('Description') as HTMLTextAreaElement).value,
+    ).toBe('Compare letters');
+    fireEvent.keyDown(secondTab, { key: 'Home' });
+    expect(document.activeElement).toBe(firstTab);
+    fireEvent.keyDown(firstTab, { key: 'End' });
+    expect(document.activeElement).toBe(secondTab);
+    expect(api.updateProblem).not.toHaveBeenCalled();
+  });
+  it('creates and selects confirmed metadata while creation is visibly pending', async () => {
+    let resolve!: (record: typeof first) => void;
+    api.createProblem.mockReturnValue(
+      new Promise((done) => {
+        resolve = done;
+      }),
+    );
+    await loaded();
+    fireEvent.click(screen.getByRole('button', { name: 'Add problem' }));
+    expect(screen.getByText('Creating problem…')).toBeTruthy();
+    expect(screen.queryByRole('tab', { name: 'Untitled Problem' })).toBeNull();
+    resolve({
+      ...first,
+      id: 'new',
+      problem: { ...first.problem, title: 'Untitled Problem' },
+    });
+    expect(
+      (
+        await screen.findByRole('tab', { name: 'Untitled Problem' })
+      ).getAttribute('aria-selected'),
+    ).toBe('true');
+    expect(api.createProblem).toHaveBeenCalledWith('session');
+    expect(api.listProblems).toHaveBeenCalledTimes(1);
+  });
+  it('keeps failed creation empty with a recoverable error', async () => {
+    api.listProblems.mockResolvedValue([]);
+    api.createProblem.mockRejectedValue(new Error('offline'));
+    start();
+    await screen.findByText('No problems yet');
+    fireEvent.click(screen.getByRole('button', { name: '+ Add problem' }));
+    expect((await screen.findByRole('alert')).textContent).toContain(
+      'Creating problem failed',
+    );
+    expect(screen.queryAllByRole('tab')).toHaveLength(0);
+  });
+  it('saves all content on blur only after confirmation, preserving failure edits and retry', async () => {
+    api.updateProblem.mockRejectedValueOnce(new Error('offline'));
+    await loaded();
+    const description = screen.getByLabelText(
+      'Description',
+    ) as HTMLTextAreaElement;
+    fireEvent.change(description, { target: { value: 'New statement' } });
+    expect(api.updateProblem).not.toHaveBeenCalled();
+    expect(
+      (screen.getByRole('tab', { name: 'Anagram' }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
+    fireEvent.blur(description);
+    await screen.findByRole('alert');
+    expect(description.value).toBe('New statement');
+    expect(onBusyChange).toHaveBeenLastCalledWith(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Retry problem save' }));
+    await screen.findByText('Problem saved ✓');
+    expect(api.updateProblem).toHaveBeenLastCalledWith('session', 'first', {
+      title: 'Two Sum',
+      description: 'New statement',
+      exampleInput: '1 2',
+      exampleOutput: '3',
+    });
+    expect(onBusyChange).toHaveBeenLastCalledWith(false);
+    for (const [label, value] of [
+      ['Problem title', 'Renamed'],
+      ['Example input', '4 5'],
+      ['Example output', '9'],
+    ]) {
+      fireEvent.change(screen.getByLabelText(label), { target: { value } });
+      fireEvent.blur(screen.getByLabelText(label));
+      await waitFor(() =>
+        expect(api.updateProblem).toHaveBeenLastCalledWith(
+          'session',
+          'first',
+          expect.objectContaining({
+            [label === 'Problem title'
+              ? 'title'
+              : label === 'Example input'
+                ? 'exampleInput'
+                : 'exampleOutput']: value,
+          }),
+        ),
+      );
+      await screen.findByText('Problem saved ✓');
+    }
+    expect(screen.getByRole('tab', { name: 'Renamed' })).toBeTruthy();
+  });
+  it('does not display saved before the backend confirms and blocks navigation', async () => {
+    let resolve!: () => void;
+    api.updateProblem.mockReturnValue(
+      new Promise<void>((done) => {
+        resolve = done;
+      }),
+    );
+    await loaded();
+    fireEvent.change(screen.getByLabelText('Problem title'), {
+      target: { value: 'New title' },
+    });
+    fireEvent.blur(screen.getByLabelText('Problem title'));
+    expect(screen.getByText('Saving problem…')).toBeTruthy();
+    expect(
+      (
+        screen.getByRole('button', {
+          name: 'Problem actions',
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(true);
+    resolve();
+    expect(await screen.findByText('Problem saved ✓')).toBeTruthy();
+  });
+  it('clears a failed-save state when edits return to persisted content', async () => {
+    api.updateProblem.mockRejectedValue(new Error('offline'));
+    await loaded();
+    const title = screen.getByLabelText('Problem title');
+    fireEvent.change(title, { target: { value: 'Unsaved' } });
+    fireEvent.blur(title);
+    await screen.findByRole('alert');
+    fireEvent.change(title, { target: { value: 'Two Sum' } });
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.getByText('Problem saved ✓')).toBeTruthy();
+  });
+  it('uses compact actions to rename, reorder after confirmation and recover from reorder failure', async () => {
+    await loaded();
+    expect(screen.queryByRole('button', { name: 'Rename' })).toBeNull();
+    actions();
+    fireEvent.click(screen.getByRole('button', { name: 'Rename' }));
+    expect(document.activeElement).toBe(screen.getByLabelText('Problem title'));
+    actions();
+    fireEvent.click(screen.getByRole('button', { name: 'Move later' }));
+    await waitFor(() =>
+      expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
+        'Anagram',
+        'Two Sum',
+      ]),
+    );
+    expect(api.reorderProblems).toHaveBeenCalledWith('session', [
+      'second',
+      'first',
+    ]);
+    api.reorderProblems.mockRejectedValue(new Error('offline'));
+    actions();
+    fireEvent.click(screen.getByRole('button', { name: 'Move earlier' }));
+    await screen.findByRole('alert');
+    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
+      'Anagram',
+      'Two Sum',
+    ]);
+    fireEvent.click(screen.getByRole('button', { name: 'Reload problems' }));
+    await waitFor(() => expect(api.listProblems).toHaveBeenCalledTimes(2));
+  });
+  it('requires named delete confirmation, restores focus, retains failed deletion and deletes final problem to empty', async () => {
+    api.listProblems.mockResolvedValue([first]);
+    api.deleteProblem.mockRejectedValueOnce(new Error('offline'));
+    await loaded();
+    actions();
+    fireEvent.click(screen.getByRole('button', { name: 'Delete problem' }));
+    const confirmation = screen.getByRole('group', {
+      name: 'Confirm problem deletion',
+    });
+    expect(confirmation.textContent).toContain('Two Sum');
+    expect(document.activeElement).toBe(
+      within(confirmation).getByRole('button', { name: 'Cancel' }),
+    );
+    expect(api.deleteProblem).not.toHaveBeenCalled();
+    fireEvent.keyDown(confirmation, { key: 'Escape' });
+    expect(screen.queryByRole('group')).toBeNull();
+    expect(document.activeElement).toBe(
+      screen.getByRole('button', { name: 'Problem actions' }),
+    );
+    actions();
+    fireEvent.click(screen.getByRole('button', { name: 'Delete problem' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Confirm delete problem' }),
+    );
+    await screen.findByRole('alert');
+    expect(screen.getByRole('tab', { name: 'Two Sum' })).toBeTruthy();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Confirm delete problem' }),
+    );
+    expect(await screen.findByText('No problems yet')).toBeTruthy();
+    expect(api.deleteProblem).toHaveBeenLastCalledWith('session', 'first');
+  });
+});
