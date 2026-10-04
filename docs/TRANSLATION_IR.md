@@ -20,4 +20,4 @@ The IR records structure and declared or inferred neutral types, not source form
 
 ## Parser and emitter contracts
 
-Each parser identifies its source language and returns either a `Program` or diagnostics. A parser should reject unsupported constructs with useful locations when available, rather than silently inventing IR. Each emitter identifies its target language and accepts a `Program`, returning emitted code. Both contracts use the same neutral `SourceLanguage` tag for routing; that tag selects an implementation and is not embedded in the program IR.
+Each parser identifies its source language and returns either a `Program` or diagnostics. A parser should reject unsupported constructs with useful locations when available, rather than silently inventing IR. Each emitter identifies its target language and accepts a `Program`, returning emitted code. Both contracts use the same `SupportedLanguage` tag for routing; that tag selects an implementation and is not embedded in the program IR.

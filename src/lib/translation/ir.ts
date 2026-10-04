@@ -1,7 +1,3 @@
-/** Neutral source-language tags used by the parser and emitter contracts. */
-export type SourceLanguage = 'python' | 'java' | 'cpp';
-
-/** Types shared by the documented interview-code subset. */
 export type CappyType =
   | { kind: 'integer' }
   | { kind: 'boolean' }
@@ -70,7 +66,6 @@ export interface IfStatement {
   elseBody?: Statement[];
 }
 
-/** Iterates over each element of a collection. */
 export interface ForEachStatement {
   kind: 'forEach';
   variable: Parameter;
@@ -78,7 +73,6 @@ export interface ForEachStatement {
   body: Statement[];
 }
 
-/** A counted loop with explicit initialization, condition, and update steps. */
 export interface ForStatement {
   kind: 'for';
   initializer?: Statement;
@@ -196,7 +190,6 @@ export interface IndexExpression {
   index: Expression;
 }
 
-/** Common collection behavior without source-language method names. */
 export interface CollectionOperationExpression {
   kind: 'collectionOperation';
   operation: 'length' | 'contains' | 'add' | 'remove' | 'append' | 'get';

@@ -1,4 +1,6 @@
-import type { Program, SourceLanguage } from './ir';
+import type { Program } from './ir';
+
+export type SupportedLanguage = 'python' | 'java' | 'cpp';
 
 export interface SourceLocation {
   line: number;
@@ -14,9 +16,8 @@ export type ParseResult =
   | { ok: true; program: Program }
   | { ok: false; diagnostics: ParseDiagnostic[] };
 
-/** A source-language parser converts supported input into language-neutral IR. */
 export interface CappyParser {
-  readonly language: SourceLanguage;
+  readonly language: SupportedLanguage;
   parse(source: string): ParseResult;
 }
 
@@ -24,8 +25,7 @@ export interface EmitResult {
   code: string;
 }
 
-/** A target-language emitter produces code from IR without parsing source text. */
 export interface CappyEmitter {
-  readonly language: SourceLanguage;
+  readonly language: SupportedLanguage;
   emit(program: Program): EmitResult;
 }
