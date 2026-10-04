@@ -14,27 +14,27 @@ CIC Intro officers are the authenticated content managers and presenters. Fireba
 
 ### Members
 
-Members are anonymous public viewers. They do not create accounts or authenticate. Member Mode provides read-only access to public problem metadata for a live session and to solution documents only when the officer has revealed the answers under the configured Firestore Security Rules.
+Members are anonymous viewers. They do not create accounts or authenticate. Member Mode provides read-only access only to sessions whose status and publication rules permit member access, such as an eligible `live` session or a published `ended` session. A `draft` session is officer-only. Problem descriptions and examples are safe member-facing metadata for an eligible session, but they are not always publicly readable. Solution documents are readable only when their problem's `answersVisible` is true and the session permits member access under Firestore Security Rules.
 
 ## Persistence and architecture
 
 Firestore is the canonical persistence layer. It stores session content, session history, prepared solutions, and presentation state. Firebase Authentication protects Officer Mode; public membership does not depend on authentication.
 
-Keep public problem metadata separate from solution documents. Public metadata includes the problem title, description, examples, and order. Protected solution documents include manually prepared Python, Java, and C++ source and prepared static output for each language. Separation lets Firestore Security Rules enforce answer access independently of what the UI renders.
+Keep problem metadata separate from solution documents. Metadata includes the problem title, description, examples, order, and `answersVisible`. These fields are member-readable only when the session's status/publication rules permit access; a draft's metadata remains officer-only. Protected solution documents include manually prepared Python, Java, and C++ source and prepared static output for each language. Separation lets Firestore Security Rules enforce answer access independently of what the UI renders.
 
-Firestore Security Rules are the actual hidden-answer permission boundary. A hidden answer must not be readable by an anonymous member client. The rules permit intended member reads after the officer reveals answers, and restrict session and problem management to authenticated officers. UI state such as **Hide Answers** is not a substitute for these rules.
+Firestore Security Rules are the actual hidden-answer permission boundary. A hidden answer must not be readable by an anonymous member client. Solution-document reads require the parent problem's `answersVisible` to be true and the session to permit member access. Rules also restrict session and problem management to authenticated officers. UI state such as **Hide Answers** is not a substitute for these rules.
 
 ## Session model and presentation behavior
 
 Sessions have three states:
 
-- `draft` — officers prepare and order session problems and their content.
-- `live` — members can open the public presentation view; the officer controls the active problem and answer reveal.
-- `ended` — the live presentation is over and the session remains in session history.
+- `draft` — officers prepare and order session problems and their content; members cannot read the session or its problem metadata.
+- `live` — member access is allowed by publication rules; the officer controls the active problem and each problem's answer visibility.
+- `ended` — the live presentation is over and the session remains in officer session history; member reads are allowed only if the session is published under the publication rules.
 
-A session contains multiple ordered problems. Each problem has a description and examples, plus separately stored solution content. The session-level `activeProblemId` identifies the problem currently selected by the officer. Members can enable **Follow Presenter** to move to the officer's active problem as presentation state changes.
+A session contains multiple ordered problems. Each problem has a description and examples, its own `answersVisible` field, and separately stored solution content. The session-level `activeProblemId` identifies the problem currently selected by the officer. Members can enable **Follow Presenter** to move to the officer's active problem as presentation state changes.
 
-The officer dashboard provides session creation and management, access to session history, and controls for starting, presenting, and ending sessions. **Show Answers** and **Hide Answers** control the presentation and the answer access policy. Realtime Firestore updates synchronize the active problem and reveal state with member views.
+The officer dashboard provides session creation and management, access to session history, and controls for starting, presenting, and ending sessions. **Show Answers** and **Hide Answers** update `answersVisible` on the selected problem. Realtime Firestore updates synchronize session `activeProblemId` and each problem's reveal state with eligible member views.
 
 ## Editors and presentation UI
 
