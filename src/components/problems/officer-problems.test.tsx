@@ -18,6 +18,10 @@ const api = vi.hoisted(() => ({
   getSolutionsForProblem: vi.fn(),
   updateSolution: vi.fn(),
 }));
+const presentation = vi.hoisted(() => ({
+  setActiveProblem: vi.fn(),
+  useActiveProblemId: vi.fn(),
+}));
 vi.mock('@/lib/firebase/problems', async (original) => ({
   ...(await original<typeof import('@/lib/firebase/problems')>()),
   ...api,
@@ -26,6 +30,12 @@ vi.mock('client-only', () => ({}));
 vi.mock('@/lib/firebase/solutions', () => ({
   getSolutionsForProblem: api.getSolutionsForProblem,
   updateSolution: api.updateSolution,
+}));
+vi.mock('@/lib/firebase/presentation', () => ({
+  setActiveProblem: presentation.setActiveProblem,
+}));
+vi.mock('@/hooks/use-presentation-state', () => ({
+  useActiveProblemId: presentation.useActiveProblemId,
 }));
 vi.mock('@monaco-editor/react', () => ({
   default: ({
@@ -71,10 +81,11 @@ const second = {
 };
 const onBusyChange = vi.fn();
 const onProblemCountChange = vi.fn();
-function start() {
+function start(sessionStatus: 'draft' | 'live' | 'ended' = 'draft') {
   render(
     <OfficerProblems
       sessionId="session"
+      sessionStatus={sessionStatus}
       onBusyChange={onBusyChange}
       onProblemCountChange={onProblemCountChange}
     />,
@@ -109,6 +120,11 @@ beforeEach(() => {
     cpp: { code: 'cpp source', output: '' },
   });
   api.updateSolution.mockResolvedValue(undefined);
+  presentation.setActiveProblem.mockResolvedValue(undefined);
+  presentation.useActiveProblemId.mockReturnValue({
+    status: 'ready',
+    value: null,
+  });
 });
 afterEach(() => {
   cleanup();
@@ -156,6 +172,35 @@ describe('Officer Problem workspace', () => {
     fireEvent.keyDown(firstTab, { key: 'End' });
     expect(document.activeElement).toBe(secondTab);
     expect(api.updateProblem).not.toHaveBeenCalled();
+    expect(presentation.setActiveProblem).not.toHaveBeenCalled();
+  });
+  it('persists the active Problem only through its explicit live control', async () => {
+    start('live');
+    const secondTab = await screen.findByRole('tab', { name: 'Anagram' });
+    fireEvent.click(secondTab);
+    expect(presentation.setActiveProblem).not.toHaveBeenCalled();
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Present this problem' }),
+    );
+    await waitFor(() =>
+      expect(presentation.setActiveProblem).toHaveBeenCalledExactlyOnceWith(
+        'session',
+        'second',
+      ),
+    );
+  });
+  it('does not show presenter controls for draft or ended Sessions', async () => {
+    await loaded();
+    expect(
+      screen.queryByRole('button', { name: /Present this problem/ }),
+    ).toBeNull();
+    cleanup();
+    start('ended');
+    await screen.findByRole('tab', { name: 'Two Sum' });
+    expect(
+      screen.queryByRole('button', { name: /Present this problem/ }),
+    ).toBeNull();
   });
   it('reveals answers only after confirmation and hides only the selected problem', async () => {
     await loaded();

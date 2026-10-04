@@ -15,6 +15,23 @@ import {
   type PublicSessionSummary,
 } from './public-session-ui';
 
+const presentation = vi.hoisted(() => ({
+  activeProblemId: null as string | null,
+  answersVisible: false,
+}));
+
+vi.mock('@/hooks/use-presentation-state', async (original) => ({
+  ...(await original<typeof import('@/hooks/use-presentation-state')>()),
+  useActiveProblemId: () => ({
+    status: 'ready',
+    value: presentation.activeProblemId,
+  }),
+  useAnswersVisible: () => ({
+    status: 'ready',
+    value: presentation.answersVisible,
+  }),
+}));
+
 vi.mock('next/link', () => ({
   default: ({ href, children, ...props }: React.ComponentProps<'a'>) => (
     <a href={href as string} {...props}>
@@ -39,6 +56,8 @@ vi.mock('@monaco-editor/react', () => ({
 }));
 
 beforeEach(() => {
+  presentation.activeProblemId = null;
+  presentation.answersVisible = false;
   vi.stubGlobal('matchMedia', () => ({
     matches: false,
     addEventListener: vi.fn(),
@@ -179,6 +198,7 @@ describe('public member UI scaffold', () => {
   });
 
   it('loads revealed solutions into the existing read-only workspace', async () => {
+    presentation.answersVisible = true;
     const load = vi.fn().mockResolvedValue(solutions);
     render(
       <PublicSessionView
@@ -203,6 +223,7 @@ describe('public member UI scaffold', () => {
   });
 
   it('handles a permission race safely and retries without exposing error details', async () => {
+    presentation.answersVisible = true;
     const load = vi
       .fn()
       .mockRejectedValueOnce(new Error('permission-denied raw detail'));

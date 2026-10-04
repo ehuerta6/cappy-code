@@ -8,8 +8,23 @@ const api = vi.hoisted(() => ({
   listMemberProblems: vi.fn(),
   getRevealedMemberSolutions: vi.fn(),
 }));
+const realtime = vi.hoisted(() => ({
+  activeProblemId: null as string | null,
+  answersVisible: false,
+}));
 
 vi.mock('@/lib/firebase/member', () => api);
+vi.mock('@/hooks/use-presentation-state', async (original) => ({
+  ...(await original<typeof import('@/hooks/use-presentation-state')>()),
+  useActiveProblemId: () => ({
+    status: 'ready',
+    value: realtime.activeProblemId,
+  }),
+  useAnswersVisible: () => ({
+    status: 'ready',
+    value: realtime.answersVisible,
+  }),
+}));
 vi.mock('next/link', () => ({
   default: ({ href, children, ...props }: React.ComponentProps<'a'>) => (
     <a href={href as string} {...props}>
@@ -62,6 +77,8 @@ const solutions = {
 };
 
 beforeEach(() => {
+  realtime.activeProblemId = null;
+  realtime.answersVisible = false;
   vi.stubGlobal('matchMedia', () => ({
     matches: false,
     addEventListener: vi.fn(),
@@ -95,6 +112,7 @@ describe('public member page integration', () => {
   });
 
   it('requests revealed Solutions and renders all three editors read-only', async () => {
+    realtime.answersVisible = true;
     api.listMemberProblems.mockResolvedValueOnce([
       { ...problem, problem: { ...problem.problem, answersVisible: true } },
     ]);

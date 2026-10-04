@@ -282,10 +282,13 @@ placeholder text.
 ### Problem management
 
 Use `Contains Duplicate | Valid Anagram | Two Sum | +` with a labeled Add Problem
-button. Click selects; officer selection during a live Session sets `activeProblemId`.
-Drag reorders; a keyboard-accessible contextual menu offers Rename, Delete, and
-Move earlier/later. Do not place permanent management buttons on every tab.
-Rename uses a compact inline input; `+` creates/selects a new Problem directly.
+button. Click selects a Problem locally for preparation. During a live Session,
+provide a separate contextual **Present this problem** action that persists
+`activeProblemId`; changing the preparation selection alone does not move the
+presenter pointer. Drag reorders; a keyboard-accessible contextual menu offers
+Rename, Delete, and Move earlier/later. Do not place permanent management
+buttons on every tab. Rename uses a compact inline input; `+` creates/selects a
+new Problem directly.
 
 Deletion uses a compact confirmation popover naming the Problem and consequences,
 with Cancel and Delete. Dangerous live actions, especially deleting the active
