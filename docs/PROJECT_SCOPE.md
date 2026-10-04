@@ -1,95 +1,61 @@
 # Project Scope
 
-This document defines what CappyCode is intended to be, and what it is not intended to become during its initial development.
+## Product definition
 
-## Product Goal
+CappyCode is **a live solution showcase platform for CIC Intro sessions**. CIC officers prepare interview-style problems and their solutions ahead of time, then present them to members during a session. Members join through an anonymous, read-only public view.
 
-CappyCode is an officer-focused CIC Intro solution showcase. During a session, an officer presents one interview-style solution in Python, Java, and C++ side by side so students can compare the languages while following along on a projected screen.
+CappyCode is not an IDE, code translator, transpiler, AI product, online judge, or code-execution tool. All presented source and output are prepared and stored by an officer; the runtime displays that content without generating or executing it.
 
-The showcase should help students recognize that the same algorithm can have different syntax, type declarations, standard-library APIs, and data-structure names depending on the language. Students are the audience viewing the presentation; CIC Intro officers are the primary users operating the app.
+## Users and access
 
-## Core Use Case
+### Officers
 
-Near the end of a session, an officer selects a problem tab, reviews or enters code in the Python, Java, and C++ Monaco editors, and selects one source language. The officer chooses when the solution is ready and clicks **Translate**.
+CIC Intro officers are the authenticated content managers and presenters. Firebase Authentication is used only for Officer Mode. The proof of concept has one shared CIC officer account. Officers can create and manage sessions, add and order problems, prepare solution content, and control live presentation state.
 
-The app sends the selected source language and its code to `POST /api/translate`. A server-side coding model returns structured code for Python, Java, and C++, plus concise explanations in a **“What changed?”** section. The response should help officers present language differences while preserving the intended algorithm and behavior.
+### Members
 
-Translations are explicit and manual. Editing code, switching tabs, or pausing after typing does not run a translation. There is no automatic or debounced translation requirement.
+Members are anonymous viewers. They do not create accounts or authenticate. Member Mode provides read-only access only to sessions whose status and publication rules permit member access, such as an eligible `live` session or a published `ended` session. A `draft` session is officer-only. Problem descriptions and examples are safe member-facing metadata for an eligible session, but they are not always publicly readable. Solution documents are readable only when their problem's `answersVisible` is true and the session permits member access under Firestore Security Rules.
 
-## Supported Languages and Editors
+## Persistence and architecture
 
-The showcase presents these three languages together:
+Firestore is the canonical persistence layer. It stores session content, session history, prepared solutions, and presentation state. Firebase Authentication protects Officer Mode; public membership does not depend on authentication.
 
-- Python
-- Java
-- C++
+Keep problem metadata separate from solution documents. Metadata includes the problem title, description, examples, order, and `answersVisible`. These fields are member-readable only when the session's status/publication rules permit access; a draft's metadata remains officer-only. Protected solution documents include manually prepared Python, Java, and C++ source and prepared static output for each language. Separation lets Firestore Security Rules enforce answer access independently of what the UI renders.
 
-Use a Monaco editor for each language in the side-by-side presentation. The officer selects exactly one of the three languages as the source for each translation request. The other language panes provide the translated comparison.
+Firestore Security Rules are the actual hidden-answer permission boundary. A hidden answer must not be readable by an anonymous member client. Solution-document reads require the parent problem's `answersVisible` to be true and the session to permit member access. Rules also restrict session and problem management to authenticated officers. UI state such as **Hide Answers** is not a substitute for these rules.
 
-## Translation Architecture
+## Session model and presentation behavior
 
-The browser sends the selected source language and source code to the application endpoint at `POST /api/translate`. The endpoint calls a server-side coding model and returns structured translations and “What changed?” explanations.
+Sessions have three states:
 
-The product is not tied to a particular model provider. Provider choice and credentials belong to server-side configuration. Credentials must never be sent to or embedded in browser code.
+- `draft` — officers prepare and order session problems and their content; members cannot read the session or its problem metadata.
+- `live` — member access is allowed by publication rules; the officer controls the active problem and each problem's answer visibility.
+- `ended` — the live presentation is over and the session remains in officer session history; member reads are allowed only if the session is published under the publication rules.
 
-The model response should preserve the intended algorithm, expected behavior, and complexity when possible. Translated code should be idiomatic enough to compare and teach, rather than a mechanical line-by-line rewrite. Explanations should be concise, relevant to the presented solution, and understandable to CIC Intro students.
+A session contains multiple ordered problems. Each problem has a description and examples, its own `answersVisible` field, and separately stored solution content. The session-level `activeProblemId` identifies the problem currently selected by the officer. Members can enable **Follow Presenter** to move to the officer's active problem as presentation state changes.
 
-## Problem Tabs and Session Persistence
+The officer dashboard provides session creation and management, access to session history, and controls for starting, presenting, and ending sessions. **Show Answers** and **Hide Answers** update `answersVisible` on the selected problem. Realtime Firestore updates synchronize session `activeProblemId` and each problem's reveal state with eligible member views.
 
-The interface includes problem tabs so an officer can move among prepared interview-style examples during a session.
+## Editors and presentation UI
 
-The proof of concept may optionally persist the current showcase session in browser `localStorage`. This persistence is local to that browser and device. It does not require account-based saved solutions or a server database.
+Show Python, Java, and C++ solutions together. There is no source-language selector and no translation flow. Monaco editors are editable in Officer Mode for preparing solutions, and read-only in Member Mode. Display each language's prepared static output alongside its source where appropriate.
 
-## Problem Areas
+The interface is presentation-focused: responsive, readable at a distance, and clear on the projected screen used during a CIC Intro session. Preserve a layout that keeps the problem and the three language panels easy to compare.
 
-Prioritize introductory and intermediate interview topics:
+## Content scope
 
-- arrays and strings;
-- hash maps and sets;
-- stacks and queues;
-- linked lists;
-- two pointers;
-- sliding window;
-- binary search;
-- trees and graph traversal;
-- recursion;
-- introductory dynamic programming.
+Officers prepare common interview-style problems and solutions, including topics such as arrays and strings, hash maps and sets, stacks and queues, linked lists, two pointers, sliding window, binary search, trees, graph traversal, recursion, and introductory dynamic programming. The app stores and displays prepared content; it does not assess whether a solution is correct.
 
-CappyCode is scoped to interview-style examples used for CIC Intro instruction. It is not intended to translate arbitrary Python, Java, or C++ applications.
+## Out of scope
 
-## Initial User Experience
+- Accounts, profiles, or authentication for public members.
+- Multiple officer accounts or granular officer roles in the proof of concept; it uses one shared officer account.
+- Runtime AI or LLM features, prompt engineering, coding model providers, model API keys, or generated explanations.
+- Automatic or manual code translation, source-language selection, parsers, Tree-sitter, AST translation, intermediate representations, emitters, or transpilers.
+- Code execution, compilers, interpreters, online judging, test runners, or sandboxing.
+- Browser `localStorage` as canonical persistence; Firestore is the source of truth.
+- Unrelated general-purpose IDE capabilities or arbitrary application translation.
 
-The initial showcase should provide:
+## Product principle
 
-- tabs for selecting a prepared problem;
-- three side-by-side Monaco editors for Python, Java, and C++;
-- a source-language selector with one selected language;
-- an explicit **Translate** action;
-- a clear translating/loading state and useful error state;
-- structured translations and a **“What changed?”** explanation area;
-- optional browser-local session persistence.
-
-Translation should only begin after the officer explicitly requests it.
-
-## Non-Goals
-
-The initial project does not need:
-
-- user accounts, authentication, or profiles;
-- a database or server-side session storage;
-- leaderboards or social features;
-- full LeetCode problem hosting;
-- code submissions or online judging;
-- production application, framework, or package translation;
-- arbitrary multi-file project translation;
-- languages beyond Python, Java, and C++;
-- automatic or debounced translation while typing;
-- an AI chatbot or advanced debugging assistant.
-
-## Product Principle
-
-Use this question to evaluate additions:
-
-> Does this help a CIC Intro officer present the same interview solution across Python, Java, and C++ so students can understand it?
-
-If not, the feature is probably outside the current scope.
+New work should help CIC Intro officers present prepared solutions clearly and help members follow the live session safely and readably.

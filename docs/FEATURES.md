@@ -1,86 +1,77 @@
 # Feature Tracker
 
-This file tracks the product implementation at a high level. It reflects the intended officer-focused CIC Intro solution showcase.
+This checklist tracks the product implementation for CappyCode, **a live solution showcase platform for CIC Intro sessions**. It describes the intended product scope; checked items indicate repository documentation or project foundations, not necessarily a completed end-to-end product.
 
-## Showcase Experience
+## Foundation
 
-- [ ] Add prepared problem tabs
-- [ ] Add Python, Java, and C++ Monaco editors side by side
-- [ ] Add one source-language selector for each translation
-- [ ] Keep all three language panes available for comparison
-- [ ] Add a clear/reset action for the active problem
-- [ ] Add a presentation-friendly responsive layout
+- [x] Add project README, scope, feature tracker, Git conventions, and AI development guidelines
+- [x] Establish the Next.js application, linting, type checking, formatting, and build commands
+- [ ] Document local setup and environment configuration
+- [ ] Add CI checks for the repository's lint, typecheck, test, format, and build commands
 
-## Translation
+## Authentication and access
 
-- [ ] Add an explicit Translate action
-- [ ] Send the selected source language and source code to `POST /api/translate`
-- [ ] Call a coding model from the server-side endpoint
-- [ ] Keep model credentials in server-side configuration
-- [ ] Return structured Python, Java, and C++ translations
-- [ ] Return concise “What changed?” explanations
-- [ ] Preserve the intended algorithm and behavior when possible
-- [ ] Show a translation loading state
-- [ ] Handle invalid input, model errors, and incomplete code with useful messages
-- [ ] Avoid starting translation on edits, tab changes, or typing pauses
+- [ ] Add Firebase Authentication for Officer Mode
+- [ ] Configure one shared CIC officer account for the proof of concept
+- [ ] Allow anonymous access to the public Member Mode
+- [ ] Restrict session and problem management to authenticated officers with Firestore Security Rules
+- [ ] Enforce Firestore Security Rules so draft session/problem metadata is officer-only and member reads follow session publication rules
+- [ ] Require the parent problem's `answersVisible` to permit anonymous reads of its solution documents
 
-## Session Persistence and Privacy
+## Firestore data and session lifecycle
 
-- [ ] Optionally persist the current session in browser `localStorage`
-- [ ] Restore the local session on the same browser and device
-- [ ] Keep session persistence independent of accounts and server storage
-- [ ] Avoid storing unnecessary user code on a server
+- [ ] Use Firestore as canonical persistence for sessions, ordered problems, solutions, and presentation state
+- [ ] Model sessions with `draft`, `live`, and `ended` states
+- [ ] Support session creation, editing, starting, and ending in Officer Mode
+- [ ] Keep session history available from the officer dashboard
+- [ ] Store session-level `activeProblemId` and problem-level `answersVisible`
+- [ ] Keep problem metadata separate from protected solution documents; expose metadata only when session status/publication rules permit member access
 
-## Educational Explanations
+## Problem and solution preparation
 
-- [ ] Explain meaningful syntax and type differences
-- [ ] Explain equivalent collection and standard-library choices
-- [ ] Keep explanations relevant to the selected solution
-- [ ] Write explanations for CIC Intro students viewing the presentation
-- [ ] Add optional Cappy educational notes without distracting from code
+- [ ] Add multiple problems to a session
+- [ ] Create, edit, and delete problems in Officer Mode
+- [ ] Reorder problems in a session
+- [ ] Store a problem title, description, examples, order, and `answersVisible`; member reads of metadata depend on session publication status
+- [ ] Prepare Python, Java, and C++ solutions for each problem
+- [ ] Store prepared static output for each language
+- [ ] Add Monaco editors editable in Officer Mode and read-only in Member Mode
+- [ ] Present Python, Java, and C++ together without source-language selection
 
-## Safety and Reliability
+## Live presentation
 
-- [ ] Validate translation API input
-- [ ] Limit maximum code size and request volume
-- [ ] Keep model credentials out of client-side code
-- [ ] Render generated code as untrusted text
-- [ ] Handle model and API errors without losing the officer's session
+- [ ] Build an officer dashboard for session and presentation management
+- [ ] Publish live sessions to the anonymous public view
+- [ ] Add **Show Answers** and **Hide Answers** controls
+- [ ] Synchronize session `activeProblemId` and per-problem `answersVisible` to eligible member views in realtime
+- [ ] Add member-side **Follow Presenter** behavior using the session's `activeProblemId`
+- [ ] Keep ended sessions in session history
 
-## Accessibility and UX
+## Presentation UX and accessibility
 
-- [ ] Make problem tabs and language selection keyboard accessible
-- [ ] Provide clear loading and error states
-- [ ] Keep code readable when projected
-- [ ] Support a usable layout on smaller screens
+- [ ] Keep problem text and examples readable during projection
+- [ ] Make the three language panels easy to compare side by side
+- [ ] Add responsive layouts for officer and member views
+- [ ] Support keyboard-accessible controls and visible focus states
+- [ ] Make editor content read-only to members
+- [ ] Show clear session status and answer visibility state
 
-## Testing
+## Testing and reliability
 
-- [ ] Set up or maintain unit tests for request validation and result parsing
-- [ ] Test source-language selection
-- [ ] Test explicit translation flow
-- [ ] Test API error handling
-- [ ] Test optional browser-local session persistence
-- [ ] Add an end-to-end showcase flow test
+- [ ] Test Firestore Security Rules for anonymous and authenticated access
+- [ ] Test session lifecycle, problem ordering, and `activeProblemId` updates
+- [ ] Test **Show Answers** and **Hide Answers** behavior in member views
+- [ ] Test realtime presentation updates and **Follow Presenter**
+- [ ] Test Officer Mode editing and Member Mode read-only behavior
+- [ ] Add an end-to-end officer-to-member presentation flow
 
 ## Documentation
 
-- [x] Add project README
-- [x] Add project scope
-- [x] Add feature tracker
-- [x] Add Git and PR conventions
-- [x] Add AI development guidelines
-- [ ] Add local setup instructions after stack selection
-- [ ] Add implementation notes as features are built
+- [x] Define live showcase product scope and non-goals
+- [x] Document the officer and member experience, persistence, and answer access boundary
+- [ ] Add implementation architecture notes as the Firebase design is implemented
 - [ ] Add deployment instructions after hosting is selected
 
-## Future Ideas
+## Explicit product exclusions
 
-These are not part of the initial scope unless they directly improve an officer-led session:
-
-- [ ] Highlight corresponding code lines or concepts across languages
-- [ ] Shareable showcase sessions
-- [ ] Translation history
-- [ ] Additional programming languages
-
-Future items should only be promoted into active development if they support the officer-led educational goal.
+CappyCode does not translate or generate code, use AI or coding models at runtime, parse source languages, compile or execute programs, run online judging, or use browser storage as canonical persistence. These are outside the live solution showcase product scope.
