@@ -14,8 +14,16 @@ const api = vi.hoisted(() => ({
   listSessions: vi.fn(),
   updateSession: vi.fn(),
   deleteSession: vi.fn(),
+  listProblems: vi.fn(),
+  updateProblem: vi.fn(),
 }));
 vi.mock('@/lib/firebase/sessions', () => api);
+vi.mock('@/lib/firebase/problems', async (original) => ({
+  ...(await original<typeof import('@/lib/firebase/problems')>()),
+  listProblems: api.listProblems,
+  updateProblem: api.updateProblem,
+}));
+vi.mock('client-only', () => ({}));
 import OfficerSessions from './officer-sessions';
 
 const record = {
@@ -33,6 +41,8 @@ const record = {
 beforeEach(() => {
   vi.resetAllMocks();
   api.listSessions.mockResolvedValue([record]);
+  api.listProblems.mockResolvedValue([]);
+  api.updateProblem.mockResolvedValue(undefined);
   api.createSession.mockResolvedValue('new-session');
   api.updateSession.mockResolvedValue(undefined);
   api.deleteSession.mockResolvedValue(undefined);
@@ -188,6 +198,50 @@ describe('Officer Sessions surface', () => {
     });
     fireEvent.blur(screen.getByLabelText('Session title'));
     expect(await screen.findByText('Enter a session title.')).toBeTruthy();
+    expect(api.updateSession).not.toHaveBeenCalled();
+  });
+
+  it('opens only the selected session workspace and protects unsaved problem edits before leaving', async () => {
+    api.listProblems.mockResolvedValue([
+      {
+        id: 'problem',
+        problem: {
+          title: 'Two Sum',
+          description: '',
+          exampleInput: '',
+          exampleOutput: '',
+          order: 0,
+          answersVisible: false,
+        },
+      },
+    ]);
+    api.updateProblem.mockRejectedValueOnce(new Error('offline'));
+    await openEditor();
+    fireEvent.click(screen.getByRole('button', { name: 'Manage problems' }));
+    await screen.findByRole('tab', { name: 'Two Sum' });
+    expect(api.listProblems).toHaveBeenCalledWith('session-id');
+    const title = screen.getByLabelText('Problem title');
+    fireEvent.change(title, { target: { value: 'Unsaved problem' } });
+    expect(
+      (
+        screen.getByRole('button', {
+          name: 'Back to session',
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(true);
+    fireEvent.blur(title);
+    await screen.findByRole('alert');
+    expect(
+      (
+        screen.getByRole('button', {
+          name: 'Back to session',
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Retry problem save' }));
+    await screen.findByText('Problem saved ✓');
+    fireEvent.click(screen.getByRole('button', { name: 'Back to session' }));
+    expect(screen.getByLabelText('Session title')).toBeTruthy();
     expect(api.updateSession).not.toHaveBeenCalled();
   });
 

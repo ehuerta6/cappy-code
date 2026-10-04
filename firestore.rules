@@ -8,6 +8,13 @@ service cloud.firestore {
 
     match /sessions/{sessionId} {
       allow read, write: if isOfficer();
+      match /problems/{problemId} {
+        allow read, write: if isOfficer();
+        match /solutions/{language} {
+          // Cleanup only; Solution editing/reading belongs to #40.
+          allow delete: if isOfficer() && language in ['python', 'java', 'cpp'];
+        }
+      }
     }
   }
 }

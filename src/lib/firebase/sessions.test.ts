@@ -12,7 +12,8 @@ const sdk = vi.hoisted(() => ({
   addDoc: vi.fn(),
   getDocsFromServer: vi.fn(),
   updateDoc: vi.fn(),
-  deleteDoc: vi.fn(),
+  batchDelete: vi.fn(),
+  batchCommit: vi.fn(),
 }));
 vi.mock('client-only', () => ({}));
 vi.mock('./client', () => ({
@@ -27,7 +28,7 @@ vi.mock('firebase/firestore', async (importOriginal) => ({
   addDoc: sdk.addDoc,
   getDocsFromServer: sdk.getDocsFromServer,
   updateDoc: sdk.updateDoc,
-  deleteDoc: sdk.deleteDoc,
+  writeBatch: () => ({ delete: sdk.batchDelete, commit: sdk.batchCommit }),
 }));
 import { getOfficerAuth } from './auth';
 import {
@@ -55,7 +56,7 @@ beforeEach(() => {
   sdk.user.currentUser = { uid: 'officer', isAnonymous: false };
   sdk.addDoc.mockResolvedValue({ id: 'new-session' });
   sdk.updateDoc.mockResolvedValue(undefined);
-  sdk.deleteDoc.mockResolvedValue(undefined);
+  sdk.batchCommit.mockResolvedValue(undefined);
   sdk.getDocsFromServer.mockResolvedValue({ docs: [document()] });
 });
 
@@ -120,10 +121,44 @@ describe('officer session persistence', () => {
     expect(await listSessions()).toEqual([]);
   });
 
-  it('hard deletes only the session document without changing its status', async () => {
+  it('atomically deletes known solutions, child problems and the session without changing status', async () => {
+    sdk.getDocsFromServer.mockResolvedValue({
+      docs: [document('first'), document('second')],
+    });
     await deleteSession('session-id');
-    expect(sdk.deleteDoc).toHaveBeenCalledWith({ path: 'sessions/session-id' });
+    expect(
+      sdk.batchDelete.mock.calls.map(([reference]) => reference.path),
+    ).toEqual([
+      'sessions/session-id/problems/first/solutions/python',
+      'sessions/session-id/problems/first/solutions/java',
+      'sessions/session-id/problems/first/solutions/cpp',
+      'sessions/session-id/problems/first',
+      'sessions/session-id/problems/second/solutions/python',
+      'sessions/session-id/problems/second/solutions/java',
+      'sessions/session-id/problems/second/solutions/cpp',
+      'sessions/session-id/problems/second',
+      'sessions/session-id',
+    ]);
+    expect(sdk.batchCommit).toHaveBeenCalledTimes(1);
     expect(sdk.updateDoc).not.toHaveBeenCalled();
+  });
+
+  it('deletes an empty session in one batch and rejects oversized cascades before writing', async () => {
+    sdk.getDocsFromServer.mockResolvedValue({ docs: [] });
+    await deleteSession('empty');
+    expect(sdk.batchDelete).toHaveBeenCalledWith({ path: 'sessions/empty' });
+    sdk.batchDelete.mockClear();
+    sdk.getDocsFromServer.mockResolvedValue({
+      docs: Array.from({ length: 125 }, (_, index) => document(String(index))),
+    });
+    await expect(deleteSession('large')).rejects.toThrow('Too many problems');
+    expect(sdk.batchDelete).not.toHaveBeenCalled();
+  });
+
+  it('propagates failed cascade commits without presenting deletion success', async () => {
+    const error = new Error('offline');
+    sdk.batchCommit.mockRejectedValue(error);
+    await expect(deleteSession('session-id')).rejects.toBe(error);
   });
 
   it.each([null, { uid: 'anonymous-auth', isAnonymous: true }])(
@@ -137,7 +172,6 @@ describe('officer session persistence', () => {
       expect(sdk.addDoc).not.toHaveBeenCalled();
       expect(sdk.getDocsFromServer).not.toHaveBeenCalled();
       expect(sdk.updateDoc).not.toHaveBeenCalled();
-      expect(sdk.deleteDoc).not.toHaveBeenCalled();
     },
   );
 
@@ -152,7 +186,7 @@ describe('officer session persistence', () => {
     sdk.addDoc.mockRejectedValue(error);
     sdk.getDocsFromServer.mockRejectedValue(error);
     sdk.updateDoc.mockRejectedValue(error);
-    sdk.deleteDoc.mockRejectedValue(error);
+    sdk.batchCommit.mockRejectedValue(error);
     await expect(createSession(metadata)).rejects.toBe(error);
     await expect(listSessions()).rejects.toBe(error);
     await expect(updateSession('id', metadata)).rejects.toBe(error);

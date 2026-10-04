@@ -1,0 +1,115 @@
+.workspace {
+  --surface: #fff;
+  --text: #18212b;
+  --secondary: #65717d;
+  --border: #b8c2cc;
+  --hover: #e8edf3;
+  --accent: #2563eb;
+  color: var(--text);
+  font-size: 1rem;
+  line-height: 1.6;
+}
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--border);
+}
+.tabs {
+  flex: 1 1 16rem;
+  min-width: 0;
+  display: flex;
+  max-width: 100%;
+  overflow-x: auto;
+}
+.button,
+.tab,
+.field input,
+.field textarea {
+  font: inherit;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 0.25rem;
+  padding: 0.5rem 0.75rem;
+  min-height: 2.75rem;
+}
+.button,
+.tab {
+  cursor: pointer;
+}
+.button:disabled,
+.tab:disabled {
+  color: var(--secondary);
+  cursor: default;
+}
+.button:hover:enabled,
+.tab:hover:enabled {
+  background: var(--hover);
+}
+.tab {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  color: var(--secondary);
+}
+.tab[aria-selected='true'] {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+.button:focus-visible,
+.tab:focus-visible,
+.field input:focus-visible,
+.field textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  margin: 0.75rem 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+}
+.actions p {
+  flex-basis: 100%;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 1.5rem 0;
+}
+.field textarea {
+  resize: vertical;
+}
+.examples {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+.examples textarea {
+  font-family: monospace;
+}
+@media (max-width: 600px) {
+  .examples {
+    grid-template-columns: 1fr;
+  }
+}
+@media (prefers-color-scheme: dark) {
+  .workspace {
+    --surface: #151a20;
+    --text: #e6ebf0;
+    --secondary: #a0aab5;
+    --border: #35404c;
+    --hover: #202731;
+    --accent: #4d8dff;
+  }
+}
