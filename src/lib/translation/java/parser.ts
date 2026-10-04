@@ -182,13 +182,23 @@ function parseStatement(node: Node): Statement[] {
       return parseBlock(node);
     case 'local_variable_declaration':
       return parseVariableDeclaration(node);
-    case 'expression_statement':
+    case 'expression_statement': {
+      const expression = namedChildren(node)[0];
+      if (expression?.type === 'assignment_expression') {
+        return [parseAssignment(expression)];
+      }
+      if (expression?.type === 'update_expression') {
+        return [parseUpdate(expression)];
+      }
+      if (!expression)
+        throw new UnsupportedSyntax('Empty expression statement.', node);
       return [
         {
           kind: 'expressionStatement',
-          expression: parseExpression(namedChildren(node)[0]),
+          expression: parseExpression(expression),
         },
       ];
+    }
     case 'return_statement': {
       const value = namedChildren(node)[0];
       return [
@@ -411,7 +421,10 @@ function parseExpression(node: Node): Expression {
     case 'object_creation_expression':
       return parseCollectionCreation(node);
     case 'assignment_expression':
-      return parseAssignment(node).value;
+      throw new UnsupportedSyntax(
+        'Assignments are supported only as statements and loop updates.',
+        node,
+      );
     case 'method_invocation':
       return parseInvocation(node);
     case 'field_access': {

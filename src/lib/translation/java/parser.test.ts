@@ -60,6 +60,30 @@ describe('Java parser', () => {
     ).toEqual(['array', 'array', 'map', 'set']);
   });
 
+  it('preserves assignment and increment statements in the IR', () => {
+    const result = javaParser.parse(`
+      class Solution {
+        public void update(int[] numbers) {
+          numbers[0] = 2;
+          int index = 0;
+          index += 1;
+          index++;
+        }
+      }
+    `);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const declaration = result.program.declarations[0];
+    if (declaration.kind !== 'class') throw new Error('Expected a Java class.');
+    expect(declaration.methods[0].body.map(({ kind }) => kind)).toEqual([
+      'assignment',
+      'variableDeclaration',
+      'assignment',
+      'assignment',
+    ]);
+  });
+
   it('returns a located diagnostic for syntax outside the supported subset', () => {
     const result = javaParser.parse(
       'class Solution { void run() { try {} catch (Exception e) {} } }',
