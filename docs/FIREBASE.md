@@ -4,7 +4,7 @@
 
 1. Create or select a Firebase project in the [Firebase Console](https://console.firebase.google.com/).
 2. Register a Web app under **Project settings → General → Your apps**. Copy its SDK configuration values. The [official Web SDK setup guide](https://firebase.google.com/docs/web/setup) describes these steps.
-3. Create the default Cloud Firestore database under **Build → Firestore Database**, using production mode. Keep its initial access restrictions until deploying the baseline Session rules below; public access and answer reveal rules belong to Issue #42.
+3. Create the default Cloud Firestore database under **Build → Firestore Database**, using production mode. Deploy [`firestore.rules`](../firestore.rules) before enabling public Session access.
 4. Copy the checked-in environment example at the repository root:
 
    ```bash
@@ -39,7 +39,7 @@ import { problemPath } from '@/lib/firebase/paths';
 const problemRef = doc(getFirestoreDb(), problemPath(sessionId, problemId));
 ```
 
-The public landing page does not fetch protected workspace content. Builds and unit tests require no live Firebase project. Tests exercise SDK initialization and paths locally and mock authentication interactions without network reads or writes. Concrete Session, Problem, and Officer Solution operations are described below; realtime updates and public access rules remain for later issues.
+Builds and normal unit tests require no live Firebase project. Concrete Session, Problem, Officer Solution, and public read operations are described below; Firestore Rules enforce which public documents can be read.
 
 ## Officer authentication
 
@@ -76,11 +76,11 @@ responses. Firestore Security Rules independently enforce backend access.
 
 `sessionPath`, `problemPath`, and `solutionPath` centralize nested document paths and reject empty IDs or IDs containing `/`. They return strings for SDK `doc()` calls; collection access can use SDK `collection()` with `sessions`, or a document reference and its subcollection name. Session and Problem CRUD use small concrete Firestore functions. No generic repositories, converters, or unchecked typed snapshot casts are introduced. These TypeScript types describe the intended shape; they do not validate incoming Firestore data.
 
-## Access boundary for later issues
+## Access boundary
 
-Problem documents hold member-facing metadata and `answersVisible`. Prepared code and output exist only in the separate Solution subcollection, consistent with [Firestore's hierarchical data model](https://firebase.google.com/docs/firestore/data-model). Member metadata access must follow session status/publication rules; drafts remain officer-only. Future rules must allow member Solution reads only when session access permits them **and** the parent Problem's `answersVisible` is true. Officers will use Firebase Authentication for content management.
+Problem documents hold member-facing metadata and `answersVisible`. Prepared code and output exist only in the separate Solution subcollection, consistent with [Firestore's hierarchical data model](https://firebase.google.com/docs/firestore/data-model). Draft Sessions are officer-only; anonymous members can read metadata only under `live` or `ended` Sessions. Anonymous Solution reads also require the parent Problem's `answersVisible` to be true.
 
-This foundation does not implement member rules or decide publication policy for ended sessions. Issues #38 and #39 use these paths and document fields; Issue #42 must define publication/access policy and enforce it alongside answer visibility. Hiding answers in the UI alone provides no protection.
+Hiding answers in the UI alone provides no protection; Firestore Rules deny anonymous reads of hidden Solution documents.
 
 ## Officer Session preparation (#38)
 
@@ -119,16 +119,15 @@ and does not use `ended` as an archive flag. Preparation assumes one shared offi
 is editing a Session at a time; concurrent child creation during a deletion is not
 serialized by this small client-side cascade.
 
-### Baseline Session Security Rules
+### Session and answer security rules
 
-`firebase.json` points to `firestore.rules`. The baseline permits Session document
-reads/writes only for non-anonymous Firebase Auth users, under the POC assumption
-that provisioned authenticated users are officers. Configure the shared officer
-account as described above; there is no member account or signup workflow. Problem
-documents also permit Officer reads/writes. Officers can read, create, update, and
-delete Solution documents only at the fixed `python`, `java`, and `cpp` IDs.
-Anonymous Solution access and all other paths remain denied by default.
-No public Session reads or publication policy are introduced.
+`firebase.json` points to `firestore.rules`. Authenticated Officers can read and
+write Sessions, Problems, and the fixed `python`, `java`, and `cpp` Solution
+documents. Anonymous members can read Sessions and Problems only when the parent
+Session status is `live` or `ended`. They can read a fixed Solution document only
+when that Session is public and its Problem has `answersVisible: true`. Anonymous
+writes are denied. A broad Session query does not filter drafts through Rules;
+public discovery uses separate queries constrained to `live` and `ended`.
 
 Deploy these rules to the intended Firebase project **before using Session CRUD**:
 
@@ -136,23 +135,15 @@ Deploy these rules to the intended Firebase project **before using Session CRUD*
 npx firebase-tools deploy --only firestore:rules --project YOUR_PROJECT_ID
 ```
 
-Do not deploy with public/test-mode rules. This branch does not deploy rules or
-modify any production project. #42 must extend this baseline with eligible public
-Session reads, Problem metadata access, and protected Solution reveal rules.
+Do not deploy with public/test-mode rules. The Rules test suite exercises these
+permissions in the Firestore Emulator; deploying rules to a production project
+is an operator task.
 #44 owns lifecycle transitions and the richer dashboard/history UI; the #38 list
 is a flat preparation surface showing existing status without changing it.
 
-Unit tests mock Firebase and require no project. They cover exact write fields,
-calendar dates, stable creation timestamps, list mapping/pending writes, deletion,
-current Auth guards, and UI persistence failures/retry/confirmation. Rules emulator
-validation has not run: this development machine has no Java runtime or existing
-Rules test infrastructure. Before deploying, validate with the Firestore Emulator
-or Firebase Rules Playground: officer Session CRUD allowed; signed-out and
-anonymous-auth Session reads/writes denied; Officer Problem CRUD allowed; Officer
-deletes on the three fixed Solution paths allowed (including missing documents);
-all Solution reads/creates/updates and other-language deletes denied; signed-out
-and anonymous-auth Problem and Solution reads/writes denied. #46 owns comprehensive
-permission test coverage.
+Normal unit tests mock Firebase and require no project. Rules tests use the actual
+emulator to verify officer access, public status access, answer reveal/revocation,
+fixed Solution IDs, and anonymous write denial.
 
 ## Officer Problem preparation (#39)
 
@@ -187,11 +178,9 @@ reordering. Firestore is authoritative; no localStorage or member/public fetchin
 is added. There is no constraints field in the persisted model.
 
 Unit tests mock Firebase, cover CRUD, ordering, fixed cleanup/cascade, authentication,
-selection, save failures and loading/error/empty states, and require no production
-project. **Rules emulator validation has not run:** `java -version` reports that no
-Java Runtime is installed. Mocked tests are not a substitute for deployed Rules
-validation; run the permission cases above in the Firestore Emulator or Rules
-Playground before deployment. No rules were deployed by this change.
+selection, reveal persistence, save failures and loading/error/empty states, and
+require no production project. The Firestore Rules test suite is described below.
+No rules were deployed to a production project by this change.
 
 ## Officer Solution preparation (#40)
 
@@ -213,11 +202,25 @@ short debounce. Failed saves retain edits and offer retry; unsaved changes block
 Problem switching and leaving the Session workspace. Monaco's language mode is
 fixed to Python, Java, or C++ for its panel. The reusable `SolutionWorkspace`
 accepts already-authorized records for read-only rendering and does not fetch
-Solution data itself; public data access remains for #41 and reveal authorization
-for #42. The root landing page no longer mounts the temporary single-language-tab
-Monaco workspace.
+Solution data itself; the public view fetches these records only after Problem
+metadata reports answers visible.
 
-Rules permit non-anonymous officers to read, create, update, and delete Solution
-documents only under the three fixed Language IDs. Anonymous access stays denied;
-#42 must add eligible Session publication and parent `answersVisible` conditions
-before any public Solution reads. Unit tests mock Firebase and require no project.
+Firestore Rules allow anonymous Session and Problem reads only for `live` and
+`ended` Sessions. Anonymous Solution reads additionally require the parent
+Problem's `answersVisible` to be true, and only `python`, `java`, and `cpp`
+Solution IDs are supported. Authenticated Officers manage all three document
+types; anonymous writes are denied. Ending a Session does not change each
+Problem's reveal state.
+
+## Firestore Rules tests
+
+The Rules tests use `@firebase/rules-unit-testing` against the Firestore Emulator.
+Install a supported Java JDK (11 or newer) for local emulator runs, then run:
+
+```bash
+npm run test:rules
+```
+
+CI runs this command separately from the normal Vitest suite. The GitHub Actions
+workflow installs Java 21 before running the emulator so permission tests
+exercise the actual `firestore.rules` file.

@@ -22,6 +22,12 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
 
+      - name: Set up Java for Firestore Emulator
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
       - name: Set up npm
         run: npm install --global npm@11.6.2
 
@@ -36,6 +42,9 @@ jobs:
 
       - name: Test
         run: npm test
+
+      - name: Firestore Rules tests
+        run: npm run test:rules
 
       - name: Build
         run: npm run build

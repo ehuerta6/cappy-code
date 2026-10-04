@@ -1,4 +1,5 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
     function isOfficer() {
@@ -6,14 +7,31 @@ service cloud.firestore {
         && request.auth.token.firebase.sign_in_provider != 'anonymous';
     }
 
+    function sessionIsPublic(sessionId) {
+      return get(/databases/$(database)/documents/sessions/$(sessionId)).data.status
+        in ['live', 'ended'];
+    }
+
+    function answersAreVisible(sessionId, problemId) {
+      return get(
+        /databases/$(database)/documents/sessions/$(sessionId)/problems/$(problemId)
+      ).data.answersVisible == true;
+    }
+
     match /sessions/{sessionId} {
-      allow read, write: if isOfficer();
+      allow read: if isOfficer() || resource.data.status in ['live', 'ended'];
+      allow write: if isOfficer();
+
       match /problems/{problemId} {
-        allow read, write: if isOfficer();
+        allow read: if isOfficer() || sessionIsPublic(sessionId);
+        allow write: if isOfficer();
+
         match /solutions/{language} {
-          allow read, create, update: if isOfficer()
-            && language in ['python', 'java', 'cpp'];
-          allow delete: if isOfficer() && language in ['python', 'java', 'cpp'];
+          allow read: if (isOfficer() && language in ['python', 'java', 'cpp']) ||
+            (language in ['python', 'java', 'cpp'] &&
+             sessionIsPublic(sessionId) &&
+             answersAreVisible(sessionId, problemId));
+          allow write: if isOfficer() && language in ['python', 'java', 'cpp'];
         }
       }
     }
