@@ -614,31 +614,23 @@ function parseCall(
         arguments: args,
       };
     }
+    if (operation === 'insert' && collectionType?.kind === 'map') {
+      return fail(
+        'unordered_map.insert is insert-only and cannot be represented by the neutral map add operation.',
+        callee,
+      );
+    }
     if (
       operation === 'insert' &&
-      (collectionType?.kind === 'set' || collectionType?.kind === 'map')
+      collectionType?.kind === 'set' &&
+      args.length === 1
     ) {
-      if (
-        collectionType.kind === 'map' &&
-        args.length === 1 &&
-        args[0].kind === 'arrayLiteral' &&
-        args[0].elements.length === 2
-      ) {
-        return {
-          kind: 'collectionOperation',
-          operation: 'add',
-          collection,
-          arguments: args[0].elements,
-        };
-      }
-      if (args.length === (collectionType.kind === 'map' ? 2 : 1)) {
-        return {
-          kind: 'collectionOperation',
-          operation: 'add',
-          collection,
-          arguments: args,
-        };
-      }
+      return {
+        kind: 'collectionOperation',
+        operation: 'add',
+        collection,
+        arguments: args,
+      };
     }
     if (
       operation === 'erase' &&

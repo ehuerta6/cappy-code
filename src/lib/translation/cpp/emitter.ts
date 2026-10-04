@@ -336,8 +336,11 @@ function emitExpression(expression: Expression, scope: TypeScope): string {
             return unsupported('membership requires a map or set.');
           return `${collection}.find(${argumentsText[0]}) != ${collection}.end()`;
         case 'add':
-          if (type?.kind === 'map')
-            return `${collection}.insert({${argumentsText.join(', ')}})`;
+          if (type?.kind === 'map') {
+            if (argumentsText.length !== 2)
+              return unsupported('map add requires a key and value.');
+            return `${collection}[${argumentsText[0]}] = ${argumentsText[1]}`;
+          }
           if (type?.kind === 'set')
             return `${collection}.insert(${argumentsText[0]})`;
           return unsupported('add requires a map or set.');
@@ -351,7 +354,9 @@ function emitExpression(expression: Expression, scope: TypeScope): string {
           return `${collection}.push_back(${argumentsText[0]})`;
         case 'get':
           if (type?.kind !== 'map') return unsupported('get requires a map.');
-          return `${collection}[${argumentsText[0]}]`;
+          if (argumentsText.length !== 1)
+            return unsupported('map get requires a key.');
+          return `${collection}.at(${argumentsText[0]})`;
       }
     }
   }

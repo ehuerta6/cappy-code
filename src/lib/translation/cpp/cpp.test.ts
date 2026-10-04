@@ -2,11 +2,18 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { containsDuplicateProgram } from '../fixtures/contains-duplicate';
 import { twoSumProgram } from '../fixtures/two-sum';
+import type { Program } from '../ir';
 import { CppEmitter } from './emitter';
 import { CppParser } from './parser';
 
 const parser = new CppParser();
 const emitter = new CppEmitter();
+const integerType = { kind: 'integer' } as const;
+const integerMapType = {
+  kind: 'map',
+  keyType: integerType,
+  valueType: integerType,
+} as const;
 
 function fixture(name: string): string {
   return readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8');
@@ -70,13 +77,12 @@ describe('C++ translation adapter', () => {
     expect(JSON.stringify(method.body)).toContain('"operation":"add"');
   });
 
-  it('normalizes vector and map mutations to neutral collection operations', () => {
+  it('normalizes vector append and map erase to neutral operations', () => {
     const result = parser.parse(`
       #include <vector>
       #include <unordered_map>
       void update(vector<int>& values, unordered_map<int, int>& positions) {
         values.push_back(4);
-        positions.insert({4, 2});
         positions.erase(4);
       }
     `);
@@ -100,24 +106,91 @@ describe('C++ translation adapter', () => {
         kind: 'expressionStatement',
         expression: {
           kind: 'collectionOperation',
-          operation: 'add',
-          collection: { kind: 'variable', name: 'positions' },
-          arguments: [
-            { kind: 'integerLiteral', value: 4 },
-            { kind: 'integerLiteral', value: 2 },
-          ],
-        },
-      },
-      {
-        kind: 'expressionStatement',
-        expression: {
-          kind: 'collectionOperation',
           operation: 'remove',
           collection: { kind: 'variable', name: 'positions' },
           arguments: [{ kind: 'integerLiteral', value: 4 }],
         },
       },
     ]);
+  });
+
+  it('emits neutral map add as a replacing assignment', () => {
+    const program: Program = {
+      kind: 'program',
+      declarations: [
+        {
+          kind: 'function',
+          name: 'writeValue',
+          parameters: [{ name: 'positions', type: integerMapType }],
+          returnType: { kind: 'void' },
+          body: [
+            {
+              kind: 'expressionStatement',
+              expression: {
+                kind: 'collectionOperation',
+                operation: 'add',
+                collection: { kind: 'variable', name: 'positions' },
+                arguments: [
+                  { kind: 'integerLiteral', value: 4 },
+                  { kind: 'integerLiteral', value: 2 },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    };
+
+    const { code } = emitter.emit(program);
+
+    expect(code).toContain('positions[4] = 2;');
+    expect(code).not.toContain('positions.insert(');
+  });
+
+  it('emits neutral map get as a non-mutating checked read', () => {
+    const program: Program = {
+      kind: 'program',
+      declarations: [
+        {
+          kind: 'function',
+          name: 'readValue',
+          parameters: [{ name: 'positions', type: integerMapType }],
+          returnType: integerType,
+          body: [
+            {
+              kind: 'return',
+              value: {
+                kind: 'collectionOperation',
+                operation: 'get',
+                collection: { kind: 'variable', name: 'positions' },
+                arguments: [{ kind: 'integerLiteral', value: 4 }],
+              },
+            },
+          ],
+        },
+      ],
+    };
+
+    const { code } = emitter.emit(program);
+
+    expect(code).toContain('return positions.at(4);');
+    expect(code).not.toContain('return positions[4];');
+  });
+
+  it('rejects insert-only unordered_map writes with a controlled diagnostic', () => {
+    const result = parser.parse(`
+      #include <unordered_map>
+      void update(unordered_map<int, int>& positions) {
+        positions.insert({4, 2});
+      }
+    `);
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.diagnostics[0].message).toContain(
+      'unordered_map.insert is insert-only',
+    );
+    expect(result.diagnostics[0].location).toBeDefined();
   });
 
   it('maps C++ aggregate initializers to typed IR map and set literals', () => {
@@ -235,7 +308,7 @@ describe('C++ translation adapter', () => {
     );
     expect(code).toContain('std::unordered_map<int, int> seen = {};');
     expect(code).toContain('seen.find(complement) != seen.end()');
-    expect(code).toContain('return {seen[complement], index};');
+    expect(code).toContain('return {seen.at(complement), index};');
   });
 
   it('emits vector and unordered_set IR as standard C++ containers', () => {
