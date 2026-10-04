@@ -15,21 +15,21 @@ Officers prepare Python, Java, and C++ solutions before a session. CappyCode pre
 5. The officer chooses the active problem and uses **Show Answers** or **Hide Answers** while presenting.
 6. Members can use **Follow Presenter** to stay on the problem selected by the officer. Ended sessions remain available in session history.
 
-Sessions have `draft`, `live`, and `ended` states. The session's `activeProblemId` is the shared presentation pointer. Changes to the active problem and answer reveal state update in realtime for members following the presenter.
+Sessions have `draft`, `live`, and `ended` states. The session's `activeProblemId` is the shared presentation pointer. Each problem stores its own `answersVisible` state. Changes to the active problem and to each problem's answer visibility update in realtime for members following the presenter.
 
 ## Modes and access
 
 - **Officer Mode** requires Firebase Authentication. The proof of concept uses one shared CIC officer account. Officers manage sessions and their problems, prepare solutions and outputs, and control the presentation.
-- **Member Mode** is public and anonymous. Members can view live session problem metadata and follow the presentation. Editors are read-only in this mode.
+- **Member Mode** is anonymous. Members can read problem metadata only when the session's status and publication rules allow member access, such as an eligible `live` session or a published `ended` session. Draft sessions are officer-only. Editors are read-only in Member Mode.
 - Monaco editors are editable in Officer Mode and read-only in Member Mode. Python, Java, and C++ are presented together; there is no source-language selection.
-- Problem descriptions and examples are public session content. Solution documents are stored separately from public problem metadata.
-- Firestore Security Rules enforce answer confidentiality. Hiding answers in the interface alone is not a security boundary: member clients must not be authorized to read hidden solution documents. When the officer reveals answers, the rules allow the intended solution read and the clients receive the change in realtime. Rules also restrict content management to authenticated officers.
+- Problem descriptions and examples are member-readable metadata only when the session's status/publication rules permit it; they are not always publicly readable. Solution documents are stored separately from problem metadata.
+- Firestore Security Rules enforce answer confidentiality. Hiding answers in the interface alone is not a security boundary: member clients must not be authorized to read hidden solution documents. Public solution reads require the parent problem's `answersVisible` to be true and the session to permit member access. Rules also restrict content management to authenticated officers.
 
 ## Persistence and architecture
 
 Firestore is the canonical persistence layer for officer-managed content, session history, and live presentation state. Firebase Authentication protects Officer Mode; public members do not sign in. The product has no runtime AI, LLM, translation, code execution, compiler, interpreter, or online judging system.
 
-Conceptually, a session contains ordered public problem metadata and a separate set of protected solution documents. A problem's prepared solutions include source text and static output for Python, Java, and C++. Session state stores its status, order, and `activeProblemId`; answer visibility is shared presentation state governed by Firestore Security Rules.
+Conceptually, a session stores its status and `activeProblemId`. Its ordered problems store titles, descriptions, examples, and per-problem `answersVisible`; these metadata are member-readable only when the session's status/publication rules permit access. Separate protected solution documents contain prepared source text and static output for Python, Java, and C++. Firestore Security Rules use the parent problem's `answersVisible` and session access rules to govern solution reads.
 
 ## Product principles
 
