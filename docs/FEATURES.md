@@ -1,122 +1,76 @@
 # Feature Tracker
 
-This file tracks the product implementation at a high level.
-
-It is intentionally focused on logical features rather than individual commits.
+This checklist tracks the product implementation for CappyCode, **a live solution showcase platform for CIC Intro sessions**. It describes the intended product scope; checked items indicate repository documentation or project foundations, not necessarily a completed end-to-end product.
 
 ## Foundation
 
-- [ ] Initialize the Next.js web application with React and TypeScript
-- [ ] Add project linting
-- [ ] Add type checking
-- [ ] Add formatting configuration
-- [ ] Add production build command
-- [ ] Document local development setup
-- [ ] Add basic GitHub Actions CI checks
+- [x] Add project README, scope, feature tracker, Git conventions, and AI development guidelines
+- [x] Establish the Next.js application, linting, type checking, formatting, and build commands
+- [ ] Document local setup and environment configuration
+- [ ] Add CI checks for the repository's lint, typecheck, test, format, and build commands
 
-## Editor Experience
+## Authentication and access
 
-- [ ] Add Monaco as the main code editor
-- [ ] Add Python syntax support
-- [ ] Add Java syntax support
-- [ ] Add C++ syntax support
-- [ ] Add source-language selector
-- [ ] Add translated-language tabs
-- [ ] Preserve editor content while switching translated views
-- [ ] Add a clear/reset action
+- [ ] Add Firebase Authentication for Officer Mode
+- [ ] Configure one shared CIC officer account for the proof of concept
+- [ ] Allow anonymous access to the public Member Mode
+- [ ] Restrict session and problem management to authenticated officers with Firestore Security Rules
+- [ ] Enforce hidden-answer reads in Firestore Security Rules so anonymous clients cannot read unrevealed solution documents
 
-## Translation
+## Firestore data and session lifecycle
 
-- [ ] Define the language-neutral CappyCode IR
-- [ ] Add the IR type system
-- [ ] Add the Python parser / adapter
-- [ ] Add the Java parser / adapter
-- [ ] Add the C++ parser / adapter
-- [ ] Add the Python emitter
-- [ ] Add the Java emitter
-- [ ] Add the C++ emitter
-- [ ] Add the translation service that connects parsers, IR, and emitters
-- [ ] Add the translation API endpoint
-- [ ] Return structured translation results
-- [ ] Preserve the original algorithm
-- [ ] Preserve expected time complexity
-- [ ] Preserve expected space complexity
+- [ ] Use Firestore as canonical persistence for sessions, ordered problems, solutions, and presentation state
+- [ ] Model sessions with `draft`, `live`, and `ended` states
+- [ ] Support session creation, editing, starting, and ending in Officer Mode
+- [ ] Keep session history available from the officer dashboard
+- [ ] Store session-level `activeProblemId` and answer reveal state
+- [ ] Keep public problem metadata separate from protected solution documents
 
-## Automatic Translation
+## Problem and solution preparation
 
-- [ ] Add debounce after typing
-- [ ] Prevent requests on every keystroke
-- [ ] Show translation loading state
-- [ ] Cancel or ignore stale translation responses
-- [ ] Avoid translating empty input
-- [ ] Handle incomplete code gracefully
-- [ ] Add manual retry when translation fails
+- [ ] Add multiple problems to a session
+- [ ] Create, edit, and delete problems in Officer Mode
+- [ ] Reorder problems in a session
+- [ ] Store a problem title, description, and examples as public metadata
+- [ ] Prepare Python, Java, and C++ solutions for each problem
+- [ ] Store prepared static output for each language
+- [ ] Add Monaco editors editable in Officer Mode and read-only in Member Mode
+- [ ] Present Python, Java, and C++ together without source-language selection
 
-## Educational Explanations
+## Live presentation
 
-- [ ] Add "What changed?" section
-- [ ] Explain equivalent data structures
-- [ ] Explain important syntax differences
-- [ ] Explain relevant type differences
-- [ ] Keep explanations beginner-friendly
-- [ ] Avoid explanations that are unrelated to the student's solution
-- [ ] Add optional Cappy educational notes
+- [ ] Build an officer dashboard for session and presentation management
+- [ ] Publish live sessions to the anonymous public view
+- [ ] Add **Show Answers** and **Hide Answers** controls
+- [ ] Synchronize active problem and answer reveal state to members in realtime
+- [ ] Add member-side **Follow Presenter** behavior using the session's `activeProblemId`
+- [ ] Keep ended sessions in session history
 
-## Error Handling
+## Presentation UX and accessibility
 
-- [ ] Handle translation service errors
-- [ ] Handle unsupported or non-interview-style input
-- [ ] Show useful user-facing error messages
-- [ ] Prevent stale errors from replacing newer results
+- [ ] Keep problem text and examples readable during projection
+- [ ] Make the three language panels easy to compare side by side
+- [ ] Add responsive layouts for officer and member views
+- [ ] Support keyboard-accessible controls and visible focus states
+- [ ] Make editor content read-only to members
+- [ ] Show clear session status and answer visibility state
 
-## Safety and Reliability
+## Testing and reliability
 
-- [ ] Add reasonable request limits
-- [ ] Validate API input
-- [ ] Limit maximum code size
-- [ ] Avoid rendering untrusted HTML from generated output
-- [ ] Add basic observability/logging without storing unnecessary user code
-
-## Accessibility and UX
-
-- [ ] Keyboard-accessible language controls
-- [ ] Clear loading indicators
-- [ ] Clear error states
-- [ ] Responsive layout
-- [ ] Readable code font and sizing
-- [ ] Basic mobile behavior
-
-## Testing
-
-- [ ] Set up Vitest
-- [ ] Unit tests for translation request logic
-- [ ] Tests for debounce behavior
-- [ ] Tests for stale-response handling
-- [ ] Tests for language-selection behavior
-- [ ] API validation tests
-- [ ] Basic end-to-end translation flow test
+- [ ] Test Firestore Security Rules for anonymous and authenticated access
+- [ ] Test session lifecycle, problem ordering, and `activeProblemId` updates
+- [ ] Test **Show Answers** and **Hide Answers** behavior in member views
+- [ ] Test realtime presentation updates and **Follow Presenter**
+- [ ] Test Officer Mode editing and Member Mode read-only behavior
+- [ ] Add an end-to-end officer-to-member presentation flow
 
 ## Documentation
 
-- [x] Add project README
-- [x] Add project scope
-- [x] Add feature tracker
-- [x] Add Git and PR conventions
-- [x] Add AI development guidelines
-- [ ] Add local setup instructions after stack selection
-- [ ] Add architecture notes after initial implementation
+- [x] Define live showcase product scope and non-goals
+- [x] Document the officer and member experience, persistence, and answer access boundary
+- [ ] Add implementation architecture notes as the Firebase design is implemented
 - [ ] Add deployment instructions after hosting is selected
 
-## Future Ideas
+## Explicit product exclusions
 
-These are intentionally not part of the initial scope.
-
-- [ ] Side-by-side three-language comparison mode
-- [ ] Highlight corresponding lines or concepts
-- [ ] Shareable solution links
-- [ ] Optional example problems
-- [ ] Complexity explanation
-- [ ] Translation history
-- [ ] More languages
-
-Future items should only be promoted into active development if they support the project's educational goal.
+CappyCode does not translate or generate code, use AI or coding models at runtime, parse source languages, compile or execute programs, run online judging, or use browser storage as canonical persistence. These are outside the live solution showcase product scope.
