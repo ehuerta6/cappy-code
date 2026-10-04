@@ -75,3 +75,72 @@ For Issue #38, place officer pages under `src/app/officer/` to inherit the gate.
 Problem documents hold member-facing metadata and `answersVisible`. Prepared code and output exist only in the separate Solution subcollection, consistent with [Firestore's hierarchical data model](https://firebase.google.com/docs/firestore/data-model). Member metadata access must follow session status/publication rules; drafts remain officer-only. Future rules must allow member Solution reads only when session access permits them **and** the parent Problem's `answersVisible` is true. Officers will use Firebase Authentication for content management.
 
 This foundation does not implement those rules or decide publication policy for ended sessions. Issues #38 and #39 should use these paths and document fields; Issue #42 must define the publication/access policy and enforce it alongside answer visibility. Hiding answers in the UI alone provides no protection.
+
+## Officer Session preparation (#38)
+
+`src/lib/firebase/sessions.ts` provides `createSession`, `listSessions`,
+`updateSession`, and `deleteSession`, using the foundation's `Session` type and
+`sessionPath`. Each operation checks the current user from
+`getAuth(getFirebaseApp())`; signed-out and anonymous-auth users are rejected
+before Firestore access. Firebase sends the actual Auth token to Firestore;
+Security Rules remain the backend boundary.
+
+The isolated `OfficerSessions` client component accepts the Firebase `User | null`
+from #37's auth surface. It does not subscribe to Auth, implement login, or create
+an Officer shell. It must be mounted **inside the final authenticated client
+surface from #37**, never passed a Firebase User from a Server Component.
+Currently #37 has not merged and this component is intentionally not routed.
+Before finalizing the #38 PR, merge #37 first, update this branch from `main`,
+mount the component in that surface, review the integration, and rerun all checks.
+
+Creation writes `Untitled Session`, the browser's current local calendar date,
+`draft`, `activeProblemId: null`, and server timestamps. It creates no Problems.
+Calendar dates remain `YYYY-MM-DD` strings. Edits validate title/date and write
+only those fields plus `updatedAt: serverTimestamp()`, preserving `createdAt`,
+status, and the presenter pointer. Writes resolve only after backend confirmation.
+The list uses `getDocsFromServer`; failed/offline reads remain errors rather than
+using static content or presenting cached data as current. It validates stored
+fields and rejects documents with pending writes or unresolved timestamps rather
+than inventing client timestamps. Document IDs are separate read-model fields.
+
+Title/date commit on blur, with visible unsaved, Saving, Saved, and retryable error
+states. Failed edits remain in the fields. Navigation and deletion are disabled
+until edits are saved. Lists distinguish loading, empty, failed, and populated
+states. A successfully created document followed by a failed list refresh is
+reported as a read failure, preventing an erroneous creation retry.
+
+Deletion requires a browser confirmation naming the Session and hard deletes
+only `sessions/{sessionId}`. **Firestore document deletion does not recursively
+delete subcollections.** Before #39 adds Problems, revisit deletion so child
+Problems/Solutions are not orphaned. This issue adds no recursive infrastructure
+and does not use `ended` as an archive flag.
+
+### Baseline Session Security Rules
+
+`firebase.json` points to `firestore.rules`. The baseline permits Session document
+reads/writes only for non-anonymous Firebase Auth users, under the POC assumption
+that provisioned authenticated users are officers. Configure the shared officer
+account through #37; there is no member account or signup workflow. All other
+paths, including future Problem/Solution subcollections, are denied by default.
+No public Session reads or publication policy are introduced.
+
+Deploy these rules to the intended Firebase project **before using Session CRUD**:
+
+```bash
+npx firebase-tools deploy --only firestore:rules --project YOUR_PROJECT_ID
+```
+
+Do not deploy with public/test-mode rules. This branch does not deploy rules or
+modify any production project. #42 must extend this baseline with eligible public
+Session reads, Problem metadata access, and protected Solution reveal rules.
+#44 owns lifecycle transitions and the richer dashboard/history UI; the #38 list
+is a flat preparation surface showing existing status without changing it.
+
+Unit tests mock Firebase and require no project. They cover exact write fields,
+calendar dates, stable creation timestamps, list mapping/pending writes, deletion,
+current Auth guards, and UI persistence failures/retry/confirmation. Rules emulator
+validation has not run: this development machine has no Java runtime or existing
+Rules test infrastructure. Before deploying, validate with the Firestore Emulator
+or Firebase Rules Playground: officer Session CRUD allowed; signed-out and
+anonymous-auth Session reads/writes denied; nested Problem/Solution reads/writes
+denied. #46 owns comprehensive permission test coverage.

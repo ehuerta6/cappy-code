@@ -1,0 +1,89 @@
+.sessions,
+.editor {
+  max-width: 64rem;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+.heading,
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.button,
+.row,
+.field input {
+  font: inherit;
+  color: #18212b;
+  background: #fff;
+  border: 1px solid #b8c2cc;
+  border-radius: 0.25rem;
+  min-height: 2.75rem;
+  padding: 0.5rem 0.75rem;
+}
+
+.button,
+.row {
+  cursor: pointer;
+}
+
+.button:disabled,
+.row:disabled {
+  cursor: default;
+  background: #f1f4f7;
+  color: #65717d;
+}
+
+.button:hover:enabled,
+.row:hover:enabled {
+  background: #e8edf3;
+}
+
+.button:focus-visible,
+.row:focus-visible,
+.field input:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+.list {
+  list-style: none;
+  padding: 0;
+}
+
+.row {
+  width: 100%;
+  text-align: left;
+  border: 0;
+  border-bottom: 1px solid #b8c2cc;
+  border-radius: 0;
+  padding: 1rem 0.75rem;
+}
+
+.row span:first-child {
+  flex: 1 1 16rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.status {
+  text-transform: capitalize;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 1.5rem 0;
+  max-width: 36rem;
+}
+
+.field input {
+  width: 100%;
+}
