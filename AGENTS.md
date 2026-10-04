@@ -14,7 +14,11 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - Read `README.md` and relevant files in `docs/` for project source of truth. Follow `docs/GIT_CONVENTIONS.md` for branches, commits, and PRs.
 - Never develop directly on `main`. Start from the latest `main` and use a short-lived branch.
 - Run the repository checks before opening a PR: `npm run lint`, `npm run typecheck`, `npm test`, `npm run format:check`, and `npm run build`.
-- AI/LLMs are development tools only; runtime translation uses the deterministic parser, IR, and emitter pipeline.
+- Runtime translation uses a server-side coding model through POST /api/translate. Keep model credentials server-side, and start translation only when the officer explicitly chooses Translate.
+- CIC Intro officers operate the showcase; students view the solution projected during a session.
+- Keep problem tabs and Python, Java, and C++ Monaco editors side by side, with one officer-selected source language.
+- Translation is manual through the Translate action. Do not trigger it from edits or typing pauses.
+- Browser-local session persistence is optional; accounts and a database are outside the initial scope.
 
 ## Code quality
 

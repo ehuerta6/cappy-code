@@ -1,100 +1,67 @@
 # Feature Tracker
 
-This file tracks the product implementation at a high level.
+This file tracks the product implementation at a high level. It reflects the intended officer-focused CIC Intro solution showcase.
 
-It is intentionally focused on logical features rather than individual commits.
+## Showcase Experience
 
-## Foundation
-
-- [ ] Initialize the Next.js web application with React and TypeScript
-- [ ] Add project linting
-- [ ] Add type checking
-- [ ] Add formatting configuration
-- [ ] Add production build command
-- [ ] Document local development setup
-- [ ] Add basic GitHub Actions CI checks
-
-## Editor Experience
-
-- [ ] Add Monaco as the main code editor
-- [ ] Add Python syntax support
-- [ ] Add Java syntax support
-- [ ] Add C++ syntax support
-- [ ] Add source-language selector
-- [ ] Add translated-language tabs
-- [ ] Preserve editor content while switching translated views
-- [ ] Add a clear/reset action
+- [ ] Add prepared problem tabs
+- [ ] Add Python, Java, and C++ Monaco editors side by side
+- [ ] Add one source-language selector for each translation
+- [ ] Keep all three language panes available for comparison
+- [ ] Add a clear/reset action for the active problem
+- [ ] Add a presentation-friendly responsive layout
 
 ## Translation
 
-- [ ] Define the language-neutral CappyCode IR
-- [ ] Add the IR type system
-- [ ] Add the Python parser / adapter
-- [ ] Add the Java parser / adapter
-- [ ] Add the C++ parser / adapter
-- [ ] Add the Python emitter
-- [ ] Add the Java emitter
-- [ ] Add the C++ emitter
-- [ ] Add the translation service that connects parsers, IR, and emitters
-- [ ] Add the translation API endpoint
-- [ ] Return structured translation results
-- [ ] Preserve the original algorithm
-- [ ] Preserve expected time complexity
-- [ ] Preserve expected space complexity
+- [ ] Add an explicit Translate action
+- [ ] Send the selected source language and source code to `POST /api/translate`
+- [ ] Call a coding model from the server-side endpoint
+- [ ] Keep model credentials in server-side configuration
+- [ ] Return structured Python, Java, and C++ translations
+- [ ] Return concise “What changed?” explanations
+- [ ] Preserve the intended algorithm and behavior when possible
+- [ ] Show a translation loading state
+- [ ] Handle invalid input, model errors, and incomplete code with useful messages
+- [ ] Avoid starting translation on edits, tab changes, or typing pauses
 
-## Automatic Translation
+## Session Persistence and Privacy
 
-- [ ] Add debounce after typing
-- [ ] Prevent requests on every keystroke
-- [ ] Show translation loading state
-- [ ] Cancel or ignore stale translation responses
-- [ ] Avoid translating empty input
-- [ ] Handle incomplete code gracefully
-- [ ] Add manual retry when translation fails
+- [ ] Optionally persist the current session in browser `localStorage`
+- [ ] Restore the local session on the same browser and device
+- [ ] Keep session persistence independent of accounts and server storage
+- [ ] Avoid storing unnecessary user code on a server
 
 ## Educational Explanations
 
-- [ ] Add "What changed?" section
-- [ ] Explain equivalent data structures
-- [ ] Explain important syntax differences
-- [ ] Explain relevant type differences
-- [ ] Keep explanations beginner-friendly
-- [ ] Avoid explanations that are unrelated to the student's solution
-- [ ] Add optional Cappy educational notes
-
-## Error Handling
-
-- [ ] Handle translation service errors
-- [ ] Handle unsupported or non-interview-style input
-- [ ] Show useful user-facing error messages
-- [ ] Prevent stale errors from replacing newer results
+- [ ] Explain meaningful syntax and type differences
+- [ ] Explain equivalent collection and standard-library choices
+- [ ] Keep explanations relevant to the selected solution
+- [ ] Write explanations for CIC Intro students viewing the presentation
+- [ ] Add optional Cappy educational notes without distracting from code
 
 ## Safety and Reliability
 
-- [ ] Add reasonable request limits
-- [ ] Validate API input
-- [ ] Limit maximum code size
-- [ ] Avoid rendering untrusted HTML from generated output
-- [ ] Add basic observability/logging without storing unnecessary user code
+- [ ] Validate translation API input
+- [ ] Limit maximum code size and request volume
+- [ ] Keep model credentials out of client-side code
+- [ ] Render generated code as untrusted text
+- [ ] Handle model and API errors without losing the officer's session
 
 ## Accessibility and UX
 
-- [ ] Keyboard-accessible language controls
-- [ ] Clear loading indicators
-- [ ] Clear error states
-- [ ] Responsive layout
-- [ ] Readable code font and sizing
-- [ ] Basic mobile behavior
+- [ ] Make problem tabs and language selection keyboard accessible
+- [ ] Provide clear loading and error states
+- [ ] Keep code readable when projected
+- [ ] Support a usable layout on smaller screens
 
 ## Testing
 
-- [ ] Set up Vitest
-- [ ] Unit tests for translation request logic
-- [ ] Tests for debounce behavior
-- [ ] Tests for stale-response handling
-- [ ] Tests for language-selection behavior
-- [ ] API validation tests
-- [ ] Basic end-to-end translation flow test
+- [ ] Set up or maintain unit tests for request validation and result parsing
+- [ ] Test source-language selection
+- [ ] Test explicit translation flow
+- [ ] Test API error handling
+- [ ] Test optional browser-local session persistence
+- [ ] Add an end-to-end showcase flow test
 
 ## Documentation
 
@@ -104,19 +71,16 @@ It is intentionally focused on logical features rather than individual commits.
 - [x] Add Git and PR conventions
 - [x] Add AI development guidelines
 - [ ] Add local setup instructions after stack selection
-- [ ] Add architecture notes after initial implementation
+- [ ] Add implementation notes as features are built
 - [ ] Add deployment instructions after hosting is selected
 
 ## Future Ideas
 
-These are intentionally not part of the initial scope.
+These are not part of the initial scope unless they directly improve an officer-led session:
 
-- [ ] Side-by-side three-language comparison mode
-- [ ] Highlight corresponding lines or concepts
-- [ ] Shareable solution links
-- [ ] Optional example problems
-- [ ] Complexity explanation
+- [ ] Highlight corresponding code lines or concepts across languages
+- [ ] Shareable showcase sessions
 - [ ] Translation history
-- [ ] More languages
+- [ ] Additional programming languages
 
-Future items should only be promoted into active development if they support the project's educational goal.
+Future items should only be promoted into active development if they support the officer-led educational goal.

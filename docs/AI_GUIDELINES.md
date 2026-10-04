@@ -1,173 +1,80 @@
 # AI Development Guidelines
 
-This document provides project context and guardrails for AI coding assistants working on CappyCode.
+This document provides project context and guardrails for AI coding assistants working on CappyCode. AI tools should follow the same repository rules as human contributors.
 
-AI tools should follow the same repository rules as human contributors.
+For implementation and review workflows, follow the root [AGENTS.md](../AGENTS.md) and the repository-scoped skills in .codex/skills/. This document is the source for product context and runtime model guidance.
 
-For implementation and review workflows, follow the root [AGENTS.md](../AGENTS.md) and the repository-scoped skills in `.codex/skills/`. This document remains the source for product context and runtime guardrails.
-
-AI coding assistants may help develop CappyCode, but AI/LLMs are not part of the runtime product or translation pipeline. POC translation is deterministic and uses language parsers, the CappyCode IR, and target-language emitters.
+CappyCode uses a server-side coding model for translation at runtime. Keep model credentials in server-side configuration and never expose them to browser code. AI coding assistants may also help develop CappyCode; development-time assistance and the product's runtime translation service have separate roles.
 
 ## Product Context
 
-CappyCode is an educational web app for the **Coding Interview Club Intro branch**.
+CappyCode is an officer-focused solution showcase for the Coding Interview Club Intro branch. CIC Intro officers operate it near the end of a session to present one interview-style solution in Python, Java, and C++ side by side. Students are the audience viewing the projected solution, not the primary operators of the app.
 
-Its purpose is to help beginner students compare equivalent Data Structures & Algorithms solutions across:
+## Showcase Workflow
 
-- Python
-- Java
-- C++
+The expected flow is:
 
-A student writes interview-style code in one language and receives translated versions in the other two languages, along with concise explanations of meaningful language differences.
+1. The officer selects a problem tab.
+2. The officer reviews or enters code in the three side-by-side Monaco editors.
+3. The officer selects exactly one source language: Python, Java, or C++.
+4. The officer clicks **Translate** when ready.
+5. The browser sends the selected source language and code to `POST /api/translate`.
+6. The server-side endpoint calls a coding model and returns structured Python, Java, and C++ translations with **“What changed?”** explanations.
+7. The officer presents the result to students.
 
-## Primary Audience
+Translation is manual and starts only when the officer uses the Translate action. Do not add live translation, debounce requirements, or automatic requests after typing or switching tabs.
 
-Assume the main audience is composed of freshmen and sophomores beginning to learn:
+The model provider is an implementation choice. Keep its credentials and provider configuration on the server. Validate requests and handle model errors without losing the active session.
 
-- LeetCode-style problem solving;
-- Data Structures & Algorithms;
-- technical interview patterns;
-- differences between programming languages.
+## Product Goals
 
-Avoid adding unnecessary technical complexity to the product experience.
+The showcase should help students recognize the same interview algorithm across three languages. Prioritize examples involving:
 
-## Core Product Rules
-
-When implementing product behavior:
-
-1. Preserve the algorithm during translation.
-2. Preserve asymptotic time and space complexity whenever possible.
-3. Prefer idiomatic target-language code over mechanical line-by-line translation.
-4. Optimize for interview-style snippets, not arbitrary production applications.
-5. Keep educational explanations short and beginner-friendly.
-6. Do not expand scope without a clear product reason.
-
-## Initial Supported Concepts
-
-Prioritize support for:
-
-- arrays;
-- strings;
+- arrays and strings;
 - hash maps and sets;
 - stacks and queues;
 - linked lists;
-- two pointers;
-- sliding window;
+- two pointers and sliding window;
 - binary search;
-- trees;
-- DFS and BFS;
+- trees and graph traversal;
 - recursion;
 - introductory dynamic programming.
 
-## Out of Scope by Default
+Preserve the intended algorithm and behavior when possible. Prefer idiomatic target-language code and concise explanations of relevant language differences. Do not expand the product into a general code translation platform.
 
-Do not introduce the following unless explicitly requested:
+## Session Persistence and Privacy
 
-- authentication;
-- user accounts;
-- databases;
-- profiles;
-- leaderboards;
-- social features;
-- full online judge infrastructure;
-- multi-file application translation;
-- framework translation;
-- additional programming languages;
-- unnecessary microservices;
-- unnecessary abstractions.
+The proof of concept may optionally persist the current session in browser `localStorage` so an officer can restore it on the same browser and device. Accounts, authentication, server-side session storage, and a database are outside the initial scope. Do not store unnecessary user code on a server.
+
+Treat model-generated code and explanations as untrusted text when rendering them in the browser.
 
 ## Engineering Preferences
 
-Prefer the simplest architecture that satisfies the current feature.
+Prefer the simplest architecture that satisfies the current feature. Avoid premature abstraction and unnecessary services.
 
-Avoid premature abstraction.
+When implementing product behavior:
 
-Do not create a generalized translation platform when the project only needs three supported languages and interview-style code.
-
-Do not place secrets in client-side code or commit them to the repository.
-
-Generated code should be treated as untrusted text when rendered in the browser.
-
-## Translation UX
-
-Automatic translation should use a debounce rather than sending a request for every keystroke.
-
-The implementation should account for stale responses.
-
-Example:
-
-```text
-User edits code
-      ↓
-debounce
-      ↓
-request A begins
-      ↓
-user edits code again
-      ↓
-request B begins
-      ↓
-request A returns
-      ↓
-ignore A because B represents newer input
-```
-
-The UI should clearly represent:
-
-- idle;
-- translating;
-- success;
-- failure.
+- follow the product requirements in [Project Scope](PROJECT_SCOPE.md);
+- keep model credentials server-side;
+- preserve officer edits until the officer chooses to reset or replace them;
+- start translation only from the explicit Translate action;
+- present clear idle, translating, success, and failure states;
+- keep generated output readable for projection and comparison.
 
 ## Cappy Theme
 
-Cappy is the Coding Interview Club capybara mascot.
-
-Cappy can appear in:
-
-- educational tips;
-- empty states;
-- small pieces of friendly copy.
-
-Do not let the mascot distract from code readability or the educational objective.
+Cappy is the Coding Interview Club capybara mascot. Cappy can appear in educational tips, empty states, or small pieces of friendly copy, without distracting from the code or the officer's presentation.
 
 ## Git Rules
 
-Never implement directly on `main`.
+Never implement directly on main. Use the repository branch conventions documented in [GIT_CONVENTIONS.md](GIT_CONVENTIONS.md).
 
-Use the repository branch conventions documented in [GIT_CONVENTIONS.md](GIT_CONVENTIONS.md).
-
-Examples:
-
-```text
-feat/code-editor
-fix/stale-translation-response
-docs/update-local-setup
-```
-
-Use Conventional Commit-style commits and PR titles:
-
-```text
-feat: add language tabs
-fix: prevent stale translations
-docs: update project scope
-```
-
-Keep branches and PRs focused on one logical change.
-
-Before opening a PR, run the relevant:
-
-- lint;
-- typecheck;
-- tests;
-- build.
-
-Use **Squash and Merge**, then delete the merged branch.
+Use Conventional Commit-style commits and PR titles. Keep branches and PRs focused on one logical change. Before opening a PR, run the repository's lint, typecheck, tests, formatting check, and build commands.
 
 ## When Making Product Decisions
 
-Use the following question as the default filter:
+Use this question as the default filter:
 
-> Does this make it easier for a beginner to understand the same interview algorithm across Python, Java, and C++?
+> Does this help a CIC Intro officer present the same interview solution across Python, Java, and C++ so students can understand it?
 
 If not, prefer leaving the feature out unless there is another clear requirement.
