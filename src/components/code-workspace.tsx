@@ -3,10 +3,7 @@
 import Editor from '@monaco-editor/react';
 import { useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
-
-const languages = ['python', 'java', 'cpp'] as const;
-
-type Language = (typeof languages)[number];
+import { languages, type Language } from '@/lib/domain';
 
 const languageNames: Record<Language, string> = {
   python: 'Python',

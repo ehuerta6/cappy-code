@@ -47,6 +47,7 @@ Project documentation lives in [`docs/`](docs/).
 - [Feature Tracker](docs/FEATURES.md) — implementation checklist and product roadmap.
 - [Git & Pull Request Conventions](docs/GIT_CONVENTIONS.md) — branch, commit, PR, and merge rules.
 - [AI Development Guidelines](docs/AI_GUIDELINES.md) — guardrails for AI coding assistants developing the repository. AI is outside the product runtime.
+- [Firebase Foundation](docs/FIREBASE.md) — local Firebase configuration, client access, and persisted document types.
 
 ## Development workflow
 
@@ -62,6 +63,8 @@ Install dependencies and start the development server:
 npm install
 npm run dev
 ```
+
+To configure the Firebase foundation, follow [Firebase local setup](docs/FIREBASE.md#local-setup) and populate a root `.env.local` from `.env.example`. The current workspace does not access Firebase yet.
 
 Run the project checks before opening a pull request:
 
