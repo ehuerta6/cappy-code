@@ -14,12 +14,39 @@ const api = vi.hoisted(() => ({
   updateProblem: vi.fn(),
   reorderProblems: vi.fn(),
   deleteProblem: vi.fn(),
+  getSolutionsForProblem: vi.fn(),
+  updateSolution: vi.fn(),
 }));
 vi.mock('@/lib/firebase/problems', async (original) => ({
   ...(await original<typeof import('@/lib/firebase/problems')>()),
   ...api,
 }));
 vi.mock('client-only', () => ({}));
+vi.mock('@/lib/firebase/solutions', () => ({
+  getSolutionsForProblem: api.getSolutionsForProblem,
+  updateSolution: api.updateSolution,
+}));
+vi.mock('@monaco-editor/react', () => ({
+  default: ({
+    value,
+    path,
+    options,
+    onChange,
+  }: {
+    value: string;
+    path: string;
+    options: { readOnly: boolean; ariaLabel: string };
+    onChange: (value: string) => void;
+  }) => (
+    <textarea
+      aria-label={options.ariaLabel}
+      data-path={path}
+      readOnly={options.readOnly}
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+    />
+  ),
+}));
 import OfficerProblems from './officer-problems';
 const first = {
   id: 'first',
@@ -47,6 +74,11 @@ function start() {
 }
 beforeEach(() => {
   vi.resetAllMocks();
+  vi.stubGlobal('matchMedia', () => ({
+    matches: false,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+  }));
   api.listProblems.mockResolvedValue([first, second]);
   api.createProblem.mockResolvedValue({
     id: 'new',
@@ -62,8 +94,17 @@ beforeEach(() => {
   api.updateProblem.mockResolvedValue(undefined);
   api.reorderProblems.mockResolvedValue(undefined);
   api.deleteProblem.mockResolvedValue(undefined);
+  api.getSolutionsForProblem.mockResolvedValue({
+    python: { code: 'python source', output: '' },
+    java: { code: 'java source', output: '' },
+    cpp: { code: 'cpp source', output: '' },
+  });
+  api.updateSolution.mockResolvedValue(undefined);
 });
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 async function loaded() {
   start();
   await screen.findByRole('tab', { name: 'Two Sum' });
@@ -285,5 +326,41 @@ describe('Officer Problem workspace', () => {
     );
     expect(await screen.findByText('No problems yet')).toBeTruthy();
     expect(api.deleteProblem).toHaveBeenLastCalledWith('session', 'first');
+  });
+
+  it('loads the selected Problem solutions and blocks tab changes until autosave confirms', async () => {
+    const initialBusyChanges = onBusyChange.mock.calls.length;
+    await loaded();
+    const python = await screen.findByLabelText('Python Solution, editable');
+    expect(python.getAttribute('data-path')).toBe(
+      'officer/session/first/python',
+    );
+    expect(api.getSolutionsForProblem).toHaveBeenCalledWith('session', 'first');
+    const javaOutput = screen.getByLabelText('Java prepared output');
+    fireEvent.change(javaOutput, { target: { value: 'prepared output' } });
+    expect(onBusyChange).toHaveBeenLastCalledWith(true);
+    expect(
+      (screen.getByRole('tab', { name: 'Anagram' }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
+    await waitFor(() =>
+      expect(api.updateSolution).toHaveBeenCalledWith(
+        'session',
+        'first',
+        'java',
+        {
+          code: 'java source',
+          output: 'prepared output',
+        },
+      ),
+    );
+    await waitFor(() => expect(onBusyChange).toHaveBeenLastCalledWith(false));
+    fireEvent.click(screen.getByRole('tab', { name: 'Anagram' }));
+    await screen.findByLabelText('Python Solution, editable');
+    expect(api.getSolutionsForProblem).toHaveBeenLastCalledWith(
+      'session',
+      'second',
+    );
+    expect(onBusyChange.mock.calls.length).toBeGreaterThan(initialBusyChanges);
   });
 });

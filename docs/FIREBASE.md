@@ -39,7 +39,7 @@ import { problemPath } from '@/lib/firebase/paths';
 const problemRef = doc(getFirestoreDb(), problemPath(sessionId, problemId));
 ```
 
-The public workspace does not call these accessors or persist editor content. Builds and unit tests require no live Firebase project. Tests exercise SDK initialization and paths locally and mock authentication interactions without network reads or writes. The concrete Session and Problem operations are described below; Solution editing, realtime updates, and public access rules remain for later issues.
+The public landing page does not fetch protected workspace content. Builds and unit tests require no live Firebase project. Tests exercise SDK initialization and paths locally and mock authentication interactions without network reads or writes. Concrete Session, Problem, and Officer Solution operations are described below; realtime updates and public access rules remain for later issues.
 
 ## Officer authentication
 
@@ -80,7 +80,7 @@ responses. Firestore Security Rules independently enforce backend access.
 
 Problem documents hold member-facing metadata and `answersVisible`. Prepared code and output exist only in the separate Solution subcollection, consistent with [Firestore's hierarchical data model](https://firebase.google.com/docs/firestore/data-model). Member metadata access must follow session status/publication rules; drafts remain officer-only. Future rules must allow member Solution reads only when session access permits them **and** the parent Problem's `answersVisible` is true. Officers will use Firebase Authentication for content management.
 
-This foundation does not implement those rules or decide publication policy for ended sessions. Issues #38 and #39 should use these paths and document fields; Issue #42 must define the publication/access policy and enforce it alongside answer visibility. Hiding answers in the UI alone provides no protection.
+This foundation does not implement member rules or decide publication policy for ended sessions. Issues #38 and #39 use these paths and document fields; Issue #42 must define publication/access policy and enforce it alongside answer visibility. Hiding answers in the UI alone provides no protection.
 
 ## Officer Session preparation (#38)
 
@@ -125,11 +125,9 @@ serialized by this small client-side cascade.
 reads/writes only for non-anonymous Firebase Auth users, under the POC assumption
 that provisioned authenticated users are officers. Configure the shared officer
 account as described above; there is no member account or signup workflow. Problem
-documents also permit Officer reads/writes. Solution reads, creates, and updates
-remain denied until #40. The only exception is Officer **delete**
-permission on the exact `python`, `java`, and `cpp` Solution documents, needed
-for atomic Problem/Session cleanup. Other Solution IDs and all other paths are
-denied by default.
+documents also permit Officer reads/writes. Officers can read, create, update, and
+delete Solution documents only at the fixed `python`, `java`, and `cpp` IDs.
+Anonymous Solution access and all other paths remain denied by default.
 No public Session reads or publication policy are introduced.
 
 Deploy these rules to the intended Firebase project **before using Session CRUD**:
@@ -194,3 +192,32 @@ project. **Rules emulator validation has not run:** `java -version` reports that
 Java Runtime is installed. Mocked tests are not a substitute for deployed Rules
 validation; run the permission cases above in the Firestore Emulator or Rules
 Playground before deployment. No rules were deployed by this change.
+
+## Officer Solution preparation (#40)
+
+`src/lib/firebase/solutions.ts` provides `getSolutionsForProblem` and
+`updateSolution`, using only the fixed `python`, `java`, and `cpp` document IDs.
+Every operation checks for a current non-anonymous Officer Auth session before
+accessing Firestore. The language ID establishes which Language a document holds;
+Solution records contain only `code` and prepared static `output`.
+
+Solution documents are created lazily by the first confirmed edit. Reading a
+Problem maps missing documents to empty editor values without creating data. The
+officer workspace requests all three fixed documents from the server when a
+Problem is selected. It does not store Solution fields in Problem metadata.
+
+The three integrated Solution panels appear below the selected Problem content.
+Each panel combines its language heading, Monaco source editor, and editable
+prepared Output field. Code and output save independently per Language after a
+short debounce. Failed saves retain edits and offer retry; unsaved changes block
+Problem switching and leaving the Session workspace. Monaco's language mode is
+fixed to Python, Java, or C++ for its panel. The reusable `SolutionWorkspace`
+accepts already-authorized records for read-only rendering and does not fetch
+Solution data itself; public data access remains for #41 and reveal authorization
+for #42. The root landing page no longer mounts the temporary single-language-tab
+Monaco workspace.
+
+Rules permit non-anonymous officers to read, create, update, and delete Solution
+documents only under the three fixed Language IDs. Anonymous access stays denied;
+#42 must add eligible Session publication and parent `answersVisible` conditions
+before any public Solution reads. Unit tests mock Firebase and require no project.

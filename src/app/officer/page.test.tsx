@@ -98,7 +98,9 @@ describe('Officer Session route integration', () => {
 
   it('keeps Member Mode read-only without Auth or Session data access', () => {
     render(<MemberPage />);
-    expect(screen.getByLabelText('Read-only editor')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'CappyCode' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Officer Login' })).toBeTruthy();
+    expect(screen.queryByLabelText('Read-only editor')).toBeNull();
     expect(screen.queryByRole('button', { name: '+ New session' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Delete session' })).toBeNull();
     expect(firebase.onAuthStateChanged).not.toHaveBeenCalled();

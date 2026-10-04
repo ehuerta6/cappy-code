@@ -28,145 +28,33 @@ input:focus-visible,
   outline-offset: 3px;
 }
 
-.workspace-shell {
-  width: min(100% - 3rem, 76rem);
-  margin: 0 auto;
-  padding: 3.5rem 0 4rem;
-}
-
-.workspace-header {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 2rem;
-  margin-bottom: 1.75rem;
-}
-
-.eyebrow {
-  margin: 0 0 0.55rem;
-  color: #52627a;
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
 h1 {
   margin: 0;
   font-size: clamp(1.8rem, 4vw, 2.35rem);
   letter-spacing: -0.04em;
 }
 
-.workspace-description {
-  margin: 0.7rem 0 0;
-  color: #5b6678;
-  line-height: 1.5;
+.landing-shell {
+  width: min(100% - 2rem, 76rem);
+  margin: 0 auto;
+  padding: 3rem 0;
 }
 
-.workspace-controls {
-  display: flex;
-  align-items: flex-end;
-  gap: 0.75rem;
+.landing-shell p {
+  margin: 0.5rem 0 1.5rem;
+  color: #65717d;
+  font-size: 1.1rem;
 }
 
-.clear-button {
-  min-height: 2.7rem;
-  border: 1px solid #cbd3df;
-  border-radius: 0.55rem;
-  background: #fff;
-  color: #172033;
-  padding: 0 0.95rem;
-  cursor: pointer;
-  font-size: 0.875rem;
+.landing-shell a {
+  color: #2563eb;
   font-weight: 600;
+  text-underline-offset: 3px;
 }
 
-.clear-button:hover {
-  background: #f8fafc;
-  border-color: #98a5b8;
-}
-
-.editor-card {
-  overflow: hidden;
-  border: 1px solid #263346;
-  border-radius: 0.8rem;
-  background: #1e1e1e;
-  box-shadow: 0 18px 42px rgb(22 35 55 / 12%);
-}
-
-.editor-tabs {
-  display: flex;
-  align-items: stretch;
-  min-height: 3.25rem;
-  overflow-x: auto;
-  border-bottom: 1px solid #354154;
-  background: #172033;
-}
-
-.editor-tab {
-  display: inline-flex;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 0.6rem;
-  padding: 0 1.1rem;
-  border: 0;
-  border-right: 1px solid #354154;
-  background: transparent;
-  color: #b6c0cf;
-  cursor: pointer;
-  font-size: 0.85rem;
-}
-
-.editor-tab:hover {
-  background: #202d42;
-  color: #fff;
-}
-
-.editor-tab.is-active {
-  background: #1e1e1e;
-  color: #fff;
-}
-
-.editor-panel {
-  position: relative;
-  height: min(68vh, 40rem);
-  min-height: 24rem;
-  outline-offset: -3px;
-}
-
-.editor-footer {
-  display: flex;
-  justify-content: space-between;
-  padding: 0.65rem 1rem;
-  border-top: 1px solid #354154;
-  color: #b6c0cf;
-  font-size: 0.75rem;
-}
-
-@media (max-width: 640px) {
-  .workspace-shell {
-    width: min(100% - 1.5rem, 76rem);
-    padding-top: 2rem;
-  }
-
-  .workspace-header {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 1.2rem;
-  }
-
-  .workspace-controls {
-    width: 100%;
-  }
-
-  .editor-panel {
-    height: 60vh;
-    min-height: 20rem;
-  }
-
-  .editor-tab {
-    padding: 0 0.85rem;
-  }
+.landing-shell a:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
 }
 
 .officer-entry {
@@ -284,10 +172,6 @@ h1 {
     background: #151a20;
     border-color: #35404c;
     color: #e6ebf0;
-  }
-
-  .officer-shell .workspace-description {
-    color: #a0aab5;
   }
 
   .login-button {

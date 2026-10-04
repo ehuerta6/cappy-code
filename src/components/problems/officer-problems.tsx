@@ -10,6 +10,7 @@ import {
 } from '@/lib/firebase/problems';
 import ProblemEditor from './problem-editor';
 import styles from './problems.module.css';
+import OfficerSolutions from '../solutions/officer-solutions';
 
 export default function OfficerProblems({
   sessionId,
@@ -26,6 +27,7 @@ export default function OfficerProblems({
   const [operation, setOperation] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
+  const [solutionPending, setSolutionPending] = useState(false);
   const [actionsOpen, setActionsOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const lock = useRef(false);
@@ -33,7 +35,11 @@ export default function OfficerProblems({
   const addButton = useRef<HTMLButtonElement>(null);
   const actionsButton = useRef<HTMLButtonElement>(null);
   const selected = records.find((record) => record.id === selectedId);
-  const blocked = editing || operation !== null;
+  const blocked = editing || solutionPending || operation !== null;
+
+  useEffect(() => {
+    onBusyChange(blocked);
+  }, [blocked, onBusyChange]);
 
   useEffect(() => {
     let cancelled = false;
@@ -97,7 +103,6 @@ export default function OfficerProblems({
     lock.current = true;
     setOperation(label);
     setError(null);
-    onBusyChange(true);
     try {
       await action();
     } catch {
@@ -105,7 +110,6 @@ export default function OfficerProblems({
     } finally {
       lock.current = false;
       setOperation(null);
-      onBusyChange(false);
     }
   }
   function add() {
@@ -328,31 +332,40 @@ export default function OfficerProblems({
                 </div>
               )}
               {selected && (
-                <ProblemEditor
-                  key={selected.id}
-                  sessionId={sessionId}
-                  record={selected}
-                  disabled={operation !== null}
-                  onBusyChange={(busy) => {
-                    setEditing(busy);
-                    onBusyChange(busy);
-                  }}
-                  onSaved={(content) =>
-                    setRecords((records) =>
-                      records.map((record) =>
-                        record.id === selected.id
-                          ? {
-                              ...record,
-                              problem: { ...record.problem, ...content },
-                            }
-                          : record,
-                      ),
-                    )
-                  }
-                />
+                <>
+                  <ProblemEditor
+                    key={selected.id}
+                    sessionId={sessionId}
+                    record={selected}
+                    disabled={operation !== null}
+                    onBusyChange={setEditing}
+                    onSaved={(content) =>
+                      setRecords((records) =>
+                        records.map((record) =>
+                          record.id === selected.id
+                            ? {
+                                ...record,
+                                problem: { ...record.problem, ...content },
+                              }
+                            : record,
+                        ),
+                      )
+                    }
+                  />
+                  <OfficerSolutions
+                    key={`${sessionId}/${selected.id}`}
+                    sessionId={sessionId}
+                    problemId={selected.id}
+                    disabled={operation !== null}
+                    onPendingChange={setSolutionPending}
+                  />
+                </>
               )}
               {editing && (
                 <p>Save problem changes before using problem actions.</p>
+              )}
+              {solutionPending && (
+                <p>Finish saving solution changes before changing problems.</p>
               )}
             </>
           )}
