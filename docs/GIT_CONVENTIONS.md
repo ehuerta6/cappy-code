@@ -27,8 +27,8 @@ For CappyCode, examples may include:
 
 ```text
 feat/code-editor
-feat/translation-api
-fix/stale-translation-response
+feat/session-dashboard
+fix/editor-layout
 docs/update-readme
 chore/configure-linting
 ci/add-build-checks
@@ -48,8 +48,8 @@ Examples for this project:
 
 ```text
 feat: add code editor
-feat: translate python solutions to java
-fix: ignore stale translation responses
+feat: add session dashboard
+fix: correct editor layout
 docs: document local setup
 ```
 
