@@ -22,7 +22,9 @@
     "@monaco-editor/react": "^4.7.0",
     "next": "^16.3.8",
     "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "react-dom": "^19.3.0",
+    "tree-sitter": "^0.21.1",
+    "tree-sitter-python": "^0.21.0"
   },
   "devDependencies": {
     "@next/eslint-plugin-next": "16.3.8",
@@ -34,5 +36,9 @@
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.46.0",
     "vitest": "^5.0.3"
+  },
+  "allowScripts": {
+    "tree-sitter@0.21.1": true,
+    "tree-sitter-python@0.21.0": true
   }
 }
