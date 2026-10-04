@@ -1,228 +1,83 @@
 # CappyCode
 
-**Write once. Learn it in three languages.**
+**One solution. Three languages. Ready to present.**
 
-CappyCode is a beginner-friendly web app built for the **Coding Interview Club (CIC)** Intro branch.
+CappyCode is an officer-focused solution showcase for the **Coding Interview Club (CIC) Intro branch**. Near the end of a session, an officer can present one interview-style solution in Python, Java, and C++ side by side while students follow along on the projected screen.
 
-The goal is simple: let students write interview-style code in **Python**, **Java**, or **C++**, then automatically translate the same solution into the other supported languages.
+CappyCode is a focused teaching aid, not a general-purpose code translator or replacement for LeetCode. It helps the room compare how the same algorithm is expressed across languages.
 
-CappyCode is not meant to replace LeetCode or become a general-purpose code translator. Its purpose is educational: help students understand that the **algorithm stays the same even when syntax, types, and data structures change between languages**.
+## The Showcase Workflow
 
----
+An officer can:
 
-## What CappyCode Does
+1. Select a problem from the problem tabs.
+2. Review or enter code in the Python, Java, and C++ Monaco editors shown side by side.
+3. Select one source language for the solution to translate from.
+4. Click **Translate** when the solution is ready to present.
+5. Present the structured results in all three languages and their **“What changed?”** explanations.
 
-A student can:
+Translation is manual. Editing code or changing a tab does not trigger translation; there is no live or debounced translation.
 
-- choose **Python**, **Java**, or **C++** as their input language;
-- write an interview-style solution in a browser-based editor;
-- automatically receive equivalent versions in the other two languages;
-- compare the translated implementations;
-- see short explanations of important language differences.
+The intended request flow is:
 
-Example:
+Problem tabs → three side-by-side Monaco editors → officer selects one source language and its code → Translate action → `POST /api/translate` → server-side coding model → structured Python, Java, and C++ translations plus “What changed?”
 
-```text
-Python dict
-    ↓
-Java HashMap
-    ↓
-C++ unordered_map
-```
+The model provider is an implementation choice; the product contract is a server-side coding model that returns structured translations and concise explanations. Model credentials stay on the server and must never be exposed to browser code.
 
-The translation should preserve the original:
+## Teaching Goal
 
-- algorithm;
-- time complexity;
-- space complexity;
-- data-structure choices;
-- logical behavior.
+CappyCode is built for CIC Intro officers to use during a session. Students are the audience viewing the projected solution, rather than the primary operators of the app. The comparison should help students notice that the algorithm can stay the same while syntax, types, and standard-library APIs differ.
 
-Translations should be reasonably idiomatic for each target language rather than mechanical line-by-line conversions.
+For example, a hash map solution can use dict in Python, HashMap in Java, and unordered_map in C++.
 
----
+## Product Scope
 
-## Why This Project Exists
+The showcase focuses on common interview-style topics such as arrays and strings, hash maps and sets, stacks and queues, linked lists, two pointers, sliding window, binary search, trees, graph traversal, recursion, and introductory dynamic programming.
 
-Students learning Data Structures & Algorithms often understand a solution in one language but struggle to recognize the same idea in another.
+The proof of concept may optionally persist the current session in browser `localStorage` so an officer can restore a presentation locally. It does not require accounts, authentication, or a database.
 
-CappyCode helps separate two concepts:
+The project does not aim to translate arbitrary applications, frameworks, servers, GUIs, or large production codebases. See [Project Scope](docs/PROJECT_SCOPE.md) for the complete boundaries and non-goals.
 
-```text
-Algorithm
-   ≠
-Programming language syntax
-```
+## Product Principles
 
-For example, a hash map solution to Two Sum is still a hash map solution whether it uses:
-
-- `dict` in Python;
-- `HashMap` in Java;
-- `unordered_map` in C++.
-
-This makes CappyCode especially useful during CIC Intro sessions, where freshmen and sophomores are still building confidence with interview-style coding.
-
----
-
-## Supported Languages
-
-The initial version supports:
-
-- Python
-- Java
-- C++
-
-These languages were chosen because they are commonly used for technical interview preparation and are already familiar to many CIC members.
-
----
-
-## Project Scope
-
-CappyCode is intentionally focused on **algorithmic interview code**.
-
-The first versions should work especially well with:
-
-- arrays and strings;
-- hash maps and sets;
-- stacks and queues;
-- linked lists;
-- two pointers;
-- sliding window;
-- binary search;
-- trees;
-- DFS and BFS;
-- recursion;
-- introductory dynamic programming.
-
-The project does **not** need to translate arbitrary applications, frameworks, servers, GUIs, or large production codebases.
-
-For the complete scope and non-goals, see [Project Scope](docs/PROJECT_SCOPE.md).
-
----
-
-## Core Product Experience
-
-The intended flow is:
-
-```text
-Choose language
-      ↓
-Write code
-      ↓
-Short debounce
-      ↓
-Translate solution
-      ↓
-View Python / Java / C++
-      ↓
-Read "What changed?" explanations
-```
-
-Translations should happen automatically after the user pauses typing instead of requiring a request on every keystroke.
-
-The UI can remain intentionally simple during early development. Educational usefulness is more important than visual polish.
-
----
-
-## Educational Explanations
-
-CappyCode should explain meaningful differences when useful.
-
-Examples:
-
-<!-- prettier-ignore -->
-| Concept | Python | Java | C++ |
-|---|---|---|---|
-| Hash map | `dict` | `HashMap<K, V>` | `unordered_map<K, V>` |
-| Hash set | `set` | `HashSet<T>` | `unordered_set<T>` |
-| Length | `len(nums)` | `nums.length` | `nums.size()` |
-| Null value | `None` | `null` | `nullptr` / context-dependent |
-| Indexed loop | `enumerate(nums)` | indexed `for` loop | indexed/range loop |
-
-These explanations should stay short and beginner-friendly.
-
-Cappy, the Coding Interview Club capybara mascot, can occasionally provide these educational notes without distracting from the code.
-
----
-
-## Current Product Principles
-
-1. **Beginner first** — explanations should be understandable to students early in their DSA journey.
-2. **Preserve the algorithm** — translation must not silently change the solution strategy.
-3. **Interview code first** — optimize for LeetCode-style solutions, not arbitrary software.
-4. **No unnecessary complexity** — authentication, databases, profiles, and social features are outside the initial scope.
-5. **Teach, do not only translate** — the comparison between languages is part of the product.
-6. **Keep `main` healthy** — merged code should pass the project's relevant lint, typecheck, test, and build checks.
-
----
+1. **Officer-led** — optimize the workflow for presenting a solution during CIC Intro sessions.
+2. **Three-language comparison** — keep Python, Java, and C++ visible together.
+3. **Explicit control** — translate only when the officer chooses **Translate**.
+4. **Teach the differences** — return short, relevant **“What changed?”** explanations.
+5. **Keep session data local** — browser-local persistence is optional; accounts and databases are outside the POC.
+6. **Keep main healthy** — merged changes should pass the repository checks.
 
 ## Documentation
 
-Project documentation lives in [`docs/`](docs/).
+Project documentation lives in [docs/](docs/).
 
 - [Project Scope](docs/PROJECT_SCOPE.md) — product goals, boundaries, and non-goals.
 - [Feature Tracker](docs/FEATURES.md) — implementation checklist and product roadmap.
 - [Git & Pull Request Conventions](docs/GIT_CONVENTIONS.md) — branch, commit, PR, and merge rules.
 - [AI Development Guidelines](docs/AI_GUIDELINES.md) — context and guardrails for AI coding assistants.
 
----
-
-## Suggested Initial Architecture
-
-The planned POC uses a deterministic parser → IR → emitter pipeline:
-
-```text
-Browser (Next.js, React, TypeScript)
-   ↓
-Monaco Editor
-   ↓
-Source language (Python / Java / C++)
-   ↓
-Tree-sitter parser / language adapter
-   ↓
-CappyCode language-neutral IR
-   ↓
-Deterministic target-language emitters
-   ↓
-Python / Java / C++
-```
-
-The UI initially keeps editor state in local React state and uses a short debounce for automatic translation. The parser, IR, and emitters define the translation itself: the POC does **not** use AI or an LLM for runtime translation.
-
-The initial version does not require authentication or a database.
-
----
-
 ## Development Workflow
 
-Never develop directly on `main`.
+Never develop directly on main.
 
 Every logical change should use a short-lived branch such as:
 
-```text
-feat/editor-layout
-feat/code-translation
-fix/stale-translation-response
-docs/update-local-setup
-```
+    feat/editor-layout
+    feat/code-translation
+    fix/stale-translation-response
+    docs/update-local-setup
 
 PR titles and commits follow Conventional Commit style:
 
-```text
-feat: add code editor
-fix: prevent stale translations
-docs: update local setup
-```
+    feat: add code editor
+    fix: prevent stale translation responses
+    docs: update local setup
 
 See [Git & Pull Request Conventions](docs/GIT_CONVENTIONS.md) for the full workflow.
 
----
-
 ## Status
 
-CappyCode is currently in early development.
-
-See the [Feature Tracker](docs/FEATURES.md) for the current implementation checklist.
+CappyCode is currently in early development. See the [Feature Tracker](docs/FEATURES.md) for the implementation checklist.
 
 ## Local Development
 
@@ -230,17 +85,13 @@ Use Node.js **24.11.0** and npm **11.6.2** for local development. The supported 
 
 Install dependencies and start the development server:
 
-```bash
-npm install
-npm run dev
-```
+    npm install
+    npm run dev
 
 Run the project checks before opening a pull request:
 
-```bash
-npm run lint
-npm run typecheck
-npm test
-npm run format:check
-npm run build
-```
+    npm run lint
+    npm run typecheck
+    npm test
+    npm run format:check
+    npm run build
