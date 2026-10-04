@@ -139,6 +139,25 @@ def has_item(items: list[int], values: dict[int, int], seen: set[int], key: int)
       ],
     });
   });
+
+  it('rejects loop else clauses and class inheritance instead of dropping them', () => {
+    expect(
+      parser.parse(
+        'def visit(items):\n    for item in items:\n        current = item\n    else:\n        current = 0\n',
+      ),
+    ).toMatchObject({
+      ok: false,
+      diagnostics: [{ message: 'Python for-else clauses are not supported.' }],
+    });
+    expect(
+      parser.parse(
+        'class Child(Base):\n    def value(self):\n        return 1\n',
+      ),
+    ).toMatchObject({
+      ok: false,
+      diagnostics: [{ message: 'Python class inheritance is not supported.' }],
+    });
+  });
 });
 
 describe('Python emitter', () => {

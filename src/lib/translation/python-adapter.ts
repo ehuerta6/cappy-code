@@ -116,6 +116,9 @@ function parseClass(node: Parser.SyntaxNode) {
   const name = fieldText(node, 'name');
   const body = node.childForFieldName('body');
   if (!name || !body) throw unsupported(node, 'Malformed class definition.');
+  if (node.childForFieldName('superclasses')) {
+    throw unsupported(node, 'Python class inheritance is not supported.');
+  }
   const methods = body.namedChildren.filter(isNotComment).map((child) => {
     if (child.type !== 'function_definition') {
       throw unsupported(
@@ -267,6 +270,9 @@ function parseStatement(
       const condition = node.childForFieldName('condition');
       const body = node.childForFieldName('body');
       if (!condition || !body) throw unsupported(node, 'Malformed while loop.');
+      if (node.childForFieldName('alternative')) {
+        throw unsupported(node, 'Python while-else clauses are not supported.');
+      }
       return {
         kind: 'while',
         condition: parseExpression(condition),
@@ -390,6 +396,9 @@ function parseFor(node: Parser.SyntaxNode, names: Set<string>): Statement {
       node,
       'Only a single loop variable is supported in for loops.',
     );
+  }
+  if (node.childForFieldName('alternative')) {
+    throw unsupported(node, 'Python for-else clauses are not supported.');
   }
   const forRange = parseRangeLoop(left.text, right);
   if (forRange) {
@@ -597,6 +606,14 @@ function parseCall(node: Parser.SyntaxNode): Expression {
     }
     if (fn.text === 'list' && args.length === 0) {
       return { kind: 'arrayLiteral', elements: [], elementType: unknownType };
+    }
+    if (fn.text === 'dict' && args.length === 0) {
+      return {
+        kind: 'mapLiteral',
+        entries: [],
+        keyType: unknownType,
+        valueType: unknownType,
+      };
     }
     return { kind: 'call', functionName: fn.text, arguments: args };
   }
