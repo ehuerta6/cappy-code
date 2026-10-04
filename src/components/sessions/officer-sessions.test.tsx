@@ -16,6 +16,8 @@ const api = vi.hoisted(() => ({
   deleteSession: vi.fn(),
   listProblems: vi.fn(),
   updateProblem: vi.fn(),
+  getSolutionsForProblem: vi.fn(),
+  updateSolution: vi.fn(),
 }));
 vi.mock('@/lib/firebase/sessions', () => api);
 vi.mock('@/lib/firebase/problems', async (original) => ({
@@ -23,7 +25,29 @@ vi.mock('@/lib/firebase/problems', async (original) => ({
   listProblems: api.listProblems,
   updateProblem: api.updateProblem,
 }));
+vi.mock('@/lib/firebase/solutions', () => ({
+  getSolutionsForProblem: api.getSolutionsForProblem,
+  updateSolution: api.updateSolution,
+}));
 vi.mock('client-only', () => ({}));
+vi.mock('@monaco-editor/react', () => ({
+  default: ({
+    options,
+    value,
+    onChange,
+  }: {
+    options: { readOnly: boolean; ariaLabel: string };
+    value: string;
+    onChange: (value: string) => void;
+  }) => (
+    <textarea
+      aria-label={options.ariaLabel}
+      value={value}
+      readOnly={options.readOnly}
+      onChange={(event) => onChange(event.target.value)}
+    />
+  ),
+}));
 import OfficerSessions from './officer-sessions';
 
 const record = {
@@ -40,15 +64,27 @@ const record = {
 
 beforeEach(() => {
   vi.resetAllMocks();
+  vi.stubGlobal('matchMedia', () => ({
+    matches: false,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+  }));
   api.listSessions.mockResolvedValue([record]);
   api.listProblems.mockResolvedValue([]);
   api.updateProblem.mockResolvedValue(undefined);
+  api.getSolutionsForProblem.mockResolvedValue({
+    python: { code: '', output: '' },
+    java: { code: '', output: '' },
+    cpp: { code: '', output: '' },
+  });
+  api.updateSolution.mockResolvedValue(undefined);
   api.createSession.mockResolvedValue('new-session');
   api.updateSession.mockResolvedValue(undefined);
   api.deleteSession.mockResolvedValue(undefined);
 });
 afterEach(() => {
   cleanup();
+  vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
 
@@ -243,6 +279,49 @@ describe('Officer Sessions surface', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Back to session' }));
     expect(screen.getByLabelText('Session title')).toBeTruthy();
     expect(api.updateSession).not.toHaveBeenCalled();
+  });
+
+  it('keeps the Session workspace open until the selected Problem solution saves', async () => {
+    api.listProblems.mockResolvedValue([
+      {
+        id: 'problem',
+        problem: {
+          title: 'Two Sum',
+          description: 'Find a pair',
+          exampleInput: '1 2',
+          exampleOutput: '3',
+          order: 0,
+          answersVisible: false,
+        },
+      },
+    ]);
+    render(<OfficerSessions />);
+    fireEvent.click(await screen.findByRole('button', { name: /Arrays/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Manage problems' }));
+    await screen.findByLabelText('Python Solution, editable');
+    const backButton = screen.getByRole('button', { name: 'Back to session' });
+    fireEvent.change(screen.getByLabelText('C++ prepared output'), {
+      target: { value: 'static output' },
+    });
+    expect((backButton as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(backButton);
+    expect(screen.getByLabelText('Session problems')).toBeTruthy();
+    await waitFor(() =>
+      expect(api.updateSolution).toHaveBeenCalledWith(
+        'session-id',
+        'problem',
+        'cpp',
+        {
+          code: '',
+          output: 'static output',
+        },
+      ),
+    );
+    await waitFor(() =>
+      expect((backButton as HTMLButtonElement).disabled).toBe(false),
+    );
+    fireEvent.click(backButton);
+    expect(screen.getByLabelText('Session title')).toBeTruthy();
   });
 
   it('requires confirmation, retains the record on delete failure and allows retry', async () => {
