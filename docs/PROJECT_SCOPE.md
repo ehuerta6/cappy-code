@@ -1,146 +1,61 @@
 # Project Scope
 
-This document defines what CappyCode is intended to be and, equally importantly, what it is not intended to become during its initial development.
+## Product definition
 
-## Product Goal
+CappyCode is **a live solution showcase platform for CIC Intro sessions**. CIC officers prepare interview-style problems and their solutions ahead of time, then present them to members during a session. Members join through an anonymous, read-only public view.
 
-CappyCode helps beginner programmers compare equivalent **technical interview solutions** across Python, Java, and C++.
+CappyCode is not an IDE, code translator, transpiler, AI product, online judge, or code-execution tool. All presented source and output are prepared and stored by an officer; the runtime displays that content without generating or executing it.
 
-The product should help students recognize that the same algorithm can have different syntax, type declarations, standard-library APIs, and data-structure names depending on the language.
+## Users and access
 
-## Target Users
+### Officers
 
-The primary users are students in the **Coding Interview Club Intro branch**, especially freshmen and sophomores who are beginning to practice Data Structures & Algorithms and LeetCode-style problems.
+CIC Intro officers are the authenticated content managers and presenters. Firebase Authentication is used only for Officer Mode. The proof of concept has one shared CIC officer account. Officers can create and manage sessions, add and order problems, prepare solution content, and control live presentation state.
 
-The app should still be usable by anyone without requiring an account.
+### Members
 
-## Core Use Case
+Members are anonymous public viewers. They do not create accounts or authenticate. Member Mode provides read-only access to public problem metadata for a live session and to solution documents only when the officer has revealed the answers under the configured Firestore Security Rules.
 
-A student writes a solution in one supported language.
+## Persistence and architecture
 
-CappyCode then:
+Firestore is the canonical persistence layer. It stores session content, session history, prepared solutions, and presentation state. Firebase Authentication protects Officer Mode; public membership does not depend on authentication.
 
-1. identifies the source language selected by the student;
-2. translates the implementation into the other supported languages;
-3. preserves the algorithm and complexity;
-4. displays the translated versions;
-5. explains meaningful language differences when useful.
+Keep public problem metadata separate from solution documents. Public metadata includes the problem title, description, examples, and order. Protected solution documents include manually prepared Python, Java, and C++ source and prepared static output for each language. Separation lets Firestore Security Rules enforce answer access independently of what the UI renders.
 
-## Supported Languages
+Firestore Security Rules are the actual hidden-answer permission boundary. A hidden answer must not be readable by an anonymous member client. The rules permit intended member reads after the officer reveals answers, and restrict session and problem management to authenticated officers. UI state such as **Hide Answers** is not a substitute for these rules.
 
-Initial support:
+## Session model and presentation behavior
 
-- Python
-- Java
-- C++
+Sessions have three states:
 
-Adding more languages is not a current priority.
+- `draft` — officers prepare and order session problems and their content.
+- `live` — members can open the public presentation view; the officer controls the active problem and answer reveal.
+- `ended` — the live presentation is over and the session remains in session history.
 
-## Algorithmic Scope
+A session contains multiple ordered problems. Each problem has a description and examples, plus separately stored solution content. The session-level `activeProblemId` identifies the problem currently selected by the officer. Members can enable **Follow Presenter** to move to the officer's active problem as presentation state changes.
 
-CappyCode should prioritize common beginner and intermediate interview concepts:
+The officer dashboard provides session creation and management, access to session history, and controls for starting, presenting, and ending sessions. **Show Answers** and **Hide Answers** control the presentation and the answer access policy. Realtime Firestore updates synchronize the active problem and reveal state with member views.
 
-- arrays;
-- strings;
-- hash maps;
-- hash sets;
-- stacks;
-- queues;
-- linked lists;
-- two pointers;
-- sliding window;
-- binary search;
-- trees;
-- DFS;
-- BFS;
-- recursion;
-- introductory dynamic programming.
+## Editors and presentation UI
 
-## Translation Requirements
+Show Python, Java, and C++ solutions together. There is no source-language selector and no translation flow. Monaco editors are editable in Officer Mode for preparing solutions, and read-only in Member Mode. Display each language's prepared static output alongside its source where appropriate.
 
-Translations should preserve:
+The interface is presentation-focused: responsive, readable at a distance, and clear on the projected screen used during a CIC Intro session. Preserve a layout that keeps the problem and the three language panels easy to compare.
 
-- the algorithmic strategy;
-- expected behavior;
-- asymptotic time complexity;
-- asymptotic space complexity;
-- equivalent data-structure usage.
+## Content scope
 
-Translations should be idiomatic enough to teach the target language.
+Officers prepare common interview-style problems and solutions, including topics such as arrays and strings, hash maps and sets, stacks and queues, linked lists, two pointers, sliding window, binary search, trees, graph traversal, recursion, and introductory dynamic programming. The app stores and displays prepared content; it does not assess whether a solution is correct.
 
-The system should avoid literal line-by-line translation when a language has a more natural equivalent.
+## Out of scope
 
-## Initial POC Supported Syntax
+- Accounts, profiles, or authentication for public members.
+- Multiple officer accounts or granular officer roles in the proof of concept; it uses one shared officer account.
+- Runtime AI or LLM features, prompt engineering, coding model providers, model API keys, or generated explanations.
+- Automatic or manual code translation, source-language selection, parsers, Tree-sitter, AST translation, intermediate representations, emitters, or transpilers.
+- Code execution, compilers, interpreters, online judging, test runners, or sandboxing.
+- Browser `localStorage` as canonical persistence; Firestore is the source of truth.
+- Unrelated general-purpose IDE capabilities or arbitrary application translation.
 
-The first translation implementation will support a deliberately limited syntax subset for interview-style solutions:
+## Product principle
 
-- primitive values: integers, booleans, and strings;
-- arrays/lists, hash maps, and hash sets;
-- variables and assignments;
-- functions and methods;
-- `if` / `else` statements;
-- `for` and `while` loops;
-- `return` statements;
-- arithmetic, comparison, and boolean expressions;
-- indexing;
-- common collection operations and length checks.
-
-This is the initial supported translation syntax subset. It is not a promise to translate arbitrary Python, Java, or C++ code, and it does not expand the product beyond interview-style code in the three supported languages.
-
-## Educational Layer
-
-When useful, CappyCode should explain differences such as:
-
-- `dict` vs `HashMap` vs `unordered_map`;
-- dynamic typing vs explicit type declarations;
-- array/list APIs;
-- iteration patterns;
-- null values;
-- standard-library differences.
-
-Explanations should be concise and written for beginners.
-
-## Initial UX
-
-The first version should prioritize clarity over visual complexity.
-
-Expected UI concepts:
-
-- one primary code editor;
-- source-language selector;
-- translated-language tabs or panels;
-- automatic translation after a short typing pause;
-- loading state;
-- error state;
-- "What changed?" explanation section.
-
-## Non-Goals
-
-The initial project does not need:
-
-- user accounts;
-- authentication;
-- profiles;
-- saved solutions;
-- leaderboards;
-- social features;
-- a database;
-- full LeetCode problem hosting;
-- code submissions or online judging;
-- production application translation;
-- framework translation;
-- package-management translation;
-- arbitrary multi-file project translation;
-- more than Python, Java, and C++;
-- an AI chatbot;
-- advanced debugging assistance.
-
-These features can be reconsidered later only if they support the educational goal.
-
-## Product Principle
-
-A useful test for new features is:
-
-> Does this help a beginner understand interview code across Python, Java, and C++?
-
-If the answer is no, the feature is probably outside the current scope.
+New work should help CIC Intro officers present prepared solutions clearly and help members follow the live session safely and readably.
