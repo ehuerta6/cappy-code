@@ -168,30 +168,25 @@ Project documentation lives in [`docs/`](docs/).
 
 ## Suggested Initial Architecture
 
-A minimal implementation may look like:
+The planned POC uses a deterministic parser → IR → emitter pipeline:
 
 ```text
-Browser
-   │
-   ▼
-Code Editor
+Browser (Next.js, React, TypeScript)
+   ↓
+Monaco Editor
+   ↓
+Source language (Python / Java / C++)
+   ↓
+Tree-sitter parser / language adapter
+   ↓
+CappyCode language-neutral IR
+   ↓
+Deterministic target-language emitters
+   ↓
 Python / Java / C++
-   │
-   ▼
-Debounced translation request
-   │
-   ▼
-Translation API
-   │
-   ▼
-Language translation model
-   │
-   ├── translated code
-   └── educational differences
-   │
-   ▼
-UI
 ```
+
+The UI initially keeps editor state in local React state and uses a short debounce for automatic translation. The parser, IR, and emitters define the translation itself: the POC does **not** use AI or an LLM for runtime translation.
 
 The initial version does not require authentication or a database.
 

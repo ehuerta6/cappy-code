@@ -6,17 +6,17 @@ It is intentionally focused on logical features rather than individual commits.
 
 ## Foundation
 
-- [ ] Initialize the web application
+- [ ] Initialize the Next.js web application with React and TypeScript
 - [ ] Add project linting
 - [ ] Add type checking
 - [ ] Add formatting configuration
 - [ ] Add production build command
 - [ ] Document local development setup
-- [ ] Add basic CI checks
+- [ ] Add basic GitHub Actions CI checks
 
 ## Editor Experience
 
-- [ ] Add main code editor
+- [ ] Add Monaco as the main code editor
 - [ ] Add Python syntax support
 - [ ] Add Java syntax support
 - [ ] Add C++ syntax support
@@ -27,14 +27,17 @@ It is intentionally focused on logical features rather than individual commits.
 
 ## Translation
 
-- [ ] Add translation API endpoint
-- [ ] Translate Python → Java
-- [ ] Translate Python → C++
-- [ ] Translate Java → Python
-- [ ] Translate Java → C++
-- [ ] Translate C++ → Python
-- [ ] Translate C++ → Java
-- [ ] Return translated code in structured output
+- [ ] Define the language-neutral CappyCode IR
+- [ ] Add the IR type system
+- [ ] Add the Python parser / adapter
+- [ ] Add the Java parser / adapter
+- [ ] Add the C++ parser / adapter
+- [ ] Add the Python emitter
+- [ ] Add the Java emitter
+- [ ] Add the C++ emitter
+- [ ] Add the translation service that connects parsers, IR, and emitters
+- [ ] Add the translation API endpoint
+- [ ] Return structured translation results
 - [ ] Preserve the original algorithm
 - [ ] Preserve expected time complexity
 - [ ] Preserve expected space complexity
@@ -62,14 +65,12 @@ It is intentionally focused on logical features rather than individual commits.
 ## Error Handling
 
 - [ ] Handle translation service errors
-- [ ] Handle malformed model output
 - [ ] Handle unsupported or non-interview-style input
 - [ ] Show useful user-facing error messages
 - [ ] Prevent stale errors from replacing newer results
 
 ## Safety and Reliability
 
-- [ ] Keep model/API credentials server-side
 - [ ] Add reasonable request limits
 - [ ] Validate API input
 - [ ] Limit maximum code size
@@ -87,6 +88,7 @@ It is intentionally focused on logical features rather than individual commits.
 
 ## Testing
 
+- [ ] Set up Vitest
 - [ ] Unit tests for translation request logic
 - [ ] Tests for debounce behavior
 - [ ] Tests for stale-response handling

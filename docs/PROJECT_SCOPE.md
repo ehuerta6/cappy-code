@@ -70,6 +70,23 @@ Translations should be idiomatic enough to teach the target language.
 
 The system should avoid literal line-by-line translation when a language has a more natural equivalent.
 
+## Initial POC Supported Syntax
+
+The first translation implementation will support a deliberately limited syntax subset for interview-style solutions:
+
+- primitive values: integers, booleans, and strings;
+- arrays/lists, hash maps, and hash sets;
+- variables and assignments;
+- functions and methods;
+- `if` / `else` statements;
+- `for` and `while` loops;
+- `return` statements;
+- arithmetic, comparison, and boolean expressions;
+- indexing;
+- common collection operations and length checks.
+
+This is the initial supported translation syntax subset. It is not a promise to translate arbitrary Python, Java, or C++ code, and it does not expand the product beyond interview-style code in the three supported languages.
+
 ## Educational Layer
 
 When useful, CappyCode should explain differences such as:
