@@ -39,7 +39,17 @@ import { problemPath } from '@/lib/firebase/paths';
 const problemRef = doc(getFirestoreDb(), problemPath(sessionId, problemId));
 ```
 
-The current workspace does not call these accessors or persist its editor content yet. Builds and unit tests require no live Firebase project. Tests exercise local SDK initialization and paths without reading or writing the network. Authentication UI, content workflows, realtime updates, and permission rules remain for later issues. Issue #37 can obtain Auth with the SDK's `getAuth(getFirebaseApp())`; members do not sign in.
+The public workspace does not call these accessors or persist editor content. Builds and unit tests require no live Firebase project. Tests exercise SDK initialization and paths locally, and mock authentication interactions without reading or writing the network. Content workflows, realtime updates, and permission rules remain for later issues.
+
+## Officer authentication
+
+Enable **Email/Password** under Firebase Console → Authentication → Sign-in method, then create the single shared CIC Intro officer account under **Users → Add user**. Configure the application's host under Authentication → Settings → Authorized domains if needed. Keep the account password outside the repository and environment example. There is no signup or member account flow.
+
+The secondary **Officer Login** link opens `/officer`. Its layout uses `OfficerAuthGate`, which renders a checking state until `useOfficerAuth()` receives Firebase's `onAuthStateChanged` result. Anonymous visitors see a compact login form; only confirmed authenticated users see the protected page. Initialization failures show an unavailable state without exposing Firebase configuration/errors. Logout calls Firebase `signOut`, hides protected content while pending, and returns to the login form when Firebase reports an anonymous session. Member Mode stays accessible through the public link throughout.
+
+`getOfficerAuth()` in `src/lib/firebase/auth.ts` uses `getAuth(getFirebaseApp())`, reusing the existing default app. Firebase owns browser persistence; no custom session storage or persistence override is added. Login success alone does not open the gate: the Firebase observer remains authoritative. See [Firebase auth persistence](https://firebase.google.com/docs/auth/web/auth-state-persistence).
+
+For Issue #38, place officer pages under `src/app/officer/` to inherit the gate. Client data workflows can use `useOfficerAuth()` when they need the confirmed Firebase `User` and `getFirestoreDb()` for the same app's authenticated Firestore connection. Call SDK accessors from effects/event handlers. Do not pass protected data through server-rendered children: this browser gate does not authorize server responses. It also does not authorize Firestore writes; backend Security Rules must independently enforce access. Existing production-mode restrictions remain unchanged; authenticated data writes require the later rules work.
 
 ## Persisted model
 

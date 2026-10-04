@@ -21,6 +21,8 @@ button {
 }
 
 button:focus-visible,
+a:focus-visible,
+input:focus-visible,
 [role='tabpanel']:focus-visible {
   outline: 3px solid #76a9fa;
   outline-offset: 3px;
@@ -164,5 +166,146 @@ h1 {
 
   .editor-tab {
     padding: 0 0.85rem;
+  }
+}
+
+.officer-entry {
+  color: #52627a;
+  font-size: 0.875rem;
+  text-underline-offset: 3px;
+}
+
+.officer-shell {
+  min-height: 100vh;
+  background: #f6f8fa;
+  color: #18212b;
+  font-family: system-ui, sans-serif;
+}
+
+.officer-header {
+  min-height: 56px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.5rem 1.5rem;
+  border-bottom: 1px solid #dce2e8;
+  background: #fff;
+}
+
+.officer-header a {
+  color: inherit;
+  text-underline-offset: 3px;
+}
+
+.officer-header nav {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.officer-content {
+  max-width: 76rem;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+  line-height: 1.6;
+}
+
+.officer-content h1 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: normal;
+}
+
+.officer-login {
+  width: min(100%, 24rem);
+}
+
+.officer-login form {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 1.5rem;
+}
+
+.officer-login input {
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0.5rem;
+  border: 1px solid #b8c2cc;
+  border-radius: 6px;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+}
+
+.login-button {
+  min-height: 2.75rem;
+  margin-top: 0.5rem;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: #2563eb;
+  color: #fff;
+  cursor: pointer;
+}
+
+.login-button:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.officer-shell button:disabled,
+.officer-login input:disabled {
+  background: #f1f4f7;
+  color: #65717d;
+  cursor: default;
+}
+
+.auth-error {
+  color: #b42335;
+}
+
+.officer-header a:focus-visible,
+.officer-shell input:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .officer-shell {
+    color-scheme: dark;
+    background: #0f1318;
+    color: #e6ebf0;
+  }
+
+  .officer-header,
+  .officer-login input,
+  .officer-shell .clear-button {
+    background: #151a20;
+    border-color: #35404c;
+    color: #e6ebf0;
+  }
+
+  .officer-shell .workspace-description {
+    color: #a0aab5;
+  }
+
+  .login-button {
+    background: #4d8dff;
+    color: #0f1318;
+  }
+
+  .login-button:hover:not(:disabled) {
+    background: #69a0ff;
+  }
+
+  .officer-shell button:disabled,
+  .officer-login input:disabled {
+    background: #1a2028;
+    color: #a0aab5;
+  }
+
+  .auth-error {
+    color: #d96c75;
   }
 }

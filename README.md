@@ -64,7 +64,7 @@ npm install
 npm run dev
 ```
 
-To configure the Firebase foundation, follow [Firebase local setup](docs/FIREBASE.md#local-setup) and populate a root `.env.local` from `.env.example`. The current workspace does not access Firebase yet.
+To configure the Firebase foundation, follow [Firebase local setup](docs/FIREBASE.md#local-setup) and populate a root `.env.local` from `.env.example`. The public workspace is read-only and needs no authentication. The secondary **Officer Login** link opens `/officer`; configure Email/Password authentication and the shared officer account using [the authentication setup](docs/FIREBASE.md#officer-authentication).
 
 Run the project checks before opening a pull request:
 

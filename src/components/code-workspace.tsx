@@ -1,6 +1,7 @@
 'use client';
 
 import Editor from '@monaco-editor/react';
+import Link from 'next/link';
 import { useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import { languages, type Language } from '@/lib/domain';
@@ -19,14 +20,7 @@ const emptySource: Record<Language, string> = {
 
 export default function CodeWorkspace() {
   const [activeLanguage, setActiveLanguage] = useState<Language>('python');
-  const [sourceCode, setSourceCode] =
-    useState<Record<Language, string>>(emptySource);
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
-
-  function clearWorkspace() {
-    setSourceCode({ ...emptySource });
-    setActiveLanguage('python');
-  }
 
   function handleTabKeyDown(
     event: KeyboardEvent<HTMLButtonElement>,
@@ -54,17 +48,13 @@ export default function CodeWorkspace() {
           <p className="eyebrow">CappyCode</p>
           <h1>Code workspace</h1>
           <p className="workspace-description">
-            Edit Python, Java, and C++ code in the editor workspace.
+            View prepared Python, Java, and C++ code in Member Mode.
           </p>
         </div>
         <div className="workspace-controls">
-          <button
-            className="clear-button"
-            onClick={clearWorkspace}
-            type="button"
-          >
-            Clear all
-          </button>
+          <Link className="officer-entry" href="/officer">
+            Officer Login
+          </Link>
         </div>
       </header>
 
@@ -101,13 +91,8 @@ export default function CodeWorkspace() {
           <Editor
             height="100%"
             language={activeLanguage}
-            onChange={(value) => {
-              setSourceCode((current) => ({
-                ...current,
-                [activeLanguage]: value ?? '',
-              }));
-            }}
             options={{
+              readOnly: true,
               automaticLayout: true,
               fontSize: 14,
               minimap: { enabled: false },
@@ -117,12 +102,12 @@ export default function CodeWorkspace() {
             }}
             path={activeLanguage}
             theme="vs-dark"
-            value={sourceCode[activeLanguage]}
+            value={emptySource[activeLanguage]}
           />
         </div>
         <footer className="editor-footer">
           <span>{languageNames[activeLanguage]}</span>
-          <span>Editable</span>
+          <span>Read-only</span>
         </footer>
       </section>
     </main>
