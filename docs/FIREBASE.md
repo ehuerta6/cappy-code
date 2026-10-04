@@ -212,6 +212,23 @@ Solution IDs are supported. Authenticated Officers manage all three document
 types; anonymous writes are denied. Ending a Session does not change each
 Problem's reveal state.
 
+## Public Member view (#41)
+
+`src/lib/firebase/member.ts` provides anonymous server reads for public
+discovery, a selected Session, its ordered Problem metadata, and the three fixed
+Solution documents. Discovery runs separate `status == live` and
+`status == ended` queries because Firestore Rules do not filter broad Session
+queries. Drafts are not returned. The selected Session and Problem reads still
+go through Firestore Rules, which remain authoritative if access changes.
+
+The member pages call these read functions from Client Component effects; no
+Officer Auth gate, account UI, or write function is used. The hidden-answer
+state renders from Problem metadata without requesting Solution documents.
+Only when `answersVisible` is true does the page request the fixed language
+documents, and Firestore Rules independently deny a hidden or no-longer-public
+read. The reusable `SolutionWorkspace` renders only those returned records in
+read-only Monaco panels with their prepared output.
+
 ## Firestore Rules tests
 
 The Rules tests use `@firebase/rules-unit-testing` against the Firestore Emulator.

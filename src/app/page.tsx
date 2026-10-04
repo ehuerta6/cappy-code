@@ -1,11 +1,5 @@
-import Link from 'next/link';
+import MemberHome from '@/components/member/member-home';
 
 export default function Home() {
-  return (
-    <main className="landing-shell">
-      <h1>CappyCode</h1>
-      <p>CIC Intro solution showcase</p>
-      <Link href="/officer">Officer Login</Link>
-    </main>
-  );
+  return <MemberHome />;
 }

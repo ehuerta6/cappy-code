@@ -15,6 +15,7 @@ const firebase = vi.hoisted(() => ({
   onAuthStateChanged: vi.fn(),
   signOut: vi.fn(),
   listSessions: vi.fn(),
+  listMemberSessions: vi.fn(),
 }));
 vi.mock('client-only', () => ({}));
 vi.mock('@/lib/firebase/auth', () => ({ getOfficerAuth: () => ({}) }));
@@ -28,6 +29,9 @@ vi.mock('@/lib/firebase/sessions', () => ({
   createSession: vi.fn(),
   updateSession: vi.fn(),
   deleteSession: vi.fn(),
+}));
+vi.mock('@/lib/firebase/member', () => ({
+  listMemberSessions: firebase.listMemberSessions,
 }));
 vi.mock('@monaco-editor/react', () => ({
   default: ({ options }: { options: { readOnly: boolean } }) => (
@@ -49,6 +53,7 @@ beforeEach(() => {
     return vi.fn();
   });
   firebase.listSessions.mockResolvedValue([]);
+  firebase.listMemberSessions.mockResolvedValue([]);
   firebase.signOut.mockResolvedValue(undefined);
 });
 afterEach(cleanup);
@@ -96,14 +101,15 @@ describe('Officer Session route integration', () => {
     expect(firebase.signOut).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps Member Mode read-only without Auth or Session data access', () => {
+  it('keeps Member Mode anonymous and read-only while loading public Sessions', () => {
     render(<MemberPage />);
-    expect(screen.getByRole('heading', { name: 'CappyCode' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Sessions' })).toBeTruthy();
     expect(screen.getByRole('link', { name: 'Officer Login' })).toBeTruthy();
     expect(screen.queryByLabelText('Read-only editor')).toBeNull();
     expect(screen.queryByRole('button', { name: '+ New session' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Delete session' })).toBeNull();
     expect(firebase.onAuthStateChanged).not.toHaveBeenCalled();
     expect(firebase.listSessions).not.toHaveBeenCalled();
+    expect(firebase.listMemberSessions).toHaveBeenCalledOnce();
   });
 });
