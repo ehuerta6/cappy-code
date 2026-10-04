@@ -37,6 +37,59 @@ export default function SessionEditor({
   const busy = useRef(false);
   const dirty = title !== saved.title || date !== saved.date;
 
+  function lifecycleActions() {
+    if (status === 'draft') {
+      return (
+        <div className={styles.lifecycle}>
+          <button
+            className={styles.primaryButton}
+            onClick={() => void transition('live')}
+            disabled={
+              problemCount === 0 ||
+              dirty ||
+              saving ||
+              deleting ||
+              transitionPending
+            }
+          >
+            {transitionPending ? 'Starting…' : 'Go Live'}
+          </button>
+          {problemCount === 0 ? (
+            <span className={styles.reason}>
+              Add a Problem before going live.
+            </span>
+          ) : null}
+        </div>
+      );
+    }
+    if (status === 'live') {
+      return (
+        <button
+          className={styles.button}
+          onClick={() => void transition('ended')}
+          disabled={dirty || saving || deleting || transitionPending}
+        >
+          {transitionPending ? 'Ending…' : 'End Session'}
+        </button>
+      );
+    }
+    return null;
+  }
+
+  function saveStatus() {
+    return (
+      <p className={styles.saveStatus} role="status">
+        {saving
+          ? 'Saving…'
+          : saveError
+            ? 'Save failed'
+            : dirty
+              ? 'Unsaved changes — leave a field to save'
+              : 'Saved ✓'}
+      </p>
+    );
+  }
+
   async function transition(nextStatus: 'live' | 'ended') {
     if (busy.current || dirty) return;
     if (
@@ -121,8 +174,28 @@ export default function SessionEditor({
         >
           Back to session
         </button>
-        <h1>{title}</h1>
-        <p className={styles.status}>{status}</p>
+        <div className={styles.workspaceHeader}>
+          <div>
+            <h1>{title}</h1>
+            <p className={styles.sessionContext}>
+              CIC Intro Session <span aria-hidden="true">•</span>{' '}
+              <time dateTime={date}>{formatDate(date)}</time>
+            </p>
+          </div>
+          <div className={styles.workspaceActions}>
+            <span className={`${styles.status} ${styles[status]}`}>
+              {status}
+            </span>
+            {saveStatus()}
+            {lifecycleActions()}
+          </div>
+        </div>
+        {transitionError && (
+          <p className={styles.error} role="alert">
+            Session status could not be changed. Check your connection and try
+            again.
+          </p>
+        )}
         <OfficerProblems
           sessionId={record.id}
           sessionStatus={status}
@@ -141,17 +214,20 @@ export default function SessionEditor({
       >
         Back to Sessions
       </button>
-      <h2>{record.session.title}</h2>
-      <p className={styles.status}>{status}</p>
-      <p role="status">
-        {saving
-          ? 'Saving…'
-          : saveError
-            ? 'Save failed'
-            : dirty
-              ? 'Unsaved changes — leave a field to save'
-              : 'Saved ✓'}
-      </p>
+      <div className={styles.workspaceHeader}>
+        <div>
+          <h1>{record.session.title}</h1>
+          <p className={styles.sessionContext}>
+            CIC Intro Session <span aria-hidden="true">•</span>{' '}
+            <time dateTime={date}>{formatDate(date)}</time>
+          </p>
+        </div>
+        <div className={styles.workspaceActions}>
+          <span className={`${styles.status} ${styles[status]}`}>{status}</span>
+          {saveStatus()}
+          {lifecycleActions()}
+        </div>
+      </div>
       {saveError && (
         <div role="alert">
           <p>{saveError}</p>
@@ -164,35 +240,8 @@ export default function SessionEditor({
           </button>
         </div>
       )}
-      {status === 'draft' && (
-        <div>
-          <button
-            className={styles.button}
-            onClick={() => void transition('live')}
-            disabled={
-              problemCount === 0 ||
-              dirty ||
-              saving ||
-              deleting ||
-              transitionPending
-            }
-          >
-            {transitionPending ? 'Starting…' : 'Go Live'}
-          </button>
-          {problemCount === 0 && <p>Add a Problem before going live.</p>}
-        </div>
-      )}
-      {status === 'live' && (
-        <button
-          className={styles.button}
-          onClick={() => void transition('ended')}
-          disabled={dirty || saving || deleting || transitionPending}
-        >
-          {transitionPending ? 'Ending…' : 'End Session'}
-        </button>
-      )}
       {transitionError && (
-        <p role="alert">
+        <p className={styles.error} role="alert">
           Session status could not be changed. Check your connection and try
           again.
         </p>
@@ -244,4 +293,13 @@ export default function SessionEditor({
       )}
     </section>
   );
+}
+
+function formatDate(date: string) {
+  const [year, month, day] = date.split('-').map(Number);
+  if (!year || !month || !day) return date;
+  return new Intl.DateTimeFormat('en', {
+    dateStyle: 'medium',
+    timeZone: 'UTC',
+  }).format(new Date(Date.UTC(year, month - 1, day)));
 }

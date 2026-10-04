@@ -105,7 +105,7 @@ export default function OfficerSessions() {
       <div className={styles.heading}>
         <h1>Sessions</h1>
         <button
-          className={styles.button}
+          className={styles.primaryButton}
           onClick={() => void create()}
           disabled={creating || loading || loadError}
         >
@@ -161,7 +161,9 @@ export default function OfficerSessions() {
                             {record.problemCount === 1 ? 'Problem' : 'Problems'}
                           </span>
                         </span>
-                        <span className={styles.status}>
+                        <span
+                          className={`${styles.status} ${styles[record.session.status]}`}
+                        >
                           {record.session.status}
                         </span>
                       </button>

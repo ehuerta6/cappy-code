@@ -1,8 +1,9 @@
 'use client';
 
 import Editor, { type BeforeMount } from '@monaco-editor/react';
-import { useEffect, useId, useState } from 'react';
+import { useId } from 'react';
 import type { Language, Solution } from '@/lib/domain';
+import { useColorTheme } from '@/components/theme-provider';
 import styles from './solutions.module.css';
 
 export const languageNames: Record<Language, string> = {
@@ -49,14 +50,8 @@ type Props = {
 export default function SolutionPanel(props: Props) {
   const { language, solution, modelPath, mode } = props;
   const id = useId();
-  const [dark, setDark] = useState(false);
-  useEffect(() => {
-    const media = window.matchMedia('(prefers-color-scheme: dark)');
-    const update = () => setDark(media.matches);
-    update();
-    media.addEventListener('change', update);
-    return () => media.removeEventListener('change', update);
-  }, []);
+  const theme = useColorTheme()?.theme;
+  const dark = theme === 'dark';
   const name = languageNames[language];
   return (
     <section className={styles.panel} aria-labelledby={`${id}-heading`}>

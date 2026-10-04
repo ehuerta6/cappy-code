@@ -1,0 +1,157 @@
+.header {
+  min-height: 56px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--surface-primary);
+  color: var(--text-primary);
+}
+
+.inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: min(calc(100% - 48px), 1440px);
+  min-height: 56px;
+  margin: 0 auto;
+}
+
+.brand {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+  color: inherit;
+  font-size: 16px;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.brand img {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.actions nav {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.context,
+.actions a,
+.actions button:not(.themeToggle) {
+  color: var(--text-secondary);
+  font-size: 14px;
+  text-decoration: none;
+  text-underline-offset: 3px;
+}
+
+.context {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.liveContext span {
+  color: var(--success);
+  font-size: 12px;
+}
+
+.actions a:hover {
+  color: var(--accent-hover);
+  text-decoration: underline;
+}
+
+.separator {
+  width: 1px;
+  height: 24px;
+  background: var(--border-subtle);
+}
+
+.themeToggle,
+.actions button:not(.themeToggle) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 6px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  background: var(--surface-primary);
+  color: var(--text-primary);
+  cursor: pointer;
+  font: inherit;
+  text-decoration: none;
+}
+
+.themeToggle:hover,
+.actions button:not(.themeToggle):hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.themeIcon {
+  color: var(--accent);
+  font-size: 18px;
+  line-height: 1;
+}
+
+.inner :focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (max-width: 44rem) {
+  .inner {
+    width: calc(100% - 32px);
+  }
+
+  .actions {
+    gap: 8px;
+  }
+
+  .context {
+    display: none;
+  }
+
+  .themeToggle {
+    width: 44px;
+    padding-inline: 0;
+  }
+
+  .themeToggle > span:last-child {
+    display: none;
+  }
+
+  .brand {
+    gap: 6px;
+    font-size: 15px;
+  }
+
+  .brand img {
+    width: 24px;
+    height: 24px;
+  }
+
+  .actions nav {
+    gap: 6px;
+  }
+
+  .actions nav a {
+    font-size: 13px;
+  }
+
+  .actions nav button:not(.themeToggle) {
+    padding-inline: 8px;
+  }
+}

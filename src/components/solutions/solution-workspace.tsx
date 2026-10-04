@@ -14,8 +14,7 @@ export default function SolutionWorkspace({
   modelPath: string;
 }) {
   return (
-    <section aria-label="Solutions">
-      <h2>Solutions</h2>
+    <div className={styles.revealed}>
       <div
         className={styles.rail}
         tabIndex={0}
@@ -33,6 +32,6 @@ export default function SolutionWorkspace({
           ))}
         </div>
       </div>
-    </section>
+    </div>
   );
 }
