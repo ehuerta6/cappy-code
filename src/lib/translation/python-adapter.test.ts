@@ -110,6 +110,23 @@ def has_item(items: list[int], values: dict[int, int], seen: set[int], key: int)
     expect(code).toContain('return values.get(key)');
   });
 
+  it('rejects dictionary get calls with a default value', () => {
+    const result = parser.parse(
+      'def lookup(values: dict[int, int], key: int) -> int:\n    return values.get(key, -1)\n',
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      diagnostics: [
+        {
+          message:
+            'dict.get(key, default) is not supported because the shared IR does not represent default-value lookup.',
+          location: { line: 2, column: 12 },
+        },
+      ],
+    });
+  });
+
   it('returns a located diagnostic for syntactically invalid Python', () => {
     const result = parser.parse('def broken(:\n  return 1\n');
 

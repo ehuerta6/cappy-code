@@ -622,6 +622,12 @@ function parseCall(node: Parser.SyntaxNode): Expression {
     const method = fn.childForFieldName('attribute');
     if (!object || !method) throw unsupported(fn, 'Unsupported method call.');
     const collection = parseExpression(object);
+    if (method.text === 'get' && args.length > 1) {
+      throw unsupported(
+        node,
+        'dict.get(key, default) is not supported because the shared IR does not represent default-value lookup.',
+      );
+    }
     const operation = collectionOperationFor(method.text, args.length);
     if (operation)
       return {

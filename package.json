@@ -23,8 +23,8 @@
     "next": "^16.3.8",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
-    "tree-sitter": "^0.25.1",
-    "tree-sitter-python": "^0.25.0"
+    "tree-sitter": "^0.21.1",
+    "tree-sitter-python": "^0.21.0"
   },
   "devDependencies": {
     "@next/eslint-plugin-next": "16.3.8",
@@ -38,7 +38,7 @@
     "vitest": "^5.0.3"
   },
   "allowScripts": {
-    "tree-sitter@0.25.1": true,
-    "tree-sitter-python@0.25.0": true
+    "tree-sitter@0.21.1": true,
+    "tree-sitter-python@0.21.0": true
   }
 }
