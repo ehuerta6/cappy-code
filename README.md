@@ -130,6 +130,7 @@ CappyCode should explain meaningful differences when useful.
 
 Examples:
 
+<!-- prettier-ignore -->
 | Concept | Python | Java | C++ |
 |---|---|---|---|
 | Hash map | `dict` | `HashMap<K, V>` | `unordered_map<K, V>` |
@@ -222,3 +223,24 @@ See [Git & Pull Request Conventions](docs/GIT_CONVENTIONS.md) for the full workf
 CappyCode is currently in early development.
 
 See the [Feature Tracker](docs/FEATURES.md) for the current implementation checklist.
+
+## Local Development
+
+Use Node.js **24.11.0** and npm **11.6.2** for local development. The supported Node version is recorded in `.nvmrc` and `package.json`.
+
+Install dependencies and start the development server:
+
+```bash
+npm install
+npm run dev
+```
+
+Run the project checks before opening a pull request:
+
+```bash
+npm run lint
+npm run typecheck
+npm test
+npm run format:check
+npm run build
+```
