@@ -15,7 +15,8 @@ This checklist tracks the product implementation for CappyCode, **a live solutio
 - [ ] Configure one shared CIC officer account for the proof of concept
 - [ ] Allow anonymous access to the public Member Mode
 - [ ] Restrict session and problem management to authenticated officers with Firestore Security Rules
-- [ ] Enforce hidden-answer reads in Firestore Security Rules so anonymous clients cannot read unrevealed solution documents
+- [ ] Enforce Firestore Security Rules so draft session/problem metadata is officer-only and member reads follow session publication rules
+- [ ] Require the parent problem's `answersVisible` to permit anonymous reads of its solution documents
 
 ## Firestore data and session lifecycle
 
@@ -23,15 +24,15 @@ This checklist tracks the product implementation for CappyCode, **a live solutio
 - [ ] Model sessions with `draft`, `live`, and `ended` states
 - [ ] Support session creation, editing, starting, and ending in Officer Mode
 - [ ] Keep session history available from the officer dashboard
-- [ ] Store session-level `activeProblemId` and answer reveal state
-- [ ] Keep public problem metadata separate from protected solution documents
+- [ ] Store session-level `activeProblemId` and problem-level `answersVisible`
+- [ ] Keep problem metadata separate from protected solution documents; expose metadata only when session status/publication rules permit member access
 
 ## Problem and solution preparation
 
 - [ ] Add multiple problems to a session
 - [ ] Create, edit, and delete problems in Officer Mode
 - [ ] Reorder problems in a session
-- [ ] Store a problem title, description, and examples as public metadata
+- [ ] Store a problem title, description, examples, order, and `answersVisible`; member reads of metadata depend on session publication status
 - [ ] Prepare Python, Java, and C++ solutions for each problem
 - [ ] Store prepared static output for each language
 - [ ] Add Monaco editors editable in Officer Mode and read-only in Member Mode
@@ -42,7 +43,7 @@ This checklist tracks the product implementation for CappyCode, **a live solutio
 - [ ] Build an officer dashboard for session and presentation management
 - [ ] Publish live sessions to the anonymous public view
 - [ ] Add **Show Answers** and **Hide Answers** controls
-- [ ] Synchronize active problem and answer reveal state to members in realtime
+- [ ] Synchronize session `activeProblemId` and per-problem `answersVisible` to eligible member views in realtime
 - [ ] Add member-side **Follow Presenter** behavior using the session's `activeProblemId`
 - [ ] Keep ended sessions in session history
 
