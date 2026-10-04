@@ -1,0 +1,116 @@
+.rail {
+  overflow-x: auto;
+  padding: 4px;
+  margin: -4px;
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(min(360px, calc(100vw - 40px)), 1fr));
+  gap: 16px;
+}
+.panel {
+  overflow: hidden;
+  border: 1px solid #dce2e8;
+  border-radius: 8px;
+  background: #fff;
+  color: #18212b;
+}
+.header {
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+  margin: 0;
+  padding: 8px 16px;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 22px;
+}
+.editor {
+  background: #fafbfc;
+  border-top: 1px solid #dce2e8;
+  border-bottom: 1px solid #dce2e8;
+}
+.editor:focus-within {
+  outline: 2px solid #2563eb;
+  outline-offset: -2px;
+}
+.output {
+  padding: 12px 16px 16px;
+}
+.output label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 15px;
+  font-weight: 600;
+}
+.output textarea,
+.output pre {
+  width: 100%;
+  min-height: 92px;
+  max-height: 230px;
+  overflow: auto;
+  margin: 0;
+  font:
+    15px / 23px ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Consolas,
+    monospace;
+  white-space: pre;
+}
+.output textarea {
+  padding: 8px;
+  resize: vertical;
+  border: 1px solid #b8c2cc;
+  border-radius: 6px;
+  background: #fff;
+  color: inherit;
+}
+.output textarea:focus-visible,
+.button:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+.hint,
+.saveStatus {
+  color: #65717d;
+  font-size: 14px;
+  line-height: 20px;
+}
+.button {
+  padding: 8px 12px;
+  border: 1px solid #b8c2cc;
+  border-radius: 4px;
+  background: #fff;
+  color: #18212b;
+  cursor: pointer;
+}
+.button:hover {
+  background: #e8edf3;
+}
+@media (prefers-color-scheme: dark) {
+  .panel,
+  .output textarea,
+  .button {
+    color-scheme: dark;
+    background: #151a20;
+    color: #e6ebf0;
+    border-color: #35404c;
+  }
+  .editor {
+    background: #12171d;
+    border-color: #28313b;
+  }
+  .hint,
+  .saveStatus {
+    color: #a0aab5;
+  }
+  .button:hover {
+    background: #202731;
+  }
+}
+
+.rail:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
