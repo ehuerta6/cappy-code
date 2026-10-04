@@ -4,6 +4,8 @@ This document provides project context and guardrails for AI coding assistants w
 
 AI tools should follow the same repository rules as human contributors.
 
+For implementation and review workflows, follow the root [AGENTS.md](../AGENTS.md) and the repository-scoped skills in `.codex/skills/`. This document remains the source for product context and runtime guardrails.
+
 AI coding assistants may help develop CappyCode, but AI/LLMs are not part of the runtime product or translation pipeline. POC translation is deterministic and uses language parsers, the CappyCode IR, and target-language emitters.
 
 ## Product Context
