@@ -78,6 +78,78 @@ function collectVariableTypes(
   }
 }
 
+function expressionType(
+  node: Expression,
+  types: Map<string, CappyType>,
+): CappyType | undefined {
+  switch (node.kind) {
+    case 'integerLiteral':
+      return { kind: 'integer' };
+    case 'booleanLiteral':
+      return { kind: 'boolean' };
+    case 'stringLiteral':
+      return { kind: 'string' };
+    case 'variable':
+      return types.get(node.name);
+    case 'arrayLiteral':
+      return { kind: 'array', elementType: node.elementType };
+    case 'mapLiteral':
+      return {
+        kind: 'map',
+        keyType: node.keyType,
+        valueType: node.valueType,
+      };
+    case 'setLiteral':
+      return { kind: 'set', elementType: node.elementType };
+    case 'index': {
+      const collectionType = expressionType(node.collection, types);
+      if (collectionType?.kind === 'array') return collectionType.elementType;
+      if (collectionType?.kind === 'map') return collectionType.valueType;
+      return undefined;
+    }
+    case 'collectionOperation': {
+      const collectionType = expressionType(node.collection, types);
+      if (node.operation === 'length') return { kind: 'integer' };
+      if (node.operation === 'contains') return { kind: 'boolean' };
+      if (node.operation === 'get') {
+        if (collectionType?.kind === 'array') return collectionType.elementType;
+        if (collectionType?.kind === 'map') return collectionType.valueType;
+      }
+      return undefined;
+    }
+    case 'binary':
+      if (node.operator === 'add') {
+        const leftType = expressionType(node.left, types);
+        const rightType = expressionType(node.right, types);
+        if (leftType?.kind === 'string' || rightType?.kind === 'string') {
+          return { kind: 'string' };
+        }
+        return { kind: 'integer' };
+      }
+      if (
+        [
+          'equal',
+          'notEqual',
+          'lessThan',
+          'lessThanOrEqual',
+          'greaterThan',
+          'greaterThanOrEqual',
+          'and',
+          'or',
+        ].includes(node.operator)
+      ) {
+        return { kind: 'boolean' };
+      }
+      return { kind: 'integer' };
+    case 'unary':
+      return node.operator === 'not'
+        ? { kind: 'boolean' }
+        : { kind: 'integer' };
+    case 'call':
+      return undefined;
+  }
+}
+
 function expression(node: Expression, types: Map<string, CappyType>): string {
   switch (node.kind) {
     case 'integerLiteral':
@@ -103,7 +175,17 @@ function expression(node: Expression, types: Map<string, CappyType>): string {
         and: '&&',
         or: '||',
       };
-      return `(${expression(node.left, types)} ${operators[node.operator]} ${expression(node.right, types)})`;
+      const left = expression(node.left, types);
+      const right = expression(node.right, types);
+      const isStringComparison =
+        (node.operator === 'equal' || node.operator === 'notEqual') &&
+        (expressionType(node.left, types)?.kind === 'string' ||
+          expressionType(node.right, types)?.kind === 'string');
+      if (isStringComparison) {
+        const equality = `Objects.equals(${left}, ${right})`;
+        return node.operator === 'notEqual' ? `(!${equality})` : equality;
+      }
+      return `(${left} ${operators[node.operator]} ${right})`;
     }
     case 'unary':
       return `${node.operator === 'not' ? '!' : '-'}${expression(node.operand, types)}`;
@@ -163,7 +245,11 @@ function assignment(
   if (target.kind === 'variable') {
     return `${target.name} = ${expression(value, types)}`;
   }
-  return `${expression(target.collection, types)}.set(${expression(target.index, types)}, ${expression(value, types)})`;
+  const collection = expression(target.collection, types);
+  const index = expression(target.index, types);
+  const setter =
+    expressionType(target.collection, types)?.kind === 'map' ? 'put' : 'set';
+  return `${collection}.${setter}(${index}, ${expression(value, types)})`;
 }
 
 function statement(
@@ -278,6 +364,7 @@ export const javaEmitter: CappyEmitter = {
       'import java.util.HashSet;',
       'import java.util.List;',
       'import java.util.Map;',
+      'import java.util.Objects;',
       'import java.util.Set;',
       '',
     ];
