@@ -4,7 +4,7 @@
 
 1. Create or select a Firebase project in the [Firebase Console](https://console.firebase.google.com/).
 2. Register a Web app under **Project settings → General → Your apps**. Copy its SDK configuration values. The [official Web SDK setup guide](https://firebase.google.com/docs/web/setup) describes these steps.
-3. Create the default Cloud Firestore database under **Build → Firestore Database**, using production mode. Keep its initial access restrictions; application permission rules belong to Issue #42.
+3. Create the default Cloud Firestore database under **Build → Firestore Database**, using production mode. Keep its initial access restrictions until deploying the baseline Session rules below; public access and answer reveal rules belong to Issue #42.
 4. Copy the checked-in environment example at the repository root:
 
    ```bash
@@ -39,7 +39,7 @@ import { problemPath } from '@/lib/firebase/paths';
 const problemRef = doc(getFirestoreDb(), problemPath(sessionId, problemId));
 ```
 
-The public workspace does not call these accessors or persist editor content. Builds and unit tests require no live Firebase project. Tests exercise SDK initialization and paths locally, and mock authentication interactions without reading or writing the network. Content workflows, realtime updates, and permission rules remain for later issues.
+The public workspace does not call these accessors or persist editor content. Builds and unit tests require no live Firebase project. Tests exercise SDK initialization and paths locally, and mock authentication interactions without reading or writing the network. Session preparation is described below; Problem/Solution workflows, realtime updates, and public access rules remain for later issues.
 
 ## Officer authentication
 
@@ -49,7 +49,13 @@ The secondary **Officer Login** link opens `/officer`. Its layout uses `OfficerA
 
 `getOfficerAuth()` in `src/lib/firebase/auth.ts` uses `getAuth(getFirebaseApp())`, reusing the existing default app. Firebase owns browser persistence; no custom session storage or persistence override is added. Login success alone does not open the gate: the Firebase observer remains authoritative. See [Firebase auth persistence](https://firebase.google.com/docs/auth/web/auth-state-persistence).
 
-For Issue #38, place officer pages under `src/app/officer/` to inherit the gate. Client data workflows can use `useOfficerAuth()` when they need the confirmed Firebase `User` and `getFirestoreDb()` for the same app's authenticated Firestore connection. Call SDK accessors from effects/event handlers. Do not pass protected data through server-rendered children: this browser gate does not authorize server responses. It also does not authorize Firestore writes; backend Security Rules must independently enforce access. Existing production-mode restrictions remain unchanged; authenticated data writes require the later rules work.
+Officer pages under `src/app/officer/` inherit the gate. `/officer` renders
+`OfficerSessions` only through this authenticated surface. Session management does
+not accept a Firebase User prop or subscribe to Auth; the gate owns auth rendering.
+Each persistence operation rechecks `getOfficerAuth().currentUser` before obtaining
+Firestore. Call SDK accessors from effects/event handlers. Do not pass protected
+data through server-rendered children: this browser gate does not authorize server
+responses. Firestore Security Rules independently enforce backend access.
 
 ## Persisted model
 
@@ -75,3 +81,64 @@ For Issue #38, place officer pages under `src/app/officer/` to inherit the gate.
 Problem documents hold member-facing metadata and `answersVisible`. Prepared code and output exist only in the separate Solution subcollection, consistent with [Firestore's hierarchical data model](https://firebase.google.com/docs/firestore/data-model). Member metadata access must follow session status/publication rules; drafts remain officer-only. Future rules must allow member Solution reads only when session access permits them **and** the parent Problem's `answersVisible` is true. Officers will use Firebase Authentication for content management.
 
 This foundation does not implement those rules or decide publication policy for ended sessions. Issues #38 and #39 should use these paths and document fields; Issue #42 must define the publication/access policy and enforce it alongside answer visibility. Hiding answers in the UI alone provides no protection.
+
+## Officer Session preparation (#38)
+
+`src/lib/firebase/sessions.ts` provides `createSession`, `listSessions`,
+`updateSession`, and `deleteSession`, using the foundation's `Session` type and
+`sessionPath`. Each operation checks the current user from
+`getOfficerAuth()`; signed-out and anonymous-auth users are rejected
+before Firestore access. Firebase sends the actual Auth token to Firestore;
+Security Rules remain the backend boundary.
+
+Creation writes `Untitled Session`, the browser's current local calendar date,
+`draft`, `activeProblemId: null`, and server timestamps. It creates no Problems.
+Calendar dates remain `YYYY-MM-DD` strings. Edits validate title/date and write
+only those fields plus `updatedAt: serverTimestamp()`, preserving `createdAt`,
+status, and the presenter pointer. Writes resolve only after backend confirmation.
+The list uses `getDocsFromServer`; failed/offline reads remain errors rather than
+using static content or presenting cached data as current. It validates stored
+fields and rejects documents with pending writes or unresolved timestamps rather
+than inventing client timestamps. Document IDs are separate read-model fields.
+
+Title/date commit on blur, with visible unsaved, Saving, Saved, and retryable error
+states. Failed edits remain in the fields. Navigation and deletion are disabled
+until edits are saved. Lists distinguish loading, empty, failed, and populated
+states. A successfully created document followed by a failed list refresh is
+reported as a read failure, preventing an erroneous creation retry.
+
+Deletion requires a browser confirmation naming the Session and hard deletes
+only `sessions/{sessionId}`. **Firestore document deletion does not recursively
+delete subcollections.** Before #39 adds Problems, revisit deletion so child
+Problems/Solutions are not orphaned. This issue adds no recursive infrastructure
+and does not use `ended` as an archive flag.
+
+### Baseline Session Security Rules
+
+`firebase.json` points to `firestore.rules`. The baseline permits Session document
+reads/writes only for non-anonymous Firebase Auth users, under the POC assumption
+that provisioned authenticated users are officers. Configure the shared officer
+account as described above; there is no member account or signup workflow. All other
+paths, including future Problem/Solution subcollections, are denied by default.
+No public Session reads or publication policy are introduced.
+
+Deploy these rules to the intended Firebase project **before using Session CRUD**:
+
+```bash
+npx firebase-tools deploy --only firestore:rules --project YOUR_PROJECT_ID
+```
+
+Do not deploy with public/test-mode rules. This branch does not deploy rules or
+modify any production project. #42 must extend this baseline with eligible public
+Session reads, Problem metadata access, and protected Solution reveal rules.
+#44 owns lifecycle transitions and the richer dashboard/history UI; the #38 list
+is a flat preparation surface showing existing status without changing it.
+
+Unit tests mock Firebase and require no project. They cover exact write fields,
+calendar dates, stable creation timestamps, list mapping/pending writes, deletion,
+current Auth guards, and UI persistence failures/retry/confirmation. Rules emulator
+validation has not run: this development machine has no Java runtime or existing
+Rules test infrastructure. Before deploying, validate with the Firestore Emulator
+or Firebase Rules Playground: officer Session CRUD allowed; signed-out and
+anonymous-auth Session reads/writes denied; nested Problem/Solution reads/writes
+denied. #46 owns comprehensive permission test coverage.
