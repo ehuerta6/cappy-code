@@ -16,13 +16,11 @@ body {
   min-height: 100vh;
 }
 
-button,
-select {
+button {
   font: inherit;
 }
 
 button:focus-visible,
-select:focus-visible,
 [role='tabpanel']:focus-visible {
   outline: 3px solid #76a9fa;
   outline-offset: 3px;
@@ -69,29 +67,12 @@ h1 {
   gap: 0.75rem;
 }
 
-.language-picker {
-  display: grid;
-  gap: 0.4rem;
-  color: #455168;
-  font-size: 0.8rem;
-  font-weight: 600;
-}
-
-.language-picker select,
 .clear-button {
   min-height: 2.7rem;
   border: 1px solid #cbd3df;
   border-radius: 0.55rem;
   background: #fff;
   color: #172033;
-}
-
-.language-picker select {
-  min-width: 9.25rem;
-  padding: 0 2rem 0 0.8rem;
-}
-
-.clear-button {
   padding: 0 0.95rem;
   cursor: pointer;
   font-size: 0.875rem;
@@ -144,54 +125,11 @@ h1 {
   color: #fff;
 }
 
-.tab-status {
-  color: #93a2b7;
-  font-size: 0.68rem;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-}
-
 .editor-panel {
   position: relative;
   height: min(68vh, 40rem);
   min-height: 24rem;
   outline-offset: -3px;
-}
-
-.translation-empty-state {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.65rem;
-  padding: 1.5rem;
-  color: #d3d8e0;
-  pointer-events: none;
-  text-align: center;
-}
-
-.translation-empty-state strong {
-  font-size: 1.05rem;
-}
-
-.translation-empty-state > span:not(.read-only-label) {
-  max-width: 24rem;
-  color: #aeb8c7;
-  font-size: 0.875rem;
-  line-height: 1.5;
-}
-
-.read-only-label {
-  margin-top: 0.3rem;
-  padding: 0.3rem 0.55rem;
-  border: 1px solid #52627a;
-  border-radius: 99px;
-  color: #b8c5d8;
-  font-size: 0.7rem;
-  font-weight: 600;
-  text-transform: uppercase;
 }
 
 .editor-footer {
@@ -216,14 +154,6 @@ h1 {
   }
 
   .workspace-controls {
-    width: 100%;
-  }
-
-  .language-picker {
-    flex: 1;
-  }
-
-  .language-picker select {
     width: 100%;
   }
 

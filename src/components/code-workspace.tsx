@@ -7,7 +7,6 @@ import type { KeyboardEvent } from 'react';
 const languages = ['python', 'java', 'cpp'] as const;
 
 type Language = (typeof languages)[number];
-type View = 'source' | Language;
 
 const languageNames: Record<Language, string> = {
   python: 'Python',
@@ -22,30 +21,14 @@ const emptySource: Record<Language, string> = {
 };
 
 export default function CodeWorkspace() {
-  const [sourceLanguage, setSourceLanguage] = useState<Language>('python');
-  const [activeView, setActiveView] = useState<View>('source');
+  const [activeLanguage, setActiveLanguage] = useState<Language>('python');
   const [sourceCode, setSourceCode] =
     useState<Record<Language, string>>(emptySource);
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
-  const views: Array<{ id: View; label: string }> = [
-    { id: 'source', label: `${languageNames[sourceLanguage]} source` },
-    ...languages
-      .filter((language) => language !== sourceLanguage)
-      .map((language) => ({ id: language, label: languageNames[language] })),
-  ];
-
-  const editorLanguage = activeView === 'source' ? sourceLanguage : activeView;
-  const isSourceView = activeView === 'source';
-
-  function selectSourceLanguage(language: Language) {
-    setSourceLanguage(language);
-    setActiveView('source');
-  }
-
   function clearWorkspace() {
     setSourceCode({ ...emptySource });
-    setActiveView('source');
+    setActiveLanguage('python');
   }
 
   function handleTabKeyDown(
@@ -54,15 +37,15 @@ export default function CodeWorkspace() {
   ) {
     let nextIndex: number | undefined;
 
-    if (event.key === 'ArrowRight') nextIndex = (index + 1) % views.length;
+    if (event.key === 'ArrowRight') nextIndex = (index + 1) % languages.length;
     if (event.key === 'ArrowLeft')
-      nextIndex = (index - 1 + views.length) % views.length;
+      nextIndex = (index - 1 + languages.length) % languages.length;
     if (event.key === 'Home') nextIndex = 0;
-    if (event.key === 'End') nextIndex = views.length - 1;
+    if (event.key === 'End') nextIndex = languages.length - 1;
 
     if (nextIndex !== undefined) {
       event.preventDefault();
-      setActiveView(views[nextIndex].id);
+      setActiveLanguage(languages[nextIndex]);
       tabRefs.current[nextIndex]?.focus();
     }
   }
@@ -74,25 +57,10 @@ export default function CodeWorkspace() {
           <p className="eyebrow">CappyCode</p>
           <h1>Code workspace</h1>
           <p className="workspace-description">
-            Write an interview solution and compare it across languages.
+            Edit Python, Java, and C++ code in the editor workspace.
           </p>
         </div>
         <div className="workspace-controls">
-          <label className="language-picker">
-            <span>Source language</span>
-            <select
-              value={sourceLanguage}
-              onChange={(event) =>
-                selectSourceLanguage(event.target.value as Language)
-              }
-            >
-              {languages.map((language) => (
-                <option key={language} value={language}>
-                  {languageNames[language]}
-                </option>
-              ))}
-            </select>
-          </label>
           <button
             className="clear-button"
             onClick={clearWorkspace}
@@ -105,32 +73,29 @@ export default function CodeWorkspace() {
 
       <section aria-label="Code editor workspace" className="editor-card">
         <div aria-label="Editor views" className="editor-tabs" role="tablist">
-          {views.map((view, index) => (
+          {languages.map((language, index) => (
             <button
               aria-controls="editor-panel"
-              aria-selected={activeView === view.id}
-              className={`editor-tab${activeView === view.id ? ' is-active' : ''}`}
-              id={`editor-tab-${view.id}`}
-              key={view.id}
-              onClick={() => setActiveView(view.id)}
+              aria-selected={activeLanguage === language}
+              className={`editor-tab${activeLanguage === language ? ' is-active' : ''}`}
+              id={`editor-tab-${language}`}
+              key={language}
+              onClick={() => setActiveLanguage(language)}
               onKeyDown={(event) => handleTabKeyDown(event, index)}
               ref={(element) => {
                 tabRefs.current[index] = element;
               }}
               role="tab"
-              tabIndex={activeView === view.id ? 0 : -1}
+              tabIndex={activeLanguage === language ? 0 : -1}
               type="button"
             >
-              {view.label}
-              {view.id !== 'source' && (
-                <span className="tab-status">Translation</span>
-              )}
+              {languageNames[language]}
             </button>
           ))}
         </div>
 
         <div
-          aria-labelledby={`editor-tab-${activeView}`}
+          aria-labelledby={`editor-tab-${activeLanguage}`}
           className="editor-panel"
           id="editor-panel"
           role="tabpanel"
@@ -138,45 +103,29 @@ export default function CodeWorkspace() {
         >
           <Editor
             height="100%"
-            language={editorLanguage}
+            language={activeLanguage}
             onChange={(value) => {
-              if (isSourceView) {
-                setSourceCode((current) => ({
-                  ...current,
-                  [sourceLanguage]: value ?? '',
-                }));
-              }
+              setSourceCode((current) => ({
+                ...current,
+                [activeLanguage]: value ?? '',
+              }));
             }}
             options={{
               automaticLayout: true,
               fontSize: 14,
               minimap: { enabled: false },
               padding: { top: 20, bottom: 20 },
-              readOnly: !isSourceView,
               scrollBeyondLastLine: false,
               tabSize: 4,
             }}
-            path={`${isSourceView ? 'source' : 'translation'}-${editorLanguage}`}
+            path={activeLanguage}
             theme="vs-dark"
-            value={isSourceView ? sourceCode[sourceLanguage] : ''}
+            value={sourceCode[activeLanguage]}
           />
-          {!isSourceView && (
-            <div className="translation-empty-state">
-              <strong>Translation view</strong>
-              <span>
-                Generated code will appear here when translation is available.
-              </span>
-              <span className="read-only-label">Read only</span>
-            </div>
-          )}
         </div>
         <footer className="editor-footer">
-          <span>
-            {isSourceView
-              ? `${languageNames[sourceLanguage]} source`
-              : languageNames[activeView]}
-          </span>
-          <span>{isSourceView ? 'Editable' : 'Read only'}</span>
+          <span>{languageNames[activeLanguage]}</span>
+          <span>Editable</span>
         </footer>
       </section>
     </main>
