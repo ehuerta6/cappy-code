@@ -5,6 +5,7 @@ import {
   deleteSession,
   transitionSession,
   updateSession,
+  type ProblemCountState,
   type SessionRecord,
 } from '@/lib/firebase/sessions';
 import { validateSessionMetadata } from '@/lib/session-metadata';
@@ -31,7 +32,11 @@ export default function SessionEditor({
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState(false);
   const [status, setStatus] = useState(record.session.status);
-  const [problemCount, setProblemCount] = useState(record.problemCount);
+  const [problemCount, setProblemCount] = useState<ProblemCountState>(
+    record.problemCount === null
+      ? { status: 'unavailable' }
+      : { status: 'ready', count: record.problemCount },
+  );
   const [transitionPending, setTransitionPending] = useState(false);
   const [transitionError, setTransitionError] = useState(false);
   const busy = useRef(false);
@@ -39,22 +44,32 @@ export default function SessionEditor({
 
   function lifecycleActions() {
     if (status === 'draft') {
+      const countKnown = problemCount.status === 'ready';
+      const noProblems = countKnown && problemCount.count === 0;
       return (
         <div className={styles.lifecycle}>
           <button
             className={styles.primaryButton}
             onClick={() => void transition('live')}
             disabled={
-              problemCount === 0 ||
+              !countKnown ||
+              noProblems ||
               dirty ||
               saving ||
               deleting ||
-              transitionPending
+              transitionPending ||
+              problemBusy
             }
           >
             {transitionPending ? 'Starting…' : 'Go Live'}
           </button>
-          {problemCount === 0 ? (
+          {problemCount.status === 'loading' ? (
+            <span className={styles.reason}>Checking Problems…</span>
+          ) : problemCount.status === 'unavailable' ? (
+            <span className={styles.reason}>
+              Problem count unavailable. Open Manage problems to retry.
+            </span>
+          ) : noProblems ? (
             <span className={styles.reason}>
               Add a Problem before going live.
             </span>
@@ -67,7 +82,9 @@ export default function SessionEditor({
         <button
           className={styles.button}
           onClick={() => void transition('ended')}
-          disabled={dirty || saving || deleting || transitionPending}
+          disabled={
+            dirty || saving || deleting || transitionPending || problemBusy
+          }
         >
           {transitionPending ? 'Ending…' : 'End Session'}
         </button>
@@ -91,7 +108,14 @@ export default function SessionEditor({
   }
 
   async function transition(nextStatus: 'live' | 'ended') {
-    if (busy.current || dirty) return;
+    if (
+      busy.current ||
+      dirty ||
+      problemBusy ||
+      (nextStatus === 'live' &&
+        (problemCount.status !== 'ready' || problemCount.count === 0))
+    )
+      return;
     if (
       nextStatus === 'ended' &&
       !window.confirm(
@@ -200,7 +224,7 @@ export default function SessionEditor({
           sessionId={record.id}
           sessionStatus={status}
           onBusyChange={setProblemBusy}
-          onProblemCountChange={setProblemCount}
+          onProblemCountStateChange={setProblemCount}
         />
       </section>
     );

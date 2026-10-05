@@ -231,6 +231,33 @@ describe('Officer Sessions surface', () => {
     expect(api.transitionSession).toHaveBeenCalledWith('session-id', 'live');
   });
 
+  it('keeps Go Live visible while the Problem count loads or is unavailable', async () => {
+    api.listSessions.mockResolvedValueOnce([{ ...record, problemCount: null }]);
+    await openEditor();
+    const unavailableButton = screen.getByRole('button', { name: 'Go Live' });
+    expect(unavailableButton).toBeTruthy();
+    expect((unavailableButton as HTMLButtonElement).disabled).toBe(true);
+    expect(
+      screen.getByText(
+        'Problem count unavailable. Open Manage problems to retry.',
+      ),
+    ).toBeTruthy();
+
+    cleanup();
+    let resolveProblems!: (problems: never[]) => void;
+    api.listProblems.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveProblems = resolve;
+      }),
+    );
+    await openEditor();
+    fireEvent.click(screen.getByRole('button', { name: 'Manage problems' }));
+    const loadingButton = screen.getByRole('button', { name: 'Go Live' });
+    expect((loadingButton as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText('Checking Problems…')).toBeTruthy();
+    resolveProblems([]);
+  });
+
   it('keeps the current status and offers retry after a lifecycle write fails', async () => {
     api.transitionSession.mockRejectedValueOnce(new Error('offline'));
     await openEditor();

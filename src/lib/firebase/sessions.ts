@@ -25,8 +25,13 @@ import { appendProblemDeletion } from './problems';
 export interface SessionRecord {
   id: string;
   session: Session;
-  problemCount: number;
+  problemCount: number | null;
 }
+
+export type ProblemCountState =
+  | { status: 'loading' }
+  | { status: 'unavailable' }
+  | { status: 'ready'; count: number };
 
 function officerDb() {
   const user = getOfficerAuth().currentUser;
@@ -82,12 +87,18 @@ export async function listSessions(): Promise<SessionRecord[]> {
         title: data.title,
         date: data.date,
       });
-      const problems = await getCountFromServer(
-        collection(db, `${sessionPath(document.id)}/problems`),
-      );
+      let problemCount: number | null = null;
+      try {
+        const problems = await getCountFromServer(
+          collection(db, `${sessionPath(document.id)}/problems`),
+        );
+        problemCount = problems.data().count;
+      } catch {
+        // Keep the Session available so the Officer can still open it and retry.
+      }
       return {
         id: document.id,
-        problemCount: problems.data().count,
+        problemCount,
         session: {
           ...metadata,
           status: data.status,

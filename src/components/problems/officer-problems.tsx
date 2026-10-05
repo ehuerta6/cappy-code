@@ -9,6 +9,7 @@ import {
   setAnswersVisible,
   type ProblemRecord,
 } from '@/lib/firebase/problems';
+import type { ProblemCountState } from '@/lib/firebase/sessions';
 import { setActiveProblem } from '@/lib/firebase/presentation';
 import { useActiveProblemId } from '@/hooks/use-presentation-state';
 import type { SessionStatus } from '@/lib/domain';
@@ -20,12 +21,12 @@ export default function OfficerProblems({
   sessionId,
   sessionStatus,
   onBusyChange,
-  onProblemCountChange,
+  onProblemCountStateChange,
 }: {
   sessionId: string;
   sessionStatus: SessionStatus;
   onBusyChange: (busy: boolean) => void;
-  onProblemCountChange: (count: number) => void;
+  onProblemCountStateChange: (state: ProblemCountState) => void;
 }) {
   const [records, setRecords] = useState<ProblemRecord[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -55,8 +56,14 @@ export default function OfficerProblems({
   }, [blocked, onBusyChange]);
 
   useEffect(() => {
-    if (!loading && !loadError) onProblemCountChange(records.length);
-  }, [loadError, loading, onProblemCountChange, records.length]);
+    if (loading) {
+      onProblemCountStateChange({ status: 'loading' });
+    } else if (loadError) {
+      onProblemCountStateChange({ status: 'unavailable' });
+    } else {
+      onProblemCountStateChange({ status: 'ready', count: records.length });
+    }
+  }, [loadError, loading, onProblemCountStateChange, records.length]);
 
   useEffect(() => {
     let cancelled = false;
