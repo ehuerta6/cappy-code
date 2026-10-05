@@ -145,10 +145,10 @@ describe('public member UI scaffold', () => {
     expect(
       screen.getByRole('link', { name: /Past practice/ }).getAttribute('href'),
     ).toBe('/sessions/past');
-    expect(screen.getByRole('heading', { name: 'Live now' })).toBeTruthy();
-    expect(screen.getByRole('heading', { name: 'Past sessions' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Live' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Past' })).toBeTruthy();
     expect(screen.queryByText('Private draft')).toBeNull();
-    expect(screen.getByRole('link', { name: 'Officer Login' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Officer login' })).toBeTruthy();
     expect(
       screen.getByRole('button', { name: 'Toggle color theme' }),
     ).toBeTruthy();
@@ -178,7 +178,7 @@ describe('public member UI scaffold', () => {
     expect(
       screen.getByRole('heading', { name: 'Intro practice' }),
     ).toBeTruthy();
-    expect(screen.getByRole('link', { name: 'Officer Login' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Officer login' })).toBeTruthy();
     const tabs = screen.getAllByRole('tab');
     expect(tabs.map((tab) => tab.textContent)).toEqual([
       'First problem',

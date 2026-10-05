@@ -112,7 +112,9 @@ describe('Officer auth boundary', () => {
       screen.queryByRole('button', { name: 'Protected write control' }),
     ).toBeNull();
     expect(
-      screen.getByRole('link', { name: 'Member Mode' }).getAttribute('href'),
+      screen
+        .getByRole('link', { name: 'View member site' })
+        .getAttribute('href'),
     ).toBe('/');
   });
 
@@ -206,7 +208,9 @@ describe('Officer auth boundary', () => {
     expect(screen.getByLabelText('Email')).toBeDefined();
     expect(screen.queryByRole('button', { name: 'Sign out' })).toBeNull();
     expect(
-      screen.getByRole('link', { name: 'Member Mode' }).getAttribute('href'),
+      screen
+        .getByRole('link', { name: 'View member site' })
+        .getAttribute('href'),
     ).toBe('/');
   });
 

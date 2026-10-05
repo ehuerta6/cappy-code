@@ -4,7 +4,6 @@ import Editor, { type BeforeMount } from '@monaco-editor/react';
 import { useId } from 'react';
 import type { Language, Solution } from '@/lib/domain';
 import { useColorTheme } from '@/components/theme-provider';
-import styles from './solutions.module.css';
 
 export const languageNames: Record<Language, string> = {
   python: 'Python',
@@ -54,11 +53,17 @@ export default function SolutionPanel(props: Props) {
   const dark = theme === 'dark';
   const name = languageNames[language];
   return (
-    <section className={styles.panel} aria-labelledby={`${id}-heading`}>
-      <h3 className={styles.header} id={`${id}-heading`}>
+    <section
+      className="flex min-w-0 flex-col overflow-hidden rounded-lg border border-border-soft bg-surface text-ink"
+      aria-labelledby={`${id}-heading`}
+    >
+      <h3
+        className="m-0 flex min-h-10 items-center px-4 py-2 text-[15px] font-semibold leading-[22px]"
+        id={`${id}-heading`}
+      >
         {name}
       </h3>
-      <div className={styles.editor}>
+      <div className="h-[360px] bg-monaco focus-within:outline-2 focus-within:outline-offset-[-2px] focus-within:outline-accent">
         <Editor
           height="360px"
           language={language}
@@ -88,8 +93,9 @@ export default function SolutionPanel(props: Props) {
           }}
         />
       </div>
-      <div className={styles.output}>
+      <div className="flex flex-1 flex-col px-4 pb-4 pt-3">
         <label
+          className="mb-2 block text-[15px] font-semibold leading-[22px] text-ink"
           id={`${id}-output`}
           htmlFor={mode === 'officer' ? `${id}-field` : undefined}
         >
@@ -97,6 +103,7 @@ export default function SolutionPanel(props: Props) {
         </label>
         {props.mode === 'officer' ? (
           <textarea
+            className="max-h-[230px] min-h-[92px] w-full overflow-auto whitespace-pre rounded border border-border-soft bg-raised px-2.5 py-2 font-mono text-[15px] leading-[23px] text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-default disabled:text-muted"
             id={`${id}-field`}
             aria-label={`${name} prepared output`}
             value={solution.output}
@@ -108,9 +115,16 @@ export default function SolutionPanel(props: Props) {
             rows={4}
           />
         ) : solution.output ? (
-          <pre aria-labelledby={`${id}-output`}>{solution.output}</pre>
+          <pre
+            className="m-0 max-h-[230px] min-h-[92px] w-full overflow-auto whitespace-pre rounded border border-border-soft bg-raised px-2.5 py-2 font-mono text-[15px] leading-[23px] text-ink"
+            aria-labelledby={`${id}-output`}
+          >
+            {solution.output}
+          </pre>
         ) : (
-          <p className={styles.hint}>No prepared output</p>
+          <p className="mt-2 text-sm leading-5 text-muted">
+            No prepared output
+          </p>
         )}
       </div>
     </section>

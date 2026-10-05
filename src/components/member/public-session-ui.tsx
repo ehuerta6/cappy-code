@@ -6,7 +6,6 @@ import type { ProblemSolutions } from '@/lib/firebase/solutions';
 import AppHeader from '@/components/app-header';
 import SolutionWorkspace from '@/components/solutions/solution-workspace';
 import { useAnswersVisible } from '@/hooks/use-answer-visibility';
-import styles from './public-session-ui.module.css';
 
 export interface PublicSessionSummary {
   id: string;
@@ -39,30 +38,45 @@ export function PublicSessionDiscovery({ state }: { state: DiscoveryState }) {
         )
       : [];
   return (
-    <main className={styles.shell}>
-      <AppHeader context="CIC Intro solution showcase">
-        <Link href="/officer">Officer Login</Link>
+    <main className="min-h-screen bg-canvas text-ink">
+      <AppHeader>
+        <Link href="/officer">Officer login</Link>
       </AppHeader>
-      <section className={styles.content} aria-labelledby="sessions-heading">
-        <h1 id="sessions-heading">Sessions</h1>
+      <section
+        className="mx-auto w-[calc(100%-32px)] max-w-[1440px] py-5 pb-12 leading-relaxed sm:w-[calc(100%-48px)] sm:pt-6"
+        aria-labelledby="sessions-heading"
+      >
+        <h1
+          className="m-0 text-[28px] font-semibold leading-9 tracking-tight"
+          id="sessions-heading"
+        >
+          Sessions
+        </h1>
         {state.status === 'loading' ? (
           <p role="status">Loading sessions…</p>
         ) : state.status === 'error' ? (
-          <div className={styles.notice} role="alert">
+          <div
+            className="mt-4 rounded-md border border-border-strong bg-surface p-4"
+            role="alert"
+          >
             <p>Sessions could not be loaded.</p>
-            <button type="button" onClick={state.onRetry}>
+            <button
+              className="min-h-11 rounded border border-border-strong bg-surface px-3 py-2 text-ink hover:bg-hover"
+              type="button"
+              onClick={state.onRetry}
+            >
               Retry sessions
             </button>
           </div>
         ) : state.status === 'empty' ? (
           <>
             <SessionGroup
-              title="Live now"
+              title="Live"
               sessions={[]}
               emptyMessage="No live session right now."
             />
             <SessionGroup
-              title="Past sessions"
+              title="Past"
               sessions={[]}
               emptyMessage="No past sessions yet."
             />
@@ -70,12 +84,12 @@ export function PublicSessionDiscovery({ state }: { state: DiscoveryState }) {
         ) : (
           <>
             <SessionGroup
-              title="Live now"
+              title="Live"
               sessions={sessions.filter((session) => session.status === 'live')}
               emptyMessage="No live session right now."
             />
             <SessionGroup
-              title="Past sessions"
+              title="Past"
               sessions={sessions.filter(
                 (session) => session.status === 'ended',
               )}
@@ -98,21 +112,38 @@ function SessionGroup({
   emptyMessage: string;
 }) {
   return (
-    <section className={styles.sessionGroup} aria-label={title}>
-      <h2>{title}</h2>
+    <section className="mt-8 first:mt-7" aria-label={title}>
+      <h2 className="mb-2 mt-0 text-lg font-semibold leading-[26px]">
+        {title}
+      </h2>
       {sessions.length ? (
-        <ul>
+        <ul className="m-0 max-w-5xl list-none p-0">
           {sessions.map((session) => (
-            <li key={session.id}>
-              <Link href={`/sessions/${encodeURIComponent(session.id)}`}>
-                <span>{session.title}</span>
-                <time dateTime={session.date}>{formatDate(session.date)}</time>
+            <li className="border-b border-border-soft" key={session.id}>
+              <Link
+                className="flex min-h-[52px] max-w-5xl flex-wrap items-center gap-x-4 gap-y-2 rounded px-2 py-3 text-ink no-underline hover:bg-hover focus-visible:relative focus-visible:z-10 [&:hover_.session-title]:text-accent-hover [&:hover_.session-title]:underline"
+                href={`/sessions/${encodeURIComponent(session.id)}`}
+              >
+                <time
+                  className="shrink-0 text-sm text-muted"
+                  dateTime={session.date}
+                >
+                  {formatDate(session.date)}
+                </time>
+                <span className="session-title min-w-0 max-w-[40ch] break-words font-semibold">
+                  {session.title}
+                </span>
+                <span
+                  className={`text-sm font-semibold ${session.status === 'live' ? 'text-success' : 'text-muted'}`}
+                >
+                  {session.status === 'live' ? 'Live' : 'Past'}
+                </span>
               </Link>
             </li>
           ))}
         </ul>
       ) : (
-        <p className={styles.quiet}>{emptyMessage}</p>
+        <p className="m-0 text-muted">{emptyMessage}</p>
       )}
     </section>
   );
@@ -142,26 +173,35 @@ export type SessionState =
 
 export function PublicSessionView({ state }: { state: SessionState }) {
   return (
-    <main className={styles.shell}>
-      <AppHeader
-        context={
-          state.status === 'ready' && state.session.status === 'live'
-            ? 'Live Session'
-            : 'Member view'
-        }
-        live={state.status === 'ready' && state.session.status === 'live'}
-      >
-        <Link href="/officer">Officer Login</Link>
+    <main className="min-h-screen bg-canvas text-ink">
+      <AppHeader>
+        <Link href="/officer">Officer login</Link>
       </AppHeader>
       {state.status === 'loading' ? (
-        <p className={styles.content} role="status">
+        <p
+          className="mx-auto w-[calc(100%-32px)] max-w-[1440px] py-6 text-muted sm:w-[calc(100%-48px)]"
+          role="status"
+        >
           Loading session…
         </p>
       ) : state.status === 'unavailable' ? (
-        <section className={styles.content} aria-labelledby="unavailable-title">
-          <h1 id="unavailable-title">Session unavailable</h1>
+        <section
+          className="mx-auto w-[calc(100%-32px)] max-w-[1440px] py-6 sm:w-[calc(100%-48px)]"
+          aria-labelledby="unavailable-title"
+        >
+          <h1
+            className="m-0 text-[28px] font-semibold leading-9 tracking-tight"
+            id="unavailable-title"
+          >
+            Session unavailable
+          </h1>
           <p>This session is unavailable or cannot be viewed.</p>
-          <Link href="/">Back to sessions</Link>
+          <Link
+            className="text-accent underline-offset-4 hover:text-accent-hover hover:underline"
+            href="/"
+          >
+            ← Sessions
+          </Link>
         </section>
       ) : (
         <SessionContent key={state.session.id} state={state} />
@@ -208,22 +248,26 @@ function SessionContent({
   }
 
   return (
-    <section className={styles.content}>
-      <Link className={styles.backLink} href="/">
-        ← All sessions
+    <section className="mx-auto w-[calc(100%-32px)] max-w-[1440px] py-5 pb-12 leading-relaxed sm:w-[calc(100%-48px)] sm:pt-6">
+      <Link
+        className="mb-3 inline-flex min-h-10 items-center text-sm text-muted underline-offset-4 hover:text-accent-hover hover:underline"
+        href="/"
+      >
+        ← Sessions
       </Link>
-      <div className={styles.sessionHeading}>
+      <div className="mb-5 flex flex-wrap items-start justify-between gap-3 sm:gap-4">
         <div>
-          <h1>{state.session.title}</h1>
-          <p className={styles.sessionContext}>
-            CIC Intro Session <span aria-hidden="true">•</span>{' '}
+          <h1 className="m-0 text-[25px] font-semibold leading-8 tracking-tight sm:text-[28px] sm:leading-9">
+            {state.session.title}
+          </h1>
+          <p className="mt-1 flex flex-wrap items-center gap-2 text-sm leading-5 text-muted">
             <time dateTime={state.session.date}>
               {formatDate(state.session.date)}
             </time>
           </p>
         </div>
         <span
-          className={`${styles.status} ${state.session.status === 'live' ? styles.live : ''}`}
+          className={`inline-flex min-h-7 shrink-0 items-center rounded border px-2.5 py-0.5 text-sm font-semibold capitalize leading-5 ${state.session.status === 'live' ? 'border-success/50 bg-success-surface text-success' : 'border-border-soft text-muted'}`}
         >
           {state.session.status === 'live' ? 'Live' : 'Ended'}
         </span>
@@ -232,19 +276,24 @@ function SessionContent({
       {state.problems.status === 'loading' ? (
         <p role="status">Loading problems…</p>
       ) : state.problems.status === 'error' ? (
-        <div className={styles.notice} role="alert">
+        <div
+          className="mt-4 rounded-md border border-border-strong bg-surface p-4"
+          role="alert"
+        >
           <p>Problems could not be loaded.</p>
-          <button type="button" onClick={state.problems.onRetry}>
+          <button
+            className="min-h-11 rounded border border-border-strong bg-surface px-3 py-2 hover:bg-hover"
+            type="button"
+            onClick={state.problems.onRetry}
+          >
             Retry problems
           </button>
         </div>
       ) : problems.length === 0 ? (
-        <p className={styles.quiet}>
-          No problems are available in this session.
-        </p>
+        <p className="text-muted">No problems are available in this session.</p>
       ) : (
         <>
-          <div className={styles.problemNavigation}>
+          <div className="mt-1 border-b border-border-soft">
             <ProblemTabs
               problems={problems}
               selectedId={effectiveSelectedProblemId ?? ''}
@@ -259,7 +308,7 @@ function SessionContent({
               loadRevealedSolutions={state.loadRevealedSolutions}
             />
           ) : (
-            <p className={styles.quiet} role="status">
+            <p className="text-muted" role="status">
               No problems are available in this session.
             </p>
           )}
@@ -299,7 +348,11 @@ function ProblemTabs({
   }
 
   return (
-    <div className={styles.tabs} role="tablist" aria-label="Problems">
+    <div
+      className="flex max-w-full min-w-0 gap-1 overflow-x-auto [scrollbar-width:thin]"
+      role="tablist"
+      aria-label="Problems"
+    >
       {problems.map((problem) => (
         <button
           key={problem.id}
@@ -308,6 +361,7 @@ function ProblemTabs({
           role="tab"
           aria-selected={problem.id === selectedId}
           aria-controls={`problem-panel-${problem.id}`}
+          className="min-h-12 shrink-0 rounded-t px-3 py-2 text-[15px] font-medium text-muted hover:bg-hover hover:text-ink focus-visible:relative focus-visible:z-10 aria-selected:border-b-2 aria-selected:border-accent aria-selected:font-semibold aria-selected:text-ink"
           tabIndex={problem.id === selectedId ? 0 : -1}
           onClick={() => onSelect(problem.id)}
           onKeyDown={handleKeyDown}
@@ -338,31 +392,56 @@ function ProblemContent({
 
   return (
     <article
-      className={styles.problem}
+      className="pt-5"
       id={`problem-panel-${problem.id}`}
       role="tabpanel"
       aria-labelledby={`problem-tab-${problem.id}`}
       tabIndex={0}
     >
-      <h2>{problem.title}</h2>
+      <h2 className="mb-2 mt-0 text-2xl font-semibold leading-8">
+        {problem.title}
+      </h2>
       {problem.description ? (
-        <p className={styles.description}>{problem.description}</p>
+        <p className="mb-5 max-w-[80ch] whitespace-pre-wrap text-base leading-[26px]">
+          {problem.description}
+        </p>
       ) : null}
-      <section className={styles.examples} aria-labelledby="examples-heading">
-        <h3 id="examples-heading">Examples</h3>
-        <div className={styles.examplePair}>
-          <section>
-            <h4>Input</h4>
-            <pre>{problem.exampleInput || 'No example input'}</pre>
+      <section className="my-5 mb-7" aria-labelledby="examples-heading">
+        <h3
+          className="mb-2 mt-0 text-base font-semibold leading-6"
+          id="examples-heading"
+        >
+          Examples
+        </h3>
+        <div className="grid overflow-hidden rounded-md border border-border-soft bg-surface sm:grid-cols-2">
+          <section className="min-w-0 p-3">
+            <h4 className="mb-2 mt-0 text-sm font-semibold leading-5 text-muted">
+              Input
+            </h4>
+            <pre className="m-0 min-h-6 overflow-auto whitespace-pre rounded bg-raised px-2.5 py-2 font-mono text-[15px] leading-[23px]">
+              {problem.exampleInput || 'No example input'}
+            </pre>
           </section>
-          <section>
-            <h4>Output</h4>
-            <pre>{problem.exampleOutput || 'No example output'}</pre>
+          <section className="min-w-0 border-t border-border-soft p-3 sm:border-l sm:border-t-0">
+            <h4 className="mb-2 mt-0 text-sm font-semibold leading-5 text-muted">
+              Output
+            </h4>
+            <pre className="m-0 min-h-6 overflow-auto whitespace-pre rounded bg-raised px-2.5 py-2 font-mono text-[15px] leading-[23px]">
+              {problem.exampleOutput || 'No example output'}
+            </pre>
           </section>
         </div>
       </section>
-      <section className={styles.solutions} aria-labelledby="solutions-heading">
-        <h2 id="solutions-heading">Solutions</h2>
+      <section
+        className="mt-7 border-t border-border-soft pt-6"
+        aria-labelledby="solutions-heading"
+      >
+        <h2
+          className="mb-2 mt-0 text-2xl font-semibold leading-8"
+          id="solutions-heading"
+        >
+          Solutions
+        </h2>
         {isEnded ? (
           <RevealedSolutions
             key={`${session.id}/${problem.id}`}
@@ -373,7 +452,10 @@ function ProblemContent({
         ) : visibility.status === 'loading' ? (
           <p role="status">Syncing answer visibility…</p>
         ) : visibility.status === 'error' ? (
-          <div className={styles.notice} role="status">
+          <div
+            className="mt-3 rounded-md border border-border-strong bg-surface p-4"
+            role="status"
+          >
             <p>Answer visibility could not be synchronized.</p>
             <button
               type="button"
@@ -383,9 +465,9 @@ function ProblemContent({
             </button>
           </div>
         ) : !visibility.value ? (
-          <div className={styles.answerGate}>
+          <div className="flex min-h-40 flex-col items-center justify-center rounded-lg border border-border-soft bg-surface p-6 text-center">
             <svg
-              className={styles.lockIcon}
+              className="mb-2 text-muted"
               viewBox="0 0 24 24"
               width="20"
               height="20"
@@ -408,8 +490,12 @@ function ProblemContent({
                 strokeLinecap="round"
               />
             </svg>
-            <h3>Answers hidden</h3>
-            <p>Waiting for the officer to reveal the solution…</p>
+            <h3 className="mb-1 mt-0 text-[17px] font-semibold">
+              Answers hidden
+            </h3>
+            <p className="m-0 text-[15px] leading-[23px] text-muted">
+              Waiting for the officer to reveal the solution…
+            </p>
           </div>
         ) : (
           <RevealedSolutions
@@ -459,7 +545,10 @@ function RevealedSolutions({
 
   if (failed) {
     return (
-      <div className={styles.notice} role="alert">
+      <div
+        className="mt-3 rounded-md border border-border-strong bg-surface p-4"
+        role="alert"
+      >
         <p>Solutions could not be loaded.</p>
         <button
           type="button"

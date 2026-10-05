@@ -3,7 +3,6 @@
 import { languages } from '@/lib/domain';
 import type { ProblemSolutions } from '@/lib/firebase/solutions';
 import SolutionPanel from './solution-panel';
-import styles from './solutions.module.css';
 
 // Read-only rendering receives already-authorized data; it never fetches solutions.
 export default function SolutionWorkspace({
@@ -14,13 +13,13 @@ export default function SolutionWorkspace({
   modelPath: string;
 }) {
   return (
-    <div className={styles.revealed}>
+    <div className="animate-[reveal_200ms_ease-out_both]">
       <div
-        className={styles.rail}
+        className="overflow-x-auto p-1 -m-1 [scrollbar-width:thin] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         tabIndex={0}
         aria-label="Three-language solution comparison"
       >
-        <div className={styles.grid}>
+        <div className="grid grid-cols-[repeat(3,minmax(min(360px,calc(100vw-40px)),1fr))] gap-4">
           {languages.map((language) => (
             <SolutionPanel
               key={language}

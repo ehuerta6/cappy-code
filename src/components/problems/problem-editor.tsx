@@ -7,7 +7,6 @@ import {
   type ProblemContent,
   type ProblemRecord,
 } from '@/lib/firebase/problems';
-import styles from './problems.module.css';
 
 export default function ProblemEditor({
   sessionId,
@@ -83,7 +82,7 @@ export default function ProblemEditor({
       id={`problem-panel-${record.id}`}
       aria-labelledby={`problem-tab-${record.id}`}
     >
-      <p role="status">
+      <p className="text-sm text-muted" role="status">
         {saving
           ? 'Saving problem…'
           : error
@@ -96,7 +95,7 @@ export default function ProblemEditor({
         <div role="alert">
           <p>{error}</p>
           <button
-            className={styles.button}
+            className="min-h-11 rounded border border-border-strong bg-surface px-3 py-2 hover:bg-hover disabled:cursor-default disabled:bg-raised disabled:text-muted"
             onClick={() => void save()}
             disabled={saving || disabled}
           >
@@ -104,9 +103,10 @@ export default function ProblemEditor({
           </button>
         </div>
       )}
-      <label className={`${styles.field} ${styles.titleField}`}>
+      <label className="my-5 flex max-w-3xl flex-col gap-2">
         Problem title
         <input
+          className="min-h-11 w-full rounded border border-border-strong bg-surface px-3 py-2 text-2xl font-semibold leading-8 text-ink disabled:cursor-default disabled:bg-raised disabled:text-muted"
           id="problem-title"
           value={content.title}
           onChange={(event) => edit('title', event.target.value)}
@@ -115,9 +115,10 @@ export default function ProblemEditor({
           required
         />
       </label>
-      <label className={styles.field}>
+      <label className="my-5 flex max-w-3xl flex-col gap-2">
         Description
         <textarea
+          className="min-h-[100px] w-full resize-y rounded border border-border-strong bg-surface px-3 py-2 leading-6 text-ink disabled:cursor-default disabled:bg-raised disabled:text-muted"
           rows={5}
           value={content.description}
           onChange={(event) => edit('description', event.target.value)}
@@ -125,15 +126,18 @@ export default function ProblemEditor({
           disabled={saving || disabled}
         />
       </label>
-      <section
-        className={styles.examples}
-        aria-labelledby="officer-examples-heading"
-      >
-        <h3 id="officer-examples-heading">Examples</h3>
-        <div className={styles.examplesGrid}>
-          <label className={styles.field}>
+      <section className="my-6" aria-labelledby="officer-examples-heading">
+        <h3
+          className="mb-0 mt-0 text-base font-semibold leading-6"
+          id="officer-examples-heading"
+        >
+          Examples
+        </h3>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="my-3 flex flex-col gap-2">
             Example input
             <textarea
+              className="min-h-[76px] w-full resize-y rounded border border-border-strong bg-surface px-3 py-2 font-mono text-[15px] leading-6 text-ink disabled:cursor-default disabled:bg-raised disabled:text-muted"
               rows={3}
               value={content.exampleInput}
               onChange={(event) => edit('exampleInput', event.target.value)}
@@ -141,9 +145,10 @@ export default function ProblemEditor({
               disabled={saving || disabled}
             />
           </label>
-          <label className={styles.field}>
+          <label className="my-3 flex flex-col gap-2">
             Example output
             <textarea
+              className="min-h-[76px] w-full resize-y rounded border border-border-strong bg-surface px-3 py-2 font-mono text-[15px] leading-6 text-ink disabled:cursor-default disabled:bg-raised disabled:text-muted"
               rows={3}
               value={content.exampleOutput}
               onChange={(event) => edit('exampleOutput', event.target.value)}
@@ -153,7 +158,7 @@ export default function ProblemEditor({
           </label>
         </div>
       </section>
-      <p>
+      <p className="text-sm text-muted">
         Problem fields save when you leave a field. Finish saving before
         switching problems or returning to the session.
       </p>

@@ -104,7 +104,7 @@ describe('Officer Session route integration', () => {
   it('keeps Member Mode anonymous and read-only while loading public Sessions', () => {
     render(<MemberPage />);
     expect(screen.getByRole('heading', { name: 'Sessions' })).toBeTruthy();
-    expect(screen.getByRole('link', { name: 'Officer Login' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Officer login' })).toBeTruthy();
     expect(screen.queryByLabelText('Read-only editor')).toBeNull();
     expect(screen.queryByRole('button', { name: '+ New session' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Delete session' })).toBeNull();
