@@ -63,21 +63,20 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-async function openOfficer(onPendingChange = vi.fn()) {
+async function openOfficer(
+  onPendingChange = vi.fn(),
+  onSaveStateChange = vi.fn(),
+) {
   const view = render(
     <OfficerSolutions
       sessionId="s"
       problemId="p"
       onPendingChange={onPendingChange}
+      onSaveStateChange={onSaveStateChange}
     />,
   );
   await screen.findByLabelText('Python Solution, editable');
   return view;
-}
-async function autosave() {
-  await act(async () => {
-    await vi.advanceTimersByTimeAsync(750);
-  });
 }
 
 describe('solution workspace', () => {
@@ -100,10 +99,10 @@ describe('solution workspace', () => {
     expect(screen.queryByRole('button')).toBeNull();
     expect(persistence.load).not.toHaveBeenCalled();
   });
-  it('edits and saves source and prepared output independently after a pause', async () => {
+  it('keeps source and prepared Output local until the reported save action runs', async () => {
     const onPending = vi.fn();
-    await openOfficer(onPending);
-    vi.useFakeTimers();
+    const saveState = vi.fn();
+    await openOfficer(onPending, saveState);
     const editor = screen.getByLabelText(
       'Java Solution, editable',
     ) as HTMLTextAreaElement;
@@ -114,7 +113,8 @@ describe('solution workspace', () => {
     });
     expect(onPending).toHaveBeenLastCalledWith(true);
     expect(persistence.save).not.toHaveBeenCalled();
-    await autosave();
+    expect(saveState.mock.calls.at(-1)?.[0]).toMatchObject({ dirty: true });
+    await act(async () => saveState.mock.calls.at(-1)?.[0].save());
     expect(persistence.save).toHaveBeenCalledExactlyOnceWith('s', 'p', 'java', {
       code: 'new java',
       output: 'new output',
@@ -122,13 +122,16 @@ describe('solution workspace', () => {
     expect(onPending).toHaveBeenLastCalledWith(false);
   });
   it('retains failed edits and retries only when explicitly requested', async () => {
-    await openOfficer();
-    vi.useFakeTimers();
+    const saveState = vi.fn();
+    await openOfficer(vi.fn(), saveState);
     persistence.save.mockRejectedValueOnce(new Error('offline'));
     fireEvent.change(screen.getByLabelText('Python Solution, editable'), {
       target: { value: 'unsaved python' },
     });
-    await autosave();
+    expect(persistence.save).not.toHaveBeenCalled();
+    await new Promise((resolve) => setTimeout(resolve, 750));
+    expect(persistence.save).not.toHaveBeenCalled();
+    await act(async () => saveState.mock.calls.at(-1)?.[0].save());
     expect(
       (
         screen.getByLabelText(
@@ -136,23 +139,33 @@ describe('solution workspace', () => {
         ) as HTMLTextAreaElement
       ).value,
     ).toBe('unsaved python');
-    expect(screen.getByRole('alert').textContent).toContain(
-      'Python changes could not be saved',
+    expect(saveState.mock.calls.at(-1)?.[0].error).toContain(
+      'Python Solution or prepared Output could not be saved',
     );
-    await autosave();
     expect(persistence.save).toHaveBeenCalledTimes(1);
-    await act(async () => {
-      fireEvent.click(
-        screen.getByRole('button', { name: 'Retry Python save' }),
-      );
-    });
+    await act(async () => saveState.mock.calls.at(-1)?.[0].save());
     expect(persistence.save).toHaveBeenCalledTimes(2);
     expect(screen.queryByRole('alert')).toBeNull();
   });
+  it('returns to a clean state when all edits are reverted without writing', async () => {
+    const onPending = vi.fn();
+    const saveState = vi.fn();
+    await openOfficer(onPending, saveState);
+    fireEvent.change(screen.getByLabelText('Python Solution, editable'), {
+      target: { value: 'temporary edit' },
+    });
+    expect(onPending).toHaveBeenLastCalledWith(true);
+    fireEvent.change(screen.getByLabelText('Python Solution, editable'), {
+      target: { value: 'python source' },
+    });
+    await waitFor(() => expect(onPending).toHaveBeenLastCalledWith(false));
+    expect(persistence.save).not.toHaveBeenCalled();
+    expect(saveState.mock.calls.at(-1)?.[0]).toBeNull();
+  });
   it('keeps newer edits made during an outstanding write and saves them next', async () => {
     const onPending = vi.fn();
-    await openOfficer(onPending);
-    vi.useFakeTimers();
+    const saveState = vi.fn();
+    await openOfficer(onPending, saveState);
     let resolve: () => void = () => {};
     persistence.save.mockImplementationOnce(
       () =>
@@ -163,19 +176,23 @@ describe('solution workspace', () => {
     fireEvent.change(screen.getByLabelText('C++ Solution, editable'), {
       target: { value: 'first' },
     });
-    await autosave();
+    let firstSave!: Promise<void>;
+    act(() => {
+      firstSave = saveState.mock.calls.at(-1)?.[0].save();
+    });
     fireEvent.change(screen.getByLabelText('C++ Solution, editable'), {
       target: { value: 'second' },
     });
     await act(async () => {
       resolve();
+      await firstSave;
     });
     expect(onPending).toHaveBeenLastCalledWith(true);
     expect(
       (screen.getByLabelText('C++ Solution, editable') as HTMLTextAreaElement)
         .value,
     ).toBe('second');
-    await autosave();
+    await act(async () => saveState.mock.calls.at(-1)?.[0].save());
     expect(persistence.save).toHaveBeenLastCalledWith('s', 'p', 'cpp', {
       code: 'second',
       output: '',
@@ -195,26 +212,24 @@ describe('solution workspace', () => {
   });
   it('keeps a failed dirty save blocking until the officer restores confirmed content', async () => {
     const pending = vi.fn();
-    await openOfficer(pending);
-    vi.useFakeTimers();
+    const saveState = vi.fn();
+    await openOfficer(pending, saveState);
     persistence.save.mockRejectedValueOnce(new Error('offline'));
     fireEvent.change(screen.getByLabelText('Python Solution, editable'), {
       target: { value: 'failed change' },
     });
-    await autosave();
+    await act(async () => saveState.mock.calls.at(-1)?.[0].save());
     expect(pending).toHaveBeenLastCalledWith(true);
     fireEvent.change(screen.getByLabelText('Python Solution, editable'), {
       target: { value: 'python source' },
     });
-    expect(
-      screen.queryByRole('button', { name: 'Retry Python save' }),
-    ).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
     expect(pending).toHaveBeenLastCalledWith(false);
   });
   it('shows confirmed content if a pending write fails after the officer restores it', async () => {
     const pending = vi.fn();
-    await openOfficer(pending);
-    vi.useFakeTimers();
+    const saveState = vi.fn();
+    await openOfficer(pending, saveState);
     let reject: (error: Error) => void = () => {};
     persistence.save.mockImplementationOnce(
       () =>
@@ -225,12 +240,16 @@ describe('solution workspace', () => {
     fireEvent.change(screen.getByLabelText('Python Solution, editable'), {
       target: { value: 'pending change' },
     });
-    await autosave();
+    let pendingSave!: Promise<void>;
+    act(() => {
+      pendingSave = saveState.mock.calls.at(-1)?.[0].save();
+    });
     fireEvent.change(screen.getByLabelText('Python Solution, editable'), {
       target: { value: 'python source' },
     });
     await act(async () => {
       reject(new Error('offline'));
+      await pendingSave;
     });
     expect(screen.queryByRole('alert')).toBeNull();
     expect(pending).toHaveBeenLastCalledWith(false);

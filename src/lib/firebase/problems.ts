@@ -108,11 +108,28 @@ export async function createProblem(sessionId: string): Promise<ProblemRecord> {
 export async function updateProblem(
   sessionId: string,
   problemId: string,
-  content: ProblemContent,
+  content: Partial<ProblemContent>,
 ): Promise<void> {
-  await updateDoc(doc(officerDb(), problemPath(sessionId, problemId)), {
-    ...validateProblemContent(content),
-  });
+  const updates: Partial<ProblemContent> = {};
+  if (content.title !== undefined) {
+    if (typeof content.title !== 'string' || !content.title.trim())
+      throw new Error('Enter a problem title.');
+    updates.title = content.title.trim();
+  }
+  for (const field of [
+    'description',
+    'exampleInput',
+    'exampleOutput',
+  ] as const) {
+    if (content[field] !== undefined) {
+      if (typeof content[field] !== 'string')
+        throw new Error('Problem content must be text.');
+      updates[field] = content[field];
+    }
+  }
+  if (Object.keys(updates).length === 0)
+    throw new Error('Select Problem content to save.');
+  await updateDoc(doc(officerDb(), problemPath(sessionId, problemId)), updates);
 }
 
 export async function setAnswersVisible(

@@ -12,8 +12,6 @@ import { validateSessionMetadata } from '@/lib/session-metadata';
 import OfficerProblems from '../problems/officer-problems';
 import type { OfficerSaveState } from '@/components/officer-save-state';
 
-const secondaryButtonClass =
-  'min-h-11 rounded border border-border-strong bg-surface px-3 py-2 text-ink hover:bg-hover disabled:cursor-default disabled:bg-raised disabled:text-muted';
 const contextualButtonClass =
   'min-h-10 rounded px-2 py-2 text-sm text-muted underline-offset-4 hover:bg-hover hover:text-accent-hover hover:underline disabled:cursor-default disabled:text-muted';
 const primaryButtonClass =
@@ -109,7 +107,7 @@ export default function SessionEditor({
 
   function saveStatus() {
     const failed = saveError || contentSaveState?.error;
-    const isSaving = saving || dirty || contentSaveState?.pending;
+    const isSaving = saving || contentSaveState?.saving;
     return (
       <div
         className="flex items-center gap-2 text-sm leading-5"
@@ -117,21 +115,11 @@ export default function SessionEditor({
         aria-live="polite"
       >
         {failed ? (
-          <>
-            <span className="text-danger">Save failed —</span>
-            <button
-              className="rounded px-1 text-accent underline underline-offset-4 hover:text-accent-hover"
-              onClick={() => {
-                if (saveError) void save();
-                else contentSaveState?.retry?.();
-              }}
-              type="button"
-            >
-              Retry
-            </button>
-          </>
+          <span className="text-danger">Save failed — Retry</span>
         ) : isSaving ? (
           <span className="text-muted">Saving…</span>
+        ) : dirty || contentSaveState?.dirty ? (
+          <span className="text-muted">Unsaved changes</span>
         ) : (
           <span className="text-muted">Saved ✓</span>
         )}
@@ -179,6 +167,12 @@ export default function SessionEditor({
       setSaveError(
         error instanceof Error ? error.message : 'Check the title and date.',
       );
+      return;
+    }
+    if (metadata.title === saved.title && metadata.date === saved.date) {
+      setTitle(metadata.title);
+      setDate(metadata.date);
+      setSaveError(null);
       return;
     }
     busy.current = true;
@@ -287,7 +281,7 @@ export default function SessionEditor({
         <div>
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="m-0 text-[28px] font-semibold leading-9 tracking-tight">
-              {record.session.title}
+              {title}
             </h1>
             <span
               className={`inline-flex min-h-7 items-center rounded-md border px-2.5 py-0.5 text-sm font-semibold capitalize leading-5 ${statusTone[status]}`}
@@ -302,20 +296,25 @@ export default function SessionEditor({
         </div>
         <div className="flex flex-wrap items-center justify-start gap-x-3 gap-y-2">
           {saveStatus()}
+          <button
+            className={primaryButtonClass}
+            disabled={!dirty || saving || deleting || transitionPending}
+            onClick={() => void save()}
+          >
+            {saving ? 'Saving…' : saveError ? 'Retry' : 'Save changes'}
+          </button>
           {lifecycleActions()}
         </div>
       </div>
       {saveError && (
         <div role="alert">
           <p>{saveError}</p>
-          <button
-            className={secondaryButtonClass}
-            onClick={() => void save()}
-            disabled={saving || deleting || transitionPending}
-          >
-            Retry save
-          </button>
         </div>
+      )}
+      {dirty && (
+        <p className="text-sm text-muted">
+          Save or revert changes before leaving this Session.
+        </p>
       )}
       {transitionError && (
         <p className="text-danger" role="alert">
@@ -329,7 +328,6 @@ export default function SessionEditor({
           className="min-h-11 w-full rounded border border-border-strong bg-surface px-3 py-2 text-ink"
           value={title}
           onChange={(event) => setTitle(event.target.value)}
-          onBlur={() => void save()}
           disabled={saving || deleting || transitionPending}
           required
         />
@@ -341,7 +339,6 @@ export default function SessionEditor({
           type="date"
           value={date}
           onChange={(event) => setDate(event.target.value)}
-          onBlur={() => void save()}
           disabled={saving || deleting || transitionPending}
           required
         />

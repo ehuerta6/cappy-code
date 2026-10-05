@@ -271,15 +271,17 @@ with clear confirmation. Go Live is disabled when there are no Problems, with
 explicit label such as “Starting…”; reflect confirmed shared state and show errors
 with recovery instead of implying a failed action succeeded.
 
-### Autosave and editing
+### Explicit saving and editing
 
-Design around **Saving…**, **Saved ✓**, and **Save failed — Retry** in a stable,
-visible location. Preserve unsaved edits, identify failed content, and do not show
-Saved until persistence confirms it. Retry is contextual, not a permanent primary
-Save button. If unsaved changes prevent a presentation action from applying to
-the prepared content, explain why the action is unavailable. A disconnected view
-shows “Connection lost — changes not saved” and does not imply realtime sync.
-This is a UX contract; persistence behavior is outside this issue.
+Officer edits stay local until the officer selects **Save changes** for Session
+metadata or the selected Problem workspace. Show **Unsaved changes**,
+**Saving…**, **Saved ✓**, and **Save failed — Retry** in a stable, visible
+location. Preserve unsaved edits, identify failed content, and do not show Saved
+until Firestore confirms the writes. One Problem workspace save covers its
+metadata and all dirty Python, Java, and C++ source/output content. Retry saves
+only the remaining dirty content. Block navigation and actions that would discard
+the draft while it is unsaved, saving, or failed. A disconnected view shows
+“Connection lost — changes not saved” and does not imply realtime sync.
 
 Session title/date and Problem title use labeled inline inputs. Description and
 constraints use labeled multiline fields following the document reading order.
@@ -407,8 +409,9 @@ and/or meaningful icons: Live, Ended, Answers hidden, Saved, Save failed; never
 color alone. Selected state includes underline and semantic state.
 
 Announce save errors and reveal changes politely
-without moving the member's keyboard focus. Avoid announcing every autosave
-keystroke. Intentional loading, empty, disabled, permission/unavailable, and error
+without moving the member's keyboard focus. Avoid announcing every keystroke;
+announce explicit-save status changes to Officers. Intentional loading, empty,
+disabled, permission/unavailable, and error
 states use useful text and recovery actions where applicable. An inaccessible
 Session shows “Session unavailable” without exposing draft metadata. During loss
 of answer-visibility updates, show a connection status; hidden/unauthorized
@@ -437,7 +440,7 @@ component boundaries. Do not implement them in this issue.
 | `LanguageHeader`     | Language name and optional restrained identity                               |
 | `EditorShell`        | Monaco sizing, theme, loading, focus, and editability                        |
 | `PreparedOutput`     | Labeled static output or officer output field                                |
-| `OfficerToolbar`     | Visible officer context, autosave, presentation controls                     |
+| `OfficerToolbar`     | Visible officer context, explicit save action, presentation controls         |
 | `SessionActions`     | Lifecycle and selected-Problem reveal actions                                |
 | `SaveStatus`         | Saving / confirmed saved / actionable failure                                |
 | `SessionList`        | Grouped Session library, including loading/error states                      |
@@ -455,7 +458,7 @@ component boundaries. Do not implement them in this issue.
 6. Go Live has an intentional disabled state when the Session contains no Problems.
 7. Dangerous live-Session actions require clear confirmation, especially ending a
    Session.
-8. Officer editing is designed around autosave with visible success/failure states.
+8. Officer editing uses explicit saves with visible success/failure states.
 9. Live hidden state never exposes Solution source or prepared output before reveal;
    backend authorization and the member UI must agree.
 10. Every fixed-language Solution is public for ended Sessions. Ending a Session

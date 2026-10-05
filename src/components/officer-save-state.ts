@@ -1,7 +1,8 @@
 export type OfficerSaveState = {
-  pending: boolean;
+  dirty: boolean;
+  saving: boolean;
   error?: string;
-  retry?: () => void;
+  save: () => Promise<void>;
 };
 
 export type SaveStateReporter = (state: OfficerSaveState | null) => void;

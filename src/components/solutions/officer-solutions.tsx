@@ -66,8 +66,8 @@ function ProblemSolutionsEditor({
     },
     [],
   );
-  const hasPendingChanges = languages.some(
-    (language) => saveStates[language]?.pending,
+  const hasUnsavedContent = languages.some(
+    (language) => saveStates[language]?.dirty || saveStates[language]?.saving,
   );
   const editorHeight = solutions
     ? getSharedEditorHeight({
@@ -87,20 +87,37 @@ function ProblemSolutionsEditor({
       })
     : 0;
   useEffect(() => {
-    onPendingChange?.(hasPendingChanges);
-  }, [hasPendingChanges, onPendingChange]);
+    onPendingChange?.(hasUnsavedContent);
+  }, [hasUnsavedContent, onPendingChange]);
   useEffect(() => {
     const failed = languages.find((language) => saveStates[language]?.error);
     if (failed) {
       onSaveStateChange?.({
-        pending: false,
+        dirty: true,
+        saving: languages.some((language) => saveStates[language]?.saving),
         error: saveStates[failed]?.error,
-        retry: saveStates[failed]?.retry,
+        save: async () => {
+          await Promise.all(
+            languages.map((language) => saveStates[language]?.save?.()),
+          );
+        },
       });
       return;
     }
-    onSaveStateChange?.(hasPendingChanges ? { pending: true } : null);
-  }, [hasPendingChanges, onSaveStateChange, saveStates]);
+    onSaveStateChange?.(
+      hasUnsavedContent
+        ? {
+            dirty: true,
+            saving: languages.some((language) => saveStates[language]?.saving),
+            save: async () => {
+              await Promise.all(
+                languages.map((language) => saveStates[language]?.save?.()),
+              );
+            },
+          }
+        : null,
+    );
+  }, [hasUnsavedContent, onSaveStateChange, saveStates]);
   useEffect(() => {
     let active = true;
     getSolutionsForProblem(sessionId, problemId)
@@ -212,12 +229,13 @@ function EditableSolution({
   const dirty = draft.code !== saved.code || draft.output !== saved.output;
   const save = useCallback(async () => {
     if (!dirty || busy.current) return;
+    const submitted = draft;
     busy.current = true;
     setSaving(true);
     setError(false);
     try {
-      await updateSolution(sessionId, problemId, language, draft);
-      setSaved(draft);
+      await updateSolution(sessionId, problemId, language, submitted);
+      setSaved(submitted);
     } catch {
       setError(true);
     } finally {
@@ -226,24 +244,22 @@ function EditableSolution({
     }
   }, [dirty, sessionId, problemId, language, draft]);
   useEffect(() => {
+    const isDirty = dirty;
     onSaveStateChange(
       language,
-      error && dirty
+      isDirty || saving
         ? {
-            pending: true,
-            error: `${languageNames[language]} Solution or prepared Output could not be saved.`,
-            retry: () => void save(),
+            dirty: Boolean(isDirty),
+            saving,
+            error:
+              error && isDirty
+                ? `${languageNames[language]} Solution or prepared Output could not be saved.`
+                : undefined,
+            save,
           }
-        : dirty || saving
-          ? { pending: true }
-          : null,
+        : null,
     );
   }, [language, dirty, saving, error, onSaveStateChange, save]);
-  useEffect(() => {
-    if (!dirty || saving || error) return;
-    const timer = window.setTimeout(() => void save(), 700);
-    return () => window.clearTimeout(timer);
-  }, [dirty, saving, error, save]);
   return (
     <div>
       <SolutionPanel
@@ -260,21 +276,6 @@ function EditableSolution({
             setError(false);
         }}
       />
-      {error && dirty && (
-        <div role="alert">
-          <p>
-            {languageNames[language]} changes could not be saved. Your edits are
-            still here.
-          </p>
-          <button
-            className={buttonClass}
-            onClick={() => void save()}
-            disabled={saving || disabled}
-          >
-            Retry {languageNames[language]} save
-          </button>
-        </div>
-      )}
     </div>
   );
 }
