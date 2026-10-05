@@ -14,6 +14,7 @@ import {
   type SessionStatus,
   type Solution,
 } from '../domain';
+import { validateLeetcodeProblemUrl } from '../problem-metadata';
 import { validateSessionMetadata } from '../session-metadata';
 import { getFirestoreDb } from './client';
 import { sessionPath, solutionPath } from './paths';
@@ -72,6 +73,10 @@ function validateProblemRecord(
     typeof data.answersVisible !== 'boolean'
   )
     throw new Error('A stored problem has invalid fields.');
+  const leetcodeUrl =
+    data.leetcodeUrl === undefined
+      ? undefined
+      : validateLeetcodeProblemUrl(data.leetcodeUrl);
   return {
     id,
     problem: {
@@ -81,6 +86,7 @@ function validateProblemRecord(
       exampleOutput: data.exampleOutput,
       order: data.order,
       answersVisible: data.answersVisible,
+      ...(leetcodeUrl ? { leetcodeUrl } : {}),
     },
   };
 }

@@ -137,6 +137,35 @@ describe('anonymous member persistence', () => {
     });
   });
 
+  it('accepts a missing optional LeetCode URL and validates linked Problems', async () => {
+    sdk.getDocsFromServer.mockResolvedValueOnce({
+      docs: [
+        snapshot('custom', { ...problem, order: 0 }),
+        snapshot('linked', {
+          ...problem,
+          order: 1,
+          leetcodeUrl: 'https://leetcode.com/problems/two-sum/',
+        }),
+      ],
+    });
+    const records = await listMemberProblems('session');
+    expect(records[0].problem).not.toHaveProperty('leetcodeUrl');
+    expect(records[1].problem.leetcodeUrl).toBe(
+      'https://leetcode.com/problems/two-sum/',
+    );
+    sdk.getDocsFromServer.mockResolvedValueOnce({
+      docs: [
+        snapshot('bad', {
+          ...problem,
+          leetcodeUrl: 'http://example.com/problem',
+        }),
+      ],
+    });
+    await expect(listMemberProblems('session')).rejects.toThrow(
+      'valid HTTPS LeetCode Problem URL',
+    );
+  });
+
   it('loads only the three fixed solution documents', async () => {
     sdk.getDocFromServer.mockImplementation(
       async ({ path }: { path: string }) =>

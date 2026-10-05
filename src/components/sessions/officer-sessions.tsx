@@ -6,6 +6,7 @@ import {
   listSessions,
   type SessionRecord,
 } from '@/lib/firebase/sessions';
+import { listProblems, type ProblemRecord } from '@/lib/firebase/problems';
 import { todayCalendarDate } from '@/lib/session-metadata';
 import SessionEditor from './session-editor';
 
@@ -184,12 +185,108 @@ export default function OfficerSessions() {
                           {record.session.status}
                         </span>
                       </button>
+                      {record.session.status === 'ended' ? (
+                        <PastSessionProblemHistory
+                          sessionId={record.id}
+                          sessionTitle={record.session.title}
+                        />
+                      ) : null}
                     </li>
                   ))}
                 </ul>
               </section>
             ),
         )
+      )}
+    </section>
+  );
+}
+
+function PastSessionProblemHistory({
+  sessionId,
+  sessionTitle,
+}: {
+  sessionId: string;
+  sessionTitle: string;
+}) {
+  const [state, setState] = useState<
+    | { status: 'loading' }
+    | { status: 'loaded'; problems: ProblemRecord[] }
+    | { status: 'empty' }
+    | { status: 'unavailable' }
+  >({ status: 'loading' });
+  const [revision, setRevision] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    setState({ status: 'loading' });
+    listProblems(sessionId).then(
+      (problems) => {
+        if (cancelled) return;
+        setState(
+          problems.length
+            ? { status: 'loaded', problems }
+            : { status: 'empty' },
+        );
+      },
+      () => {
+        if (!cancelled) setState({ status: 'unavailable' });
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [revision, sessionId]);
+
+  return (
+    <section
+      className="mb-4 ml-3 max-w-4xl border-l border-border-soft py-1 pl-4 sm:ml-[4.5rem] sm:pl-5"
+      aria-label={`Problem history for ${sessionTitle}`}
+    >
+      {state.status === 'loading' ? (
+        <p className="m-0 text-sm text-muted" role="status">
+          Loading Problems…
+        </p>
+      ) : state.status === 'unavailable' ? (
+        <div className="text-sm text-muted">
+          <p className="m-0">Problem history could not be loaded.</p>
+          <button
+            className="mt-1 min-h-9 rounded px-2 text-accent underline underline-offset-2 hover:text-accent-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            onClick={() => setRevision((value) => value + 1)}
+          >
+            Retry Problem history
+          </button>
+        </div>
+      ) : state.status === 'empty' ? (
+        <p className="m-0 text-sm text-muted">No Problems recorded.</p>
+      ) : (
+        <ol className="m-0 grid gap-3 pl-5">
+          {state.problems.map(({ id, problem }) => (
+            <li className="min-w-0 pl-1" key={id}>
+              <h3 className="m-0 break-words text-sm font-semibold leading-5 text-ink">
+                {problem.title}
+              </h3>
+              <p className="m-0 mt-1 whitespace-pre-wrap break-words text-sm leading-5 text-muted">
+                {problem.description || 'No description provided'}
+              </p>
+              <p className="m-0 mt-1 min-w-0 break-all text-sm leading-5 text-muted">
+                <span className="font-medium text-ink">LeetCode: </span>
+                {problem.leetcodeUrl ? (
+                  <a
+                    className="text-accent underline underline-offset-2 hover:text-accent-hover focus-visible:rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                    href={problem.leetcodeUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    {problem.leetcodeUrl}
+                  </a>
+                ) : (
+                  'No LeetCode link provided'
+                )}
+              </p>
+            </li>
+          ))}
+        </ol>
       )}
     </section>
   );

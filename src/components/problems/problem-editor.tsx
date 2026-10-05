@@ -30,6 +30,7 @@ export default function ProblemEditor({
   const [saved, setSaved] = useState(content);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldError, setFieldError] = useState<string | null>(null);
   const busy = useRef(false);
   const dirty = Object.keys(content).some(
     (key) =>
@@ -41,6 +42,7 @@ export default function ProblemEditor({
     const next = { ...content, [field]: value };
     setContent(next);
     setError(null);
+    setFieldError(null);
   }
   const save = useCallback(async () => {
     if (!dirty || busy.current) return;
@@ -48,9 +50,10 @@ export default function ProblemEditor({
     try {
       fields = validateProblemContent(content);
     } catch (error) {
-      setError(
-        error instanceof Error ? error.message : 'Check problem content.',
-      );
+      const message =
+        error instanceof Error ? error.message : 'Check problem content.';
+      setError(message);
+      setFieldError(message.includes('LeetCode') ? message : null);
       return;
     }
     busy.current = true;
@@ -122,6 +125,25 @@ export default function ProblemEditor({
           onChange={(event) => edit('description', event.target.value)}
           disabled={saving || disabled}
         />
+      </label>
+      <label className="my-5 flex max-w-3xl flex-col gap-2">
+        LeetCode link (optional)
+        <input
+          className="min-h-11 w-full min-w-0 rounded border border-border-strong bg-surface px-3 py-2 text-ink disabled:cursor-default disabled:bg-raised disabled:text-muted"
+          type="url"
+          inputMode="url"
+          placeholder="https://leetcode.com/problems/two-sum/"
+          value={content.leetcodeUrl}
+          onChange={(event) => edit('leetcodeUrl', event.target.value)}
+          disabled={saving || disabled}
+          aria-invalid={fieldError ? true : undefined}
+          aria-describedby={fieldError ? 'leetcode-url-error' : undefined}
+        />
+        {fieldError ? (
+          <span className="text-sm text-danger" id="leetcode-url-error">
+            {fieldError}
+          </span>
+        ) : null}
       </label>
       <section className="my-6" aria-labelledby="officer-examples-heading">
         <h3

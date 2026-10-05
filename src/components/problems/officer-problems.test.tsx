@@ -233,10 +233,12 @@ describe('Officer Problem workspace', () => {
     ).toBe('true');
     expect(api.createProblem).toHaveBeenCalledWith('session');
     expect(api.listProblems).toHaveBeenCalledTimes(1);
-    expect(onProblemCountStateChange).toHaveBeenLastCalledWith({
-      status: 'ready',
-      count: 3,
-    });
+    await waitFor(() =>
+      expect(onProblemCountStateChange).toHaveBeenLastCalledWith({
+        status: 'ready',
+        count: 3,
+      }),
+    );
   });
   it('keeps failed creation empty with a recoverable error', async () => {
     api.listProblems.mockResolvedValue([]);
@@ -265,6 +267,9 @@ describe('Officer Problem workspace', () => {
     fireEvent.change(screen.getByLabelText('Example output'), {
       target: { value: '9' },
     });
+    fireEvent.change(screen.getByLabelText('LeetCode link (optional)'), {
+      target: { value: 'https://leetcode.com/problems/two-sum/' },
+    });
     expect(api.updateProblem).not.toHaveBeenCalled();
     expect(
       (screen.getByRole('tab', { name: 'Anagram' }) as HTMLButtonElement)
@@ -284,9 +289,26 @@ describe('Officer Problem workspace', () => {
       description: 'New statement',
       exampleInput: '4 5',
       exampleOutput: '9',
+      leetcodeUrl: 'https://leetcode.com/problems/two-sum/',
     });
     expect(api.updateProblem).toHaveBeenCalledTimes(2);
     expect(screen.getByRole('tab', { name: 'Renamed' })).toBeTruthy();
+  });
+  it('rejects an invalid LeetCode URL before saving and preserves the entered value', async () => {
+    await loaded();
+    const input = screen.getByLabelText(
+      'LeetCode link (optional)',
+    ) as HTMLInputElement;
+    fireEvent.change(input, {
+      target: { value: 'http://example.com/not-a-problem' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    expect((await screen.findByRole('alert')).textContent).toContain(
+      'Enter a valid HTTPS LeetCode Problem URL.',
+    );
+    expect(input.value).toBe('http://example.com/not-a-problem');
+    expect(input.getAttribute('aria-invalid')).toBe('true');
+    expect(api.updateProblem).not.toHaveBeenCalled();
   });
   it('keeps aggregate save state pending until the backend confirms and blocks navigation', async () => {
     let resolve!: () => void;

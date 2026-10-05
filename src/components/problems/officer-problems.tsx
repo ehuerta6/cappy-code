@@ -17,7 +17,7 @@ import {
   type ProblemRecord,
 } from '@/lib/firebase/problems';
 import type { ProblemCountState } from '@/lib/firebase/sessions';
-import type { SessionStatus } from '@/lib/domain';
+import type { Problem, SessionStatus } from '@/lib/domain';
 import ProblemEditor from './problem-editor';
 import OfficerSolutions from '../solutions/officer-solutions';
 import type {
@@ -66,11 +66,12 @@ export default function OfficerProblems({
     (content: ProblemContent) => {
       if (!selectedId) return;
       setRecords((currentRecords) =>
-        currentRecords.map((record) =>
-          record.id === selectedId
-            ? { ...record, problem: { ...record.problem, ...content } }
-            : record,
-        ),
+        currentRecords.map((record) => {
+          if (record.id !== selectedId) return record;
+          const problem: Problem = { ...record.problem, ...content };
+          if (!content.leetcodeUrl) delete problem.leetcodeUrl;
+          return { ...record, problem };
+        }),
       );
     },
     [selectedId],
