@@ -104,7 +104,7 @@ export default function ProblemEditor({
           </button>
         </div>
       )}
-      <label className={styles.field}>
+      <label className={`${styles.field} ${styles.titleField}`}>
         Problem title
         <input
           id="problem-title"
@@ -125,28 +125,34 @@ export default function ProblemEditor({
           disabled={saving || disabled}
         />
       </label>
-      <div className={styles.examples}>
-        <label className={styles.field}>
-          Example input
-          <textarea
-            rows={3}
-            value={content.exampleInput}
-            onChange={(event) => edit('exampleInput', event.target.value)}
-            onBlur={() => void save()}
-            disabled={saving || disabled}
-          />
-        </label>
-        <label className={styles.field}>
-          Example output
-          <textarea
-            rows={3}
-            value={content.exampleOutput}
-            onChange={(event) => edit('exampleOutput', event.target.value)}
-            onBlur={() => void save()}
-            disabled={saving || disabled}
-          />
-        </label>
-      </div>
+      <section
+        className={styles.examples}
+        aria-labelledby="officer-examples-heading"
+      >
+        <h3 id="officer-examples-heading">Examples</h3>
+        <div className={styles.examplesGrid}>
+          <label className={styles.field}>
+            Example input
+            <textarea
+              rows={3}
+              value={content.exampleInput}
+              onChange={(event) => edit('exampleInput', event.target.value)}
+              onBlur={() => void save()}
+              disabled={saving || disabled}
+            />
+          </label>
+          <label className={styles.field}>
+            Example output
+            <textarea
+              rows={3}
+              value={content.exampleOutput}
+              onChange={(event) => edit('exampleOutput', event.target.value)}
+              onBlur={() => void save()}
+              disabled={saving || disabled}
+            />
+          </label>
+        </div>
+      </section>
       <p>
         Problem fields save when you leave a field. Finish saving before
         switching problems or returning to the session.

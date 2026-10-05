@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import type { ProblemSolutions } from '@/lib/firebase/solutions';
+import AppHeader from '@/components/app-header';
 import SolutionWorkspace from '@/components/solutions/solution-workspace';
 import {
   createFollowPresenterState,
@@ -45,17 +46,10 @@ export function PublicSessionDiscovery({ state }: { state: DiscoveryState }) {
       : [];
   return (
     <main className={styles.shell}>
-      <header className={styles.header}>
-        <Link className={styles.brand} href="/" aria-label="CappyCode home">
-          CappyCode
-        </Link>
-        <span className={styles.context}>CIC Intro solution showcase</span>
-        <Link className={styles.officerLink} href="/officer">
-          Officer Login
-        </Link>
-      </header>
+      <AppHeader context="CIC Intro solution showcase">
+        <Link href="/officer">Officer Login</Link>
+      </AppHeader>
       <section className={styles.content} aria-labelledby="sessions-heading">
-        <p className={styles.eyebrow}>Member view</p>
         <h1 id="sessions-heading">Sessions</h1>
         {state.status === 'loading' ? (
           <p role="status">Loading sessions…</p>
@@ -140,15 +134,16 @@ export type SessionState =
 export function PublicSessionView({ state }: { state: SessionState }) {
   return (
     <main className={styles.shell}>
-      <header className={styles.header}>
-        <Link className={styles.brand} href="/" aria-label="CappyCode home">
-          CappyCode
-        </Link>
-        <span className={styles.context}>Member view</span>
-        <Link className={styles.officerLink} href="/officer">
-          Officer Login
-        </Link>
-      </header>
+      <AppHeader
+        context={
+          state.status === 'ready' && state.session.status === 'live'
+            ? 'Live Session'
+            : 'Member view'
+        }
+        live={state.status === 'ready' && state.session.status === 'live'}
+      >
+        <Link href="/officer">Officer Login</Link>
+      </AppHeader>
       {state.status === 'loading' ? (
         <p className={styles.content} role="status">
           Loading session…
@@ -259,9 +254,12 @@ function SessionContent({
       <div className={styles.sessionHeading}>
         <div>
           <h1>{state.session.title}</h1>
-          <time dateTime={state.session.date}>
-            {formatDate(state.session.date)}
-          </time>
+          <p className={styles.sessionContext}>
+            CIC Intro Session <span aria-hidden="true">•</span>{' '}
+            <time dateTime={state.session.date}>
+              {formatDate(state.session.date)}
+            </time>
+          </p>
         </div>
         <span
           className={`${styles.status} ${state.session.status === 'live' ? styles.live : ''}`}
@@ -296,6 +294,7 @@ function SessionContent({
                 <input
                   type="checkbox"
                   checked={presenterState.isFollowing}
+                  aria-describedby="follow-presenter-description"
                   onChange={(event) =>
                     event.target.checked
                       ? followPresenter()
@@ -304,8 +303,12 @@ function SessionContent({
                 />
                 Follow presenter
               </label>
+              <span id="follow-presenter-description" className={styles.srOnly}>
+                Follow the officer’s selected Problem. Selecting a Problem
+                manually turns this off.
+              </span>
               <span
-                className={styles.quiet}
+                className={styles.srOnly}
                 aria-live="polite"
                 aria-atomic="true"
               >
@@ -321,10 +324,11 @@ function SessionContent({
               </span>
               {presenter.status === 'error' ? (
                 <button
+                  className={styles.syncButton}
                   type="button"
                   onClick={() => setPresentationRetry((value) => value + 1)}
                 >
-                  Retry sync
+                  Presenter unavailable · Retry sync
                 </button>
               ) : null}
             </div>
@@ -423,16 +427,19 @@ function ProblemContent({
       {problem.description ? (
         <p className={styles.description}>{problem.description}</p>
       ) : null}
-      <div className={styles.examples}>
-        <section>
-          <h3>Input</h3>
-          <pre>{problem.exampleInput || 'No example input'}</pre>
-        </section>
-        <section>
-          <h3>Output</h3>
-          <pre>{problem.exampleOutput || 'No example output'}</pre>
-        </section>
-      </div>
+      <section className={styles.examples} aria-labelledby="examples-heading">
+        <h3 id="examples-heading">Examples</h3>
+        <div className={styles.examplePair}>
+          <section>
+            <h4>Input</h4>
+            <pre>{problem.exampleInput || 'No example input'}</pre>
+          </section>
+          <section>
+            <h4>Output</h4>
+            <pre>{problem.exampleOutput || 'No example output'}</pre>
+          </section>
+        </div>
+      </section>
       <section className={styles.solutions} aria-labelledby="solutions-heading">
         <h2 id="solutions-heading">Solutions</h2>
         {visibility.status === 'loading' ? (
@@ -449,6 +456,30 @@ function ProblemContent({
           </div>
         ) : !visibility.value ? (
           <div className={styles.answerGate}>
+            <svg
+              className={styles.lockIcon}
+              viewBox="0 0 24 24"
+              width="20"
+              height="20"
+              fill="none"
+              aria-hidden="true"
+            >
+              <rect
+                x="5"
+                y="10"
+                width="14"
+                height="11"
+                rx="2"
+                stroke="currentColor"
+                strokeWidth="1.7"
+              />
+              <path
+                d="M8 10V7a4 4 0 1 1 8 0v3"
+                stroke="currentColor"
+                strokeWidth="1.7"
+                strokeLinecap="round"
+              />
+            </svg>
             <h3>Answers hidden</h3>
             <p>
               {session.status === 'ended'

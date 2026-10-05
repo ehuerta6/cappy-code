@@ -8,6 +8,7 @@ import {
 } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ProblemSolutions } from '@/lib/firebase/solutions';
+import { ThemeProvider } from '@/components/theme-provider';
 import {
   PublicSessionDiscovery,
   PublicSessionView,
@@ -43,13 +44,16 @@ vi.mock('@monaco-editor/react', () => ({
   default: ({
     value,
     options,
+    theme,
   }: {
     value: string;
     options: { readOnly: boolean; ariaLabel: string };
+    theme: string;
   }) => (
     <textarea
       aria-label={options.ariaLabel}
       readOnly={options.readOnly}
+      data-editor-theme={theme}
       value={value}
     />
   ),
@@ -58,6 +62,8 @@ vi.mock('@monaco-editor/react', () => ({
 beforeEach(() => {
   presentation.activeProblemId = null;
   presentation.answersVisible = false;
+  window.localStorage.clear();
+  document.documentElement.removeAttribute('data-theme');
   vi.stubGlobal('matchMedia', () => ({
     matches: false,
     addEventListener: vi.fn(),
@@ -66,6 +72,8 @@ beforeEach(() => {
 });
 afterEach(() => {
   cleanup();
+  document.documentElement.removeAttribute('data-theme');
+  window.localStorage.clear();
   vi.unstubAllGlobals();
 });
 
@@ -145,7 +153,10 @@ describe('public member UI scaffold', () => {
     ).toBe('/sessions/past');
     expect(screen.queryByText('Private draft')).toBeNull();
     expect(screen.getByRole('link', { name: 'Officer Login' })).toBeTruthy();
-    expect(screen.queryByRole('button')).toBeNull();
+    expect(
+      screen.getByRole('button', { name: 'Toggle color theme' }),
+    ).toBeTruthy();
+    expect(screen.getAllByRole('button')).toHaveLength(1);
     expect(screen.queryByLabelText(/Password|Email/)).toBeNull();
   });
 
@@ -170,6 +181,7 @@ describe('public member UI scaffold', () => {
     expect(
       screen.getByRole('heading', { name: 'Intro practice' }),
     ).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Officer Login' })).toBeTruthy();
     const tabs = screen.getAllByRole('tab');
     expect(tabs.map((tab) => tab.textContent)).toEqual([
       'First problem',
@@ -178,7 +190,21 @@ describe('public member UI scaffold', () => {
     expect(screen.getByText('First description')).toBeTruthy();
     expect(screen.getByText('first input')).toBeTruthy();
     expect(screen.getByText('first output')).toBeTruthy();
-    fireEvent.click(screen.getByRole('tab', { name: 'Second problem' }));
+    const follow = screen.getByRole('checkbox', { name: 'Follow presenter' });
+    expect((follow as HTMLInputElement).checked).toBe(true);
+    fireEvent.keyDown(screen.getByRole('tab', { name: 'First problem' }), {
+      key: 'ArrowRight',
+    });
+    expect(document.activeElement).toBe(
+      screen.getByRole('tab', { name: 'Second problem' }),
+    );
+    expect(
+      (
+        screen.getByRole('checkbox', {
+          name: 'Follow presenter',
+        }) as HTMLInputElement
+      ).checked,
+    ).toBe(false);
     expect(screen.getByText('Second description')).toBeTruthy();
     expect(load).not.toHaveBeenCalled();
     expect(
@@ -216,10 +242,71 @@ describe('public member UI scaffold', () => {
         ) as HTMLTextAreaElement
       ).readOnly,
     ).toBe(true);
+    expect(screen.getByLabelText('Java Solution, read-only')).toBeTruthy();
+    expect(screen.getByLabelText('C++ Solution, read-only')).toBeTruthy();
     expect(screen.getByText('hello').tagName).toBe('PRE');
     expect(
       screen.queryByRole('button', { name: /run|translate|submit/i }),
     ).toBeNull();
+  });
+
+  it('switches theme independently of hidden and revealed answer state', async () => {
+    const load = vi.fn().mockResolvedValue(solutions);
+    const records = [{ ...problems[1], answersVisible: false }];
+    const view = render(
+      <ThemeProvider>
+        <PublicSessionView state={viewState(load, records)} />
+      </ThemeProvider>,
+    );
+    const themeToggle = await screen.findByRole('button', {
+      name: 'Toggle color theme',
+    });
+    expect(themeToggle.getAttribute('aria-pressed')).toBe('false');
+    expect(document.documentElement.dataset.theme).toBe('light');
+    expect(screen.getByText('Answers hidden')).toBeTruthy();
+    expect(screen.queryByLabelText('Python Solution, read-only')).toBeNull();
+    expect(load).not.toHaveBeenCalled();
+
+    fireEvent.click(themeToggle);
+    expect(document.documentElement.dataset.theme).toBe('dark');
+    expect(themeToggle.getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByText('Answers hidden')).toBeTruthy();
+    expect(load).not.toHaveBeenCalled();
+
+    presentation.answersVisible = true;
+    view.rerender(
+      <ThemeProvider>
+        <PublicSessionView state={viewState(load, records)} />
+      </ThemeProvider>,
+    );
+    const darkPython = await screen.findByLabelText(
+      'Python Solution, read-only',
+    );
+    expect(darkPython.getAttribute('data-editor-theme')).toBe('cappy-dark');
+    expect(screen.getByLabelText('Java Solution, read-only')).toBeTruthy();
+    expect(screen.getByLabelText('C++ Solution, read-only')).toBeTruthy();
+    expect(load).toHaveBeenCalledExactlyOnceWith('first');
+
+    fireEvent.click(themeToggle);
+    expect(document.documentElement.dataset.theme).toBe('light');
+    expect(themeToggle.getAttribute('aria-pressed')).toBe('false');
+    expect(
+      screen
+        .getByLabelText('Python Solution, read-only')
+        .getAttribute('data-editor-theme'),
+    ).toBe('cappy-light');
+
+    presentation.answersVisible = false;
+    view.rerender(
+      <ThemeProvider>
+        <PublicSessionView state={viewState(load, records)} />
+      </ThemeProvider>,
+    );
+    expect(screen.getByText('Answers hidden')).toBeTruthy();
+    expect(screen.queryByLabelText('Python Solution, read-only')).toBeNull();
+    fireEvent.click(themeToggle);
+    expect(document.documentElement.dataset.theme).toBe('dark');
+    expect(screen.getByText('Answers hidden')).toBeTruthy();
   });
 
   it('handles a permission race safely and retries without exposing error details', async () => {

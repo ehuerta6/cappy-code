@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useState, type ReactNode } from 'react';
 import { useOfficerAuth } from '@/hooks/use-officer-auth';
 import { getOfficerAuth } from '@/lib/firebase/auth';
+import AppHeader from './app-header';
 import OfficerLogin from './officer-login';
 
 export default function OfficerAuthGate({ children }: { children: ReactNode }) {
@@ -27,10 +28,15 @@ export default function OfficerAuthGate({ children }: { children: ReactNode }) {
 
   return (
     <div className="officer-shell">
-      <header className="officer-header">
-        <Link href="/">CappyCode</Link>
+      <AppHeader
+        context={
+          auth.status === 'authenticated' ? 'Officer Mode' : 'Officer Login'
+        }
+      >
         <nav aria-label="Officer navigation">
-          <Link href="/">Member Mode</Link>
+          <Link href="/" aria-label="Member Mode">
+            Members
+          </Link>
           {auth.status === 'authenticated' && (
             <button
               className="clear-button"
@@ -42,7 +48,7 @@ export default function OfficerAuthGate({ children }: { children: ReactNode }) {
             </button>
           )}
         </nav>
-      </header>
+      </AppHeader>
       <main className="officer-content">
         {error && (
           <p className="auth-error" role="alert">
