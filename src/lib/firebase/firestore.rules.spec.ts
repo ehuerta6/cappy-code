@@ -123,7 +123,7 @@ describe('Firestore security rules', () => {
       }),
     );
     await assertSucceeds(
-      updateDoc(doc(db, 'sessions/draft'), { activeProblemId: 'revealed' }),
+      updateDoc(doc(db, 'sessions/draft'), { title: 'Updated title' }),
     );
     await assertSucceeds(getDoc(doc(db, 'sessions/draft/problems/revealed')));
     await assertSucceeds(

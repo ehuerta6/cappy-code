@@ -2,7 +2,7 @@
 
 **A live solution showcase platform for CIC Intro sessions.**
 
-CappyCode helps Coding Interview Club (CIC) Intro officers prepare and present interview-style problems and solutions. Officers manage a session from Officer Mode; members open an anonymous, read-only view and follow the presentation as prepared answers are revealed.
+CappyCode helps Coding Interview Club (CIC) Intro officers prepare interview-style problems and solutions. Officers manage sessions from Officer Mode; members open an anonymous, read-only view and choose problems independently as prepared answers are revealed.
 
 Officers prepare Python, Java, and C++ solutions before a session. CappyCode presents those solutions side by side with prepared static output for each language. It does not generate, translate, compile, or run code.
 
@@ -12,10 +12,10 @@ Officers prepare Python, Java, and C++ solutions before a session. CappyCode pre
 2. The officer adds, edits, orders, and describes multiple problems, including examples.
 3. For each problem, the officer prepares Python, Java, and C++ source and static output.
 4. The officer starts the session, which becomes live. Members open the public session view without accounts.
-5. The officer chooses the active problem and uses **Show Answers** or **Hide Answers** while presenting.
-6. Members can use **Follow Presenter** to stay on the problem selected by the officer. Ended sessions remain available in session history.
+5. The officer chooses which problem to manage and uses **Show Answers** or **Hide Answers** for that problem while presenting. Members choose problems independently.
+6. Ended sessions remain available in session history.
 
-Sessions have `draft`, `live`, and `ended` states. The session's `activeProblemId` is the shared presentation pointer. Each problem stores its own `answersVisible` state. Changes to the active problem and to each problem's answer visibility update in realtime for members following the presenter.
+Sessions have `draft`, `live`, and `ended` states. Members choose problems independently in their own view. Each problem stores its own `answersVisible` state, which updates in realtime for members viewing that problem.
 
 ## Modes and access
 
@@ -27,9 +27,9 @@ Sessions have `draft`, `live`, and `ended` states. The session's `activeProblemI
 
 ## Persistence and architecture
 
-Firestore is the canonical persistence layer for officer-managed content, session history, and live presentation state. Firebase Authentication protects Officer Mode; public members do not sign in. The product has no runtime AI, LLM, translation, code execution, compiler, interpreter, or online judging system.
+Firestore is the canonical persistence layer for officer-managed content, session history, and live answer visibility. Firebase Authentication protects Officer Mode; public members do not sign in. The product has no runtime AI, LLM, translation, code execution, compiler, interpreter, or online judging system.
 
-Conceptually, a session stores its status and `activeProblemId`. Its ordered problems store titles, descriptions, examples, and per-problem `answersVisible`; these metadata are member-readable only when the session's status/publication rules permit access. Separate protected solution documents contain prepared source text and static output for Python, Java, and C++. Firestore Security Rules use the parent problem's `answersVisible` and session access rules to govern solution reads.
+A session stores its status. Its ordered problems store titles, descriptions, examples, and per-problem `answersVisible`; these metadata are member-readable only when the session's status/publication rules permit access. Separate protected solution documents contain prepared source text and static output for Python, Java, and C++. Firestore Security Rules use the parent problem's `answersVisible` and session access rules to govern solution reads.
 
 ## Product principles
 
@@ -37,7 +37,7 @@ Conceptually, a session stores its status and `activeProblemId`. Its ordered pro
 2. **Presentation first** — keep problems and all three language views clear, readable, and useful on a projected screen.
 3. **Prepared content** — solutions and outputs are authored before presentation and shown as stored.
 4. **Anonymous audience** — members can follow along without accounts and cannot edit content.
-5. **Secure reveal** — answer access is enforced by Firestore Security Rules, with realtime presentation updates.
+5. **Secure reveal** — answer access is enforced by Firestore Security Rules, with realtime answer visibility updates.
 
 ## Documentation
 

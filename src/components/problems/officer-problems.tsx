@@ -10,21 +10,16 @@ import {
   type ProblemRecord,
 } from '@/lib/firebase/problems';
 import type { ProblemCountState } from '@/lib/firebase/sessions';
-import { setActiveProblem } from '@/lib/firebase/presentation';
-import { useActiveProblemId } from '@/hooks/use-presentation-state';
-import type { SessionStatus } from '@/lib/domain';
 import ProblemEditor from './problem-editor';
 import styles from './problems.module.css';
 import OfficerSolutions from '../solutions/officer-solutions';
 
 export default function OfficerProblems({
   sessionId,
-  sessionStatus,
   onBusyChange,
   onProblemCountStateChange,
 }: {
   sessionId: string;
-  sessionStatus: SessionStatus;
   onBusyChange: (busy: boolean) => void;
   onProblemCountStateChange: (state: ProblemCountState) => void;
 }) {
@@ -39,17 +34,12 @@ export default function OfficerProblems({
   const [solutionPending, setSolutionPending] = useState(false);
   const [actionsOpen, setActionsOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [presentationRetry, setPresentationRetry] = useState(0);
   const lock = useRef(false);
   const tabs = useRef(new Map<string, HTMLButtonElement>());
   const addButton = useRef<HTMLButtonElement>(null);
   const actionsButton = useRef<HTMLButtonElement>(null);
   const selected = records.find((record) => record.id === selectedId);
   const blocked = editing || solutionPending || operation !== null;
-  const presentation = useActiveProblemId(
-    sessionStatus === 'live' ? sessionId : null,
-    presentationRetry,
-  );
 
   useEffect(() => {
     onBusyChange(blocked);
@@ -289,45 +279,6 @@ export default function OfficerProblems({
                   Problem actions
                 </button>
               </div>
-              {sessionStatus === 'live' && selected && (
-                <div className={styles.reveal}>
-                  <button
-                    className={styles.button}
-                    disabled={
-                      blocked ||
-                      presentation.status === 'loading' ||
-                      (presentation.status === 'ready' &&
-                        presentation.value === selected.id)
-                    }
-                    onClick={() =>
-                      void act('Updating presentation problem', () =>
-                        setActiveProblem(sessionId, selected.id),
-                      )
-                    }
-                  >
-                    {presentation.status === 'ready' &&
-                    presentation.value === selected.id
-                      ? 'Currently presenting this problem'
-                      : 'Present this problem'}
-                  </button>
-                  {presentation.status === 'loading' ? (
-                    <p role="status">Syncing presentation state…</p>
-                  ) : presentation.status === 'error' ? (
-                    <div role="status">
-                      <span>Presentation state is unavailable.</span>{' '}
-                      <button
-                        className={styles.button}
-                        disabled={blocked}
-                        onClick={() =>
-                          setPresentationRetry((value) => value + 1)
-                        }
-                      >
-                        Retry sync
-                      </button>
-                    </div>
-                  ) : null}
-                </div>
-              )}
               {actionsOpen && selected && (
                 <div
                   id="problem-actions"

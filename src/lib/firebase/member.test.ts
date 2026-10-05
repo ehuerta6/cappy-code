@@ -36,7 +36,6 @@ const live = {
   title: 'Intro practice',
   date: '2026-10-04',
   status: 'live',
-  activeProblemId: null,
 };
 const problem = {
   title: 'Arrays',
@@ -105,6 +104,18 @@ describe('anonymous member persistence', () => {
     await expect(getMemberSession('s')).rejects.toThrow(
       'awaiting confirmation',
     );
+  });
+
+  it('ignores a legacy activeProblemId field in public Session data', async () => {
+    sdk.getDocFromServer.mockResolvedValueOnce(
+      snapshot('legacy', { ...live, activeProblemId: 'old-problem' }),
+    );
+    const record = await getMemberSession('legacy');
+    expect(record?.session).not.toHaveProperty('activeProblemId');
+    expect(record?.session).toMatchObject({
+      title: 'Intro practice',
+      status: 'live',
+    });
   });
 
   it('reads public Problem metadata and sorts by order then document ID', async () => {

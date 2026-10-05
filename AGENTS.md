@@ -21,7 +21,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - Keep public problem descriptions and examples separate from protected solution documents. Officers manually prepare Python, Java, and C++ source plus static output for each language.
 - Monaco editors are editable in Officer Mode and read-only in Member Mode. Show all three languages together; there is no source language or translation flow.
 - Draft sessions are officer-only; member reads of problem metadata follow session status/publication rules. Firestore Security Rules permit solution reads only when the parent problem's `answersVisible` and session access rules allow them.
-- Realtime presentation state uses session-level `activeProblemId` for navigation and problem-level `answersVisible` for answer reveal; members can use Follow Presenter.
+- Members choose problems independently; problem-level `answersVisible` updates in realtime for members viewing that problem. Firestore Security Rules protect unrevealed solutions.
 - Provide an officer dashboard and a responsive, presentation-focused interface that stays readable when projected.
 - Do not add runtime AI, translation, code execution, compilers/interpreters, online judging, or browser `localStorage` as canonical persistence.
 

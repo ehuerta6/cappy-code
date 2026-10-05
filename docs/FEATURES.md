@@ -20,11 +20,11 @@ This checklist tracks the product implementation for CappyCode, **a live solutio
 
 ## Firestore data and session lifecycle
 
-- [ ] Use Firestore as canonical persistence for sessions, ordered problems, solutions, and presentation state
+- [ ] Use Firestore as canonical persistence for sessions, ordered problems, solutions, and answer visibility
 - [ ] Model sessions with `draft`, `live`, and `ended` states
 - [ ] Support session creation, editing, starting, and ending in Officer Mode
 - [ ] Keep session history available from the officer dashboard
-- [ ] Store session-level `activeProblemId` and problem-level `answersVisible`
+- [ ] Store problem-level `answersVisible` and keep legacy session fields ignored
 - [ ] Keep problem metadata separate from protected solution documents; expose metadata only when session status/publication rules permit member access
 
 ## Problem and solution preparation
@@ -43,8 +43,8 @@ This checklist tracks the product implementation for CappyCode, **a live solutio
 - [ ] Build an officer dashboard for session and presentation management
 - [ ] Publish live sessions to the anonymous public view
 - [ ] Add **Show Answers** and **Hide Answers** controls
-- [ ] Synchronize session `activeProblemId` and per-problem `answersVisible` to eligible member views in realtime
-- [ ] Add member-side **Follow Presenter** behavior using the session's `activeProblemId`
+- [ ] Update per-problem `answersVisible` in eligible member views in realtime
+- [ ] Keep problem selection local and independent in each view
 - [ ] Keep ended sessions in session history
 
 ## Presentation UX and accessibility
@@ -59,9 +59,9 @@ This checklist tracks the product implementation for CappyCode, **a live solutio
 ## Testing and reliability
 
 - [ ] Test Firestore Security Rules for anonymous and authenticated access
-- [ ] Test session lifecycle, problem ordering, and `activeProblemId` updates
+- [ ] Test session lifecycle, problem ordering, and legacy session-field compatibility
 - [ ] Test **Show Answers** and **Hide Answers** behavior in member views
-- [ ] Test realtime presentation updates and **Follow Presenter**
+- [ ] Test realtime answer visibility and independent member problem selection
 - [ ] Test Officer Mode editing and Member Mode read-only behavior
 - [ ] Add an end-to-end officer-to-member presentation flow
 

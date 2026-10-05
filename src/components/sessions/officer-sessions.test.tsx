@@ -58,7 +58,6 @@ const record = {
     title: 'Arrays',
     date: '2026-10-08',
     status: 'draft',
-    activeProblemId: null,
     createdAt: Timestamp.fromMillis(1000),
     updatedAt: Timestamp.fromMillis(1000),
   },

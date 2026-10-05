@@ -163,53 +163,6 @@
   font-weight: 600;
 }
 
-.followControl {
-  display: flex;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 8px;
-}
-
-.followControl label {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 48px;
-  white-space: nowrap;
-  cursor: pointer;
-  font-size: 14px;
-}
-
-.followControl input {
-  width: 18px;
-  height: 18px;
-  margin: 0;
-  accent-color: var(--accent);
-}
-
-.followControl button,
-.notice button,
-.syncButton {
-  min-height: 44px;
-  padding: 6px 10px;
-  border: 1px solid var(--border-strong);
-  border-radius: 4px;
-  background: var(--surface-primary);
-  color: var(--text-primary);
-  cursor: pointer;
-}
-
-.followControl button:hover,
-.notice button:hover,
-.syncButton:hover {
-  background: var(--surface-hover);
-}
-
-.syncButton {
-  color: var(--danger);
-  white-space: nowrap;
-}
-
 .problem {
   padding-top: 20px;
 }
@@ -335,16 +288,6 @@
   margin: 0 0 12px;
 }
 
-.srOnly {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  clip-path: inset(50%);
-}
-
 .shell :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
@@ -373,11 +316,6 @@
 
   .tabs {
     flex-basis: 100%;
-  }
-
-  .followControl {
-    min-height: 48px;
-    padding-left: 8px;
   }
 
   .examplePair {

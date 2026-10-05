@@ -11,7 +11,6 @@ export interface Session {
   // Calendar date in YYYY-MM-DD format, independent of a time zone.
   date: string;
   status: SessionStatus;
-  activeProblemId: string | null;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }

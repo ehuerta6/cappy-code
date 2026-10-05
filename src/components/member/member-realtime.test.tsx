@@ -15,14 +15,7 @@ const member = vi.hoisted(() => ({
   getRevealedMemberSolutions: vi.fn(),
 }));
 const listeners = vi.hoisted(() => ({
-  subscribeToActiveProblem: vi.fn(),
   subscribeToAnswersVisible: vi.fn(),
-  active: [] as Array<{
-    sessionId: string;
-    onValue: (problemId: string | null) => void;
-    onError: (error: Error) => void;
-    unsubscribe: ReturnType<typeof vi.fn>;
-  }>,
   answers: [] as Array<{
     sessionId: string;
     problemId: string;
@@ -33,8 +26,7 @@ const listeners = vi.hoisted(() => ({
 }));
 
 vi.mock('@/lib/firebase/member', () => member);
-vi.mock('@/lib/firebase/presentation', () => ({
-  subscribeToActiveProblem: listeners.subscribeToActiveProblem,
+vi.mock('@/lib/firebase/answer-visibility', () => ({
   subscribeToAnswersVisible: listeners.subscribeToAnswersVisible,
 }));
 vi.mock('next/link', () => ({
@@ -68,7 +60,6 @@ const session = {
     title: 'Intro practice',
     date: '2026-10-04',
     status: 'live' as const,
-    activeProblemId: 'second',
   },
 };
 const problems = [
@@ -108,22 +99,10 @@ beforeEach(() => {
     addEventListener: vi.fn(),
     removeEventListener: vi.fn(),
   }));
-  listeners.active.length = 0;
   listeners.answers.length = 0;
   member.getMemberSession.mockResolvedValue(session);
   member.listMemberProblems.mockResolvedValue(problems);
   member.getRevealedMemberSolutions.mockResolvedValue(solutions);
-  listeners.subscribeToActiveProblem.mockImplementation(
-    (
-      sessionId: string,
-      onValue: (problemId: string | null) => void,
-      onError: (error: Error) => void,
-    ) => {
-      const unsubscribe = vi.fn();
-      listeners.active.push({ sessionId, onValue, onError, unsubscribe });
-      return unsubscribe;
-    },
-  );
   listeners.subscribeToAnswersVisible.mockImplementation(
     (
       sessionId: string,
@@ -151,99 +130,11 @@ afterEach(() => {
 
 async function openSession() {
   render(<MemberSessionPage sessionId="session" />);
-  await screen.findByText('Second description');
-  await waitFor(() => expect(listeners.active).toHaveLength(1));
+  await screen.findByText('First description');
   await waitFor(() => expect(listeners.answers).toHaveLength(1));
 }
 
-describe('Member realtime presentation', () => {
-  it('starts on the active Problem with Follow Presenter enabled and follows live changes', async () => {
-    await openSession();
-    const follow = screen.getByRole('checkbox', { name: 'Follow presenter' });
-    expect((follow as HTMLInputElement).checked).toBe(true);
-
-    act(() => listeners.active[0].onValue('first'));
-    expect(await screen.findByText('First description')).toBeTruthy();
-    act(() => listeners.active[0].onValue('second'));
-    expect(await screen.findByText('Second description')).toBeTruthy();
-  });
-
-  it('describes a null initial presenter pointer without attributing the fallback Problem to the presenter', async () => {
-    member.getMemberSession.mockResolvedValueOnce({
-      ...session,
-      session: { ...session.session, activeProblemId: null },
-    });
-    render(<MemberSessionPage sessionId="session" />);
-
-    expect(await screen.findByText('First description')).toBeTruthy();
-    expect(
-      await screen.findByText(
-        'No Problem is currently selected by the presenter.',
-      ),
-    ).toBeTruthy();
-    expect(screen.queryByText('Following First problem.')).toBeNull();
-    expect(
-      (
-        screen.getByRole('checkbox', {
-          name: 'Follow presenter',
-        }) as HTMLInputElement
-      ).checked,
-    ).toBe(true);
-  });
-
-  it('describes an unavailable initial presenter pointer while showing the local fallback', async () => {
-    member.getMemberSession.mockResolvedValueOnce({
-      ...session,
-      session: { ...session.session, activeProblemId: 'missing-problem' },
-    });
-    render(<MemberSessionPage sessionId="session" />);
-
-    expect(await screen.findByText('First description')).toBeTruthy();
-    expect(
-      await screen.findByText(
-        'The presenter’s Problem is not available in this session.',
-      ),
-    ).toBeTruthy();
-    expect(screen.queryByText('Following First problem.')).toBeNull();
-  });
-
-  it('turns following off on manual navigation and jumps to the current presenter when re-enabled', async () => {
-    await openSession();
-    act(() => listeners.active[0].onValue('second'));
-
-    fireEvent.click(screen.getByRole('tab', { name: 'First problem' }));
-    const follow = screen.getByRole('checkbox', { name: 'Follow presenter' });
-    expect((follow as HTMLInputElement).checked).toBe(false);
-    act(() => listeners.active[0].onValue('second'));
-    expect(screen.getByText('First description')).toBeTruthy();
-
-    fireEvent.click(follow);
-    expect((follow as HTMLInputElement).checked).toBe(true);
-    expect(screen.getByText('Second description')).toBeTruthy();
-  });
-
-  it('uses a local initial fallback but gracefully clears selection for a later null or unavailable pointer', async () => {
-    member.getMemberSession.mockResolvedValueOnce({
-      ...session,
-      session: { ...session.session, activeProblemId: null },
-    });
-    render(<MemberSessionPage sessionId="session" />);
-    expect(await screen.findByText('First description')).toBeTruthy();
-    await waitFor(() => expect(listeners.active).toHaveLength(1));
-    act(() => listeners.active[0].onValue('second'));
-    act(() => listeners.active[0].onValue(null));
-    expect(
-      await screen.findByText('The presenter has not selected a Problem.'),
-    ).toBeTruthy();
-
-    act(() => listeners.active[0].onValue('missing-problem'));
-    expect(
-      screen.getAllByText(
-        'The presenter’s Problem is not available in this session.',
-      ),
-    ).toHaveLength(2);
-  });
-
+describe('Member answer visibility realtime', () => {
   it('loads Solutions only after realtime reveal and removes them after Hide Answers', async () => {
     await openSession();
     expect(member.getRevealedMemberSolutions).not.toHaveBeenCalled();
@@ -257,7 +148,7 @@ describe('Member realtime presentation', () => {
     ).toBeTruthy();
     expect(member.getRevealedMemberSolutions).toHaveBeenCalledExactlyOnceWith(
       'session',
-      'second',
+      'first',
     );
     expect(screen.getByLabelText('Java Solution, read-only')).toBeTruthy();
     expect(screen.getByLabelText('C++ Solution, read-only')).toBeTruthy();
@@ -273,12 +164,12 @@ describe('Member realtime presentation', () => {
   it('cleans up reveal listeners when selection changes and ignores their late callbacks', async () => {
     await openSession();
     const oldListener = listeners.answers[0];
-    fireEvent.click(screen.getByRole('tab', { name: 'First problem' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Second problem' }));
     await waitFor(() => expect(listeners.answers).toHaveLength(2));
     expect(oldListener.unsubscribe).toHaveBeenCalledOnce();
     act(() => oldListener.onValue(true));
     expect(member.getRevealedMemberSolutions).not.toHaveBeenCalled();
-    expect(screen.getByText('First description')).toBeTruthy();
+    expect(screen.getByText('Second description')).toBeTruthy();
   });
 
   it('fails closed on listener errors without showing raw Firebase details', async () => {
@@ -298,21 +189,13 @@ describe('Member realtime presentation', () => {
     expect(screen.queryByText(/permission-denied/)).toBeNull();
     expect(screen.queryByLabelText('Python Solution, read-only')).toBeNull();
     expect(member.getRevealedMemberSolutions).toHaveBeenCalledOnce();
-
-    act(() =>
-      listeners.active[0].onError(new Error('private listener detail')),
-    );
-    expect(screen.getByText('Presenter updates are unavailable.')).toBeTruthy();
-    expect(screen.queryByText(/private listener detail/)).toBeNull();
   });
 
-  it('unsubscribes Session and Problem listeners on unmount', async () => {
+  it('unsubscribes the Problem listener on unmount', async () => {
     const { unmount } = render(<MemberSessionPage sessionId="session" />);
-    await screen.findByText('Second description');
-    await waitFor(() => expect(listeners.active).toHaveLength(1));
+    await screen.findByText('First description');
     await waitFor(() => expect(listeners.answers).toHaveLength(1));
     unmount();
-    expect(listeners.active[0].unsubscribe).toHaveBeenCalledOnce();
     expect(listeners.answers[0].unsubscribe).toHaveBeenCalledOnce();
   });
 });
