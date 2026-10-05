@@ -1,5 +1,82 @@
 # Firebase foundation
 
+## Local emulator development
+
+Routine development and destructive testing use the Firebase Emulator Suite.
+The project uses Firestore on `127.0.0.1:8080` and Authentication on
+`127.0.0.1:9099`. Firebase CLI is installed with the project dependencies;
+Firestore Emulator requires Java 11 or newer.
+
+Copy the local example and start the emulators in one terminal:
+
+```bash
+cp .env.example .env.local
+npm install
+npm run emulators
+```
+
+The example explicitly sets `NEXT_PUBLIC_USE_FIREBASE_EMULATORS=true`. With
+that flag, the existing Firebase client initializes with the harmless demo
+project ID `demo-cappycode-local` and connects its normal Firestore and Officer
+Auth clients to the local emulators. It does not need a Firebase Console project
+or production Web app values. `firebase.json` loads the checked-in
+[`firestore.rules`](../firestore.rules) for emulator use, the same Rules file
+used by production.
+
+In another terminal, seed the deterministic local data and start Next.js:
+
+```bash
+npm run seed
+npm run dev
+```
+
+The seed creates a local Officer account:
+
+| Field    | Local value               |
+| -------- | ------------------------- |
+| Email    | `officer@cappycode.local` |
+| Password | `cappycode-local-only`    |
+
+This account exists only in the Auth Emulator and is unrelated to the shared
+production Officer account. Members stay anonymous. The seed includes one draft
+custom Problem, a live linked Two Sum Problem with answers visible and a custom
+Problem with answers hidden, and an ended session with one linked and one custom
+Problem. Each has ordered metadata and Python, Java, and C++ source with prepared
+output. It covers LeetCode links and Problems without links for Member and Past
+history views.
+
+After destructive testing, restore the known state with the emulators still
+running:
+
+```bash
+npm run reset
+```
+
+Reset clears the local Auth and Firestore emulator data before restoring the
+Officer account and seed Sessions. `npm run seed` reapplies the sample records
+without clearing other local data. Neither script targets a Firebase project
+outside the hard-coded local emulator endpoints.
+The seed uses the existing Rules test helper to bypass Rules only while loading
+local setup data. The running application still uses the checked-in Rules for
+every app request.
+
+To confirm the app is using emulators, keep the emulator process running, sign
+in with the local Officer account, and inspect the browser Network panel for
+Firestore requests to `127.0.0.1:8080` and Auth requests to `127.0.0.1:9099`.
+If an enabled emulator is unavailable, requests fail visibly; the client does
+not fall back to production. Emulator use accepts only the explicit values
+`true` or `false`; an invalid value fails configuration, and `true` is rejected
+in a production build.
+
+Production uses the real Firebase Web app configuration with
+`NEXT_PUBLIC_USE_FIREBASE_EMULATORS=false` or the flag unset. Configure its
+`NEXT_PUBLIC_FIREBASE_*` values in the deployment environment, never in a
+committed file. Next.js inlines `NEXT_PUBLIC_` values when building, so the
+production flag and real project values must be set for the production build.
+Routine development and destructive testing belong on emulators; use production
+only for targeted deployment smoke checks. Do not create test Sessions in
+production.
+
 ## Local setup
 
 1. Create or select a Firebase project in the [Firebase Console](https://console.firebase.google.com/).
