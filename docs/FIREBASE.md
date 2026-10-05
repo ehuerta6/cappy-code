@@ -166,10 +166,11 @@ readers accept its absence without a migration. Officers can enter a link in the
 Problem editor, where a blank value clears the field and a nonblank value must
 be an HTTPS URL on `leetcode.com` or `www.leetcode.com` at `/problems/{slug}`.
 The link saves with the Problem's explicit **Save changes** workflow. Members
-see **View on LeetCode** only when a link exists. Ended Session workspaces show
-an ordered summary of Problem titles, descriptions, and links (or the
-Officer-only **No LeetCode link provided** label) from the existing Problem
-documents; no separate history records are stored.
+see **View on LeetCode** only when a link exists. The Officer Sessions dashboard
+loads an ordered Problem summary under each Past Session, using existing
+Problem documents to show titles, descriptions, and links (or the Officer-only
+**No LeetCode link provided** label). Draft and live Sessions do not load this
+history, and no separate history records are stored.
 No Solution documents or Solution fields are created in Problem metadata.
 Server reads validate the existing `Problem` model and reject pending writes.
 Content updates write only title, description, example input and example output;

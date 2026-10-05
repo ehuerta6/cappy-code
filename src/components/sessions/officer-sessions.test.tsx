@@ -4,6 +4,7 @@ import {
   fireEvent,
   render,
   screen,
+  within,
   waitFor,
 } from '@testing-library/react';
 import { Timestamp } from 'firebase/firestore';
@@ -201,6 +202,200 @@ describe('Officer Sessions surface', () => {
     expect(pastRows[0].textContent).toContain('Oct 1');
     expect(pastRows[1].textContent).toContain('Sep 1');
     expect(pastRows[0].textContent).toContain('1 Problem');
+    expect(
+      await within(screen.getByRole('region', { name: 'Past' })).findAllByText(
+        'No Problems recorded.',
+      ),
+    ).toHaveLength(2);
+  });
+
+  it('shows ended-session Problem summaries directly under Past in order and keeps row navigation', async () => {
+    const draft = {
+      ...record,
+      id: 'draft-session',
+      session: { ...record.session, status: 'draft' as const },
+    };
+    const live = {
+      ...record,
+      id: 'live-session',
+      session: { ...record.session, status: 'live' as const },
+    };
+    const older = {
+      ...record,
+      id: 'older-session',
+      session: {
+        ...record.session,
+        title: 'Strings',
+        date: '2026-10-01',
+        status: 'ended' as const,
+      },
+    };
+    const newer = {
+      ...record,
+      id: 'newer-session',
+      problemCount: 2,
+      session: {
+        ...record.session,
+        title: 'Arrays & Hashing',
+        date: '2026-10-04',
+        status: 'ended' as const,
+      },
+    };
+    api.listSessions.mockResolvedValue([draft, live, older, newer]);
+    api.listProblems.mockImplementation(async (sessionId: string) =>
+      sessionId === 'newer-session'
+        ? [
+            {
+              id: 'two-sum',
+              problem: {
+                title: 'Two Sum',
+                description: 'Given an array of integers, find two values.',
+                exampleInput: '',
+                exampleOutput: '',
+                order: 0,
+                answersVisible: false,
+                leetcodeUrl: 'https://leetcode.com/problems/two-sum/',
+              },
+            },
+            {
+              id: 'custom-prefix',
+              problem: {
+                title: 'Custom Prefix Exercise',
+                description: 'Write a function that finds a shared prefix.',
+                exampleInput: '',
+                exampleOutput: '',
+                order: 1,
+                answersVisible: false,
+              },
+            },
+          ]
+        : [
+            {
+              id: 'valid-anagram',
+              problem: {
+                title: 'Valid Anagram',
+                description: 'Determine whether two strings are anagrams.',
+                exampleInput: '',
+                exampleOutput: '',
+                order: 0,
+                answersVisible: false,
+                leetcodeUrl: 'https://leetcode.com/problems/valid-anagram/',
+              },
+            },
+          ],
+    );
+
+    render(<OfficerSessions />);
+    const past = await screen.findByRole('region', { name: 'Past' });
+    const newerHistory = await within(past).findByRole('region', {
+      name: 'Problem history for Arrays & Hashing',
+    });
+    await within(newerHistory).findByText('Custom Prefix Exercise');
+    expect(
+      Array.from(newerHistory.querySelectorAll('ol > li h3')).map(
+        (heading) => heading.textContent,
+      ),
+    ).toEqual(['Two Sum', 'Custom Prefix Exercise']);
+    expect(
+      within(newerHistory).getByText(
+        'Given an array of integers, find two values.',
+      ),
+    ).toBeTruthy();
+    expect(
+      within(newerHistory)
+        .getByRole('link', {
+          name: 'https://leetcode.com/problems/two-sum/',
+        })
+        .getAttribute('href'),
+    ).toBe('https://leetcode.com/problems/two-sum/');
+    expect(
+      within(newerHistory).getByText('No LeetCode link provided'),
+    ).toBeTruthy();
+    const olderHistory = within(past).getByRole('region', {
+      name: 'Problem history for Strings',
+    });
+    expect(within(olderHistory).getByText('Valid Anagram')).toBeTruthy();
+    expect(
+      within(olderHistory).getByRole('link', {
+        name: 'https://leetcode.com/problems/valid-anagram/',
+      }),
+    ).toBeTruthy();
+    expect(
+      within(past)
+        .getAllByRole('button')
+        .map((button) => button.textContent?.match(/Oct \d/)?.[0]),
+    ).toEqual(['Oct 4', 'Oct 1']);
+    expect(
+      api.listProblems.mock.calls.map(([sessionId]) => sessionId).sort(),
+    ).toEqual(['newer-session', 'older-session']);
+    expect(screen.queryByLabelText('Session title')).toBeNull();
+
+    fireEvent.click(
+      within(past).getByRole('button', { name: /Oct 4.*Arrays & Hashing/ }),
+    );
+    expect(await screen.findByLabelText('Session title')).toBeTruthy();
+  });
+
+  it('shows per-session loading, empty and recoverable failure states without breaking other Past entries', async () => {
+    const failed = {
+      ...record,
+      id: 'failed-history',
+      session: {
+        ...record.session,
+        title: 'Unavailable history',
+        status: 'ended' as const,
+      },
+    };
+    const empty = {
+      ...record,
+      id: 'empty-history',
+      session: {
+        ...record.session,
+        title: 'Empty history',
+        date: '2026-10-07',
+        status: 'ended' as const,
+      },
+    };
+    let resolveHistory!: (problems: never[]) => void;
+    let failedAttempts = 0;
+    api.listSessions.mockResolvedValue([failed, empty]);
+    api.listProblems.mockImplementation((sessionId: string) => {
+      if (sessionId === 'empty-history') return Promise.resolve([]);
+      failedAttempts += 1;
+      if (failedAttempts === 1) return Promise.reject(new Error('offline'));
+      return new Promise((resolve) => {
+        resolveHistory = resolve;
+      });
+    });
+
+    render(<OfficerSessions />);
+    const past = await screen.findByRole('region', { name: 'Past' });
+    const failedHistory = within(past).getByRole('region', {
+      name: 'Problem history for Unavailable history',
+    });
+    expect(
+      await within(failedHistory).findByText(
+        'Problem history could not be loaded.',
+      ),
+    ).toBeTruthy();
+    expect(within(past).getByText('No Problems recorded.')).toBeTruthy();
+    expect(
+      within(past).getByRole('button', { name: /Unavailable history/ }),
+    ).toBeTruthy();
+    expect(
+      within(past).getByRole('button', { name: /Empty history/ }),
+    ).toBeTruthy();
+
+    fireEvent.click(
+      within(failedHistory).getByRole('button', {
+        name: 'Retry Problem history',
+      }),
+    );
+    expect(await within(failedHistory).findByRole('status')).toBeTruthy();
+    resolveHistory([]);
+    expect(
+      await within(failedHistory).findByText('No Problems recorded.'),
+    ).toBeTruthy();
   });
 
   it('starts a draft session with pending and error states and keeps empty sessions disabled', async () => {

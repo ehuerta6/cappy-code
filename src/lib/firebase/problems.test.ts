@@ -127,9 +127,27 @@ describe('officer problem persistence', () => {
     );
   });
   it.each([
+    'https://leetcode.com/problems/two-sum/',
+    'https://leetcode.com/problems/two-sum/description/',
+    'https://leetcode.com/problems/two-sum/description/?lang=en',
+    'https://www.leetcode.com/problems/two-sum/',
+    'https://www.leetcode.com/problems/two-sum/description/?lang=en',
+  ])('accepts a LeetCode Problem reference URL: %s', async (url) => {
+    await updateProblem('session', 'problem', { leetcodeUrl: url });
+    expect(sdk.updateDoc).toHaveBeenCalledExactlyOnceWith(
+      { path: 'sessions/session/problems/problem' },
+      { leetcodeUrl: url },
+    );
+  });
+  it.each([
     'http://leetcode.com/problems/two-sum/',
     'https://example.com/problems/two-sum/',
     'https://leetcode.com/problemset/all/',
+    'https://leetcode.com/problems/two-sum/solutions/',
+    'https://leetcode.com/problems/two-sum/submissions/',
+    'https://leetcode.com/problems/two-sum/description/editorial/',
+    'https://user:pass@leetcode.com/problems/two-sum/',
+    'https://leetcode.com:8443/problems/two-sum/',
     'not a URL',
   ])(
     'rejects invalid LeetCode URLs before a Firestore write: %s',

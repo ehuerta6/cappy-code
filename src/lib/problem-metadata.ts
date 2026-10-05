@@ -17,7 +17,7 @@ export function validateLeetcodeProblemUrl(value: unknown): string | undefined {
     url.protocol !== 'https:' ||
     !['leetcode.com', 'www.leetcode.com'].includes(url.hostname) ||
     url.port !== '' ||
-    !/^\/problems\/[a-z0-9-]+\/?$/i.test(url.pathname) ||
+    !/^\/problems\/[a-z0-9-]+(?:\/description)?\/?$/i.test(url.pathname) ||
     url.username !== '' ||
     url.password !== ''
   )
