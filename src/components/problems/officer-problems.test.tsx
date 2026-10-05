@@ -233,10 +233,12 @@ describe('Officer Problem workspace', () => {
     ).toBe('true');
     expect(api.createProblem).toHaveBeenCalledWith('session');
     expect(api.listProblems).toHaveBeenCalledTimes(1);
-    expect(onProblemCountStateChange).toHaveBeenLastCalledWith({
-      status: 'ready',
-      count: 3,
-    });
+    await waitFor(() =>
+      expect(onProblemCountStateChange).toHaveBeenLastCalledWith({
+        status: 'ready',
+        count: 3,
+      }),
+    );
   });
   it('keeps failed creation empty with a recoverable error', async () => {
     api.listProblems.mockResolvedValue([]);
