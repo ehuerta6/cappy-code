@@ -1,12 +1,19 @@
 'use client';
 
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from 'react';
 import {
   createProblem,
   deleteProblem,
   listProblems,
   reorderProblems,
   setAnswersVisible,
+  type ProblemContent,
   type ProblemRecord,
 } from '@/lib/firebase/problems';
 import type { ProblemCountState } from '@/lib/firebase/sessions';
@@ -55,25 +62,54 @@ export default function OfficerProblems({
   const actionsButton = useRef<HTMLButtonElement>(null);
   const selected = records.find((record) => record.id === selectedId);
   const blocked = editing || solutionPending || operation !== null;
+  const handleProblemSaved = useCallback(
+    (content: ProblemContent) => {
+      if (!selectedId) return;
+      setRecords((currentRecords) =>
+        currentRecords.map((record) =>
+          record.id === selectedId
+            ? { ...record, problem: { ...record.problem, ...content } }
+            : record,
+        ),
+      );
+    },
+    [selectedId],
+  );
+  const workspaceDirty =
+    problemSaveState?.dirty === true || solutionSaveState?.dirty === true;
+  const workspaceSaving =
+    problemSaveState?.saving === true || solutionSaveState?.saving === true;
+  const workspaceError = problemSaveState?.error || solutionSaveState?.error;
+  const saveWorkspace = useCallback(async () => {
+    if (workspaceSaving) return;
+    await Promise.all([
+      problemSaveState?.dirty ? problemSaveState.save() : undefined,
+      solutionSaveState?.dirty ? solutionSaveState.save() : undefined,
+    ]);
+  }, [problemSaveState, solutionSaveState, workspaceSaving]);
 
   useEffect(() => {
     onBusyChange(blocked);
   }, [blocked, onBusyChange]);
 
   useEffect(() => {
-    const failed = [problemSaveState, solutionSaveState].find(
-      (state) => state?.error,
-    );
-    if (failed) {
-      onSaveStateChange(failed);
-      return;
-    }
     onSaveStateChange(
-      problemSaveState?.pending || solutionSaveState?.pending
-        ? { pending: true }
+      workspaceDirty || workspaceSaving
+        ? {
+            dirty: workspaceDirty,
+            saving: workspaceSaving,
+            error: workspaceError,
+            save: saveWorkspace,
+          }
         : null,
     );
-  }, [onSaveStateChange, problemSaveState, solutionSaveState]);
+  }, [
+    onSaveStateChange,
+    saveWorkspace,
+    workspaceDirty,
+    workspaceError,
+    workspaceSaving,
+  ]);
 
   useEffect(() => {
     if (loading) {
@@ -225,9 +261,32 @@ export default function OfficerProblems({
       className="text-base leading-relaxed text-ink"
       aria-label="Session problems"
     >
-      <h2 className="mb-3 mt-0 text-lg font-semibold leading-[26px]">
-        Problems
-      </h2>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <h2 className="m-0 text-lg font-semibold leading-[26px]">Problems</h2>
+        {selected && (
+          <button
+            className={buttonClass}
+            disabled={!workspaceDirty || workspaceSaving || operation !== null}
+            onClick={() => void saveWorkspace()}
+          >
+            {workspaceSaving
+              ? 'Saving…'
+              : workspaceError
+                ? 'Retry'
+                : 'Save changes'}
+          </button>
+        )}
+      </div>
+      {workspaceDirty && (
+        <p className="mb-3 text-sm text-muted">
+          Unsaved changes. Save or revert changes before leaving this Problem.
+        </p>
+      )}
+      {workspaceError && (
+        <p className="mb-3 text-sm text-danger" role="alert">
+          {workspaceError}
+        </p>
+      )}
       {loading ? (
         <p role="status">Loading problems…</p>
       ) : loadError ? (
@@ -453,18 +512,7 @@ export default function OfficerProblems({
                     disabled={operation !== null}
                     onBusyChange={setEditing}
                     onSaveStateChange={setProblemSaveState}
-                    onSaved={(content) =>
-                      setRecords((records) =>
-                        records.map((record) =>
-                          record.id === selected.id
-                            ? {
-                                ...record,
-                                problem: { ...record.problem, ...content },
-                              }
-                            : record,
-                        ),
-                      )
-                    }
+                    onSaved={handleProblemSaved}
                   />
                   <OfficerSolutions
                     key={`${sessionId}/${selected.id}`}

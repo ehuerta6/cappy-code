@@ -100,11 +100,12 @@ using static content or presenting cached data as current. It validates stored
 fields and rejects documents with pending writes or unresolved timestamps rather
 than inventing client timestamps. Document IDs are separate read-model fields.
 
-Title/date commit on blur, with visible unsaved, Saving, Saved, and retryable error
-states. Failed edits remain in the fields. Navigation and deletion are disabled
-until edits are saved. Lists distinguish loading, empty, failed, and populated
-states. A successfully created document followed by a failed list refresh is
-reported as a read failure, preventing an erroneous creation retry.
+Title/date edits remain local until **Save changes** is selected, with visible
+unsaved, Saving, Saved, and retryable error states. Failed edits remain in the
+fields. Navigation and deletion are disabled until edits are saved. Lists
+distinguish loading, empty, failed, and populated states. A successfully created
+document followed by a failed list refresh is reported as a read failure,
+preventing an erroneous creation retry.
 
 Deletion requires a browser confirmation naming the Session and its child content.
 `deleteSession` reads the child Problem IDs from the server, then commits one
@@ -176,8 +177,10 @@ Deletion uses a named confirmation with Cancel, keyboard dismissal, and focus
 restoration to a remaining tab or Add problem. Empty Sessions show the Add first
 problem state; loading and read failure remain distinct.
 
-Problem content commits on blur with unsaved, saving, confirmed saved and retryable
-failure states. Failed edits remain visible; navigation, creation, ordering and
+Problem metadata and all dirty language source/output edits stay local until one
+**Save changes** action persists the selected Problem workspace. Successful parts
+are confirmed independently; failed parts stay dirty and provide a specific
+retryable error. Failed edits remain visible; navigation, creation, ordering and
 deletion are blocked until content is saved. The Session workspace cannot close
 while a child write/edit is pending. Creation uses the backend-confirmed record
 directly rather than retrying a successful write after a failed refresh.
@@ -198,17 +201,20 @@ Every operation checks for a current non-anonymous Officer Auth session before
 accessing Firestore. The language ID establishes which Language a document holds;
 Solution records contain only `code` and prepared static `output`.
 
-Solution documents are created lazily by the first confirmed edit. Reading a
+Solution documents are created lazily by the first confirmed save. Reading a
 Problem maps missing documents to empty editor values without creating data. The
 officer workspace requests all three fixed documents from the server when a
 Problem is selected. It does not store Solution fields in Problem metadata.
 
 The three integrated Solution panels appear below the selected Problem content.
 Each panel combines its language heading, Monaco source editor, and editable
-prepared Output field. Code and output save independently per Language after a
-short debounce. Failed saves retain edits and offer retry; unsaved changes block
-Problem switching and leaving the Session workspace. Monaco's language mode is
-fixed to Python, Java, or C++ for its panel. The reusable `SolutionWorkspace`
+prepared Output field. Source and output update local drafts while editing; the
+selected Problem's single explicit save persists dirty language documents.
+Confirmed language documents stay confirmed if another write fails. Failed saves
+retain edits, identify the affected Language, and can be retried without rewriting
+clean language documents. Unsaved changes block Problem switching and leaving the
+Session workspace. Monaco's language mode is fixed to Python, Java, or C++ for its
+panel. The reusable `SolutionWorkspace`
 accepts already-authorized records for read-only rendering and does not fetch
 Solution data itself; the public view fetches live records only after Problem
 metadata reports answers visible. It fetches ended-session records automatically.

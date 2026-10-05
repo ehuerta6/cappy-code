@@ -249,53 +249,43 @@ describe('Officer Problem workspace', () => {
     );
     expect(screen.queryAllByRole('tab')).toHaveLength(0);
   });
-  it('saves all content on blur only after confirmation, preserving failure edits and retry', async () => {
+  it('keeps Problem edits local until Save changes and retries failed metadata', async () => {
     api.updateProblem.mockRejectedValueOnce(new Error('offline'));
     await loaded();
     const description = screen.getByLabelText(
       'Description',
     ) as HTMLTextAreaElement;
     fireEvent.change(description, { target: { value: 'New statement' } });
+    fireEvent.change(screen.getByLabelText('Problem title'), {
+      target: { value: 'Renamed' },
+    });
+    fireEvent.change(screen.getByLabelText('Example input'), {
+      target: { value: '4 5' },
+    });
+    fireEvent.change(screen.getByLabelText('Example output'), {
+      target: { value: '9' },
+    });
     expect(api.updateProblem).not.toHaveBeenCalled();
     expect(
       (screen.getByRole('tab', { name: 'Anagram' }) as HTMLButtonElement)
         .disabled,
     ).toBe(true);
     fireEvent.blur(description);
+    expect(api.updateProblem).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
     await screen.findByRole('alert');
     expect(description.value).toBe('New statement');
     expect(onBusyChange).toHaveBeenLastCalledWith(true);
-    fireEvent.click(screen.getByRole('button', { name: 'Retry problem save' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Retry' }));
     await waitFor(() => expect(onBusyChange).toHaveBeenLastCalledWith(false));
     expect(onSaveStateChange).toHaveBeenLastCalledWith(null);
     expect(api.updateProblem).toHaveBeenLastCalledWith('session', 'first', {
-      title: 'Two Sum',
+      title: 'Renamed',
       description: 'New statement',
-      exampleInput: '1 2',
-      exampleOutput: '3',
+      exampleInput: '4 5',
+      exampleOutput: '9',
     });
-    expect(onBusyChange).toHaveBeenLastCalledWith(false);
-    for (const [label, value] of [
-      ['Problem title', 'Renamed'],
-      ['Example input', '4 5'],
-      ['Example output', '9'],
-    ]) {
-      fireEvent.change(screen.getByLabelText(label), { target: { value } });
-      fireEvent.blur(screen.getByLabelText(label));
-      await waitFor(() =>
-        expect(api.updateProblem).toHaveBeenLastCalledWith(
-          'session',
-          'first',
-          expect.objectContaining({
-            [label === 'Problem title'
-              ? 'title'
-              : label === 'Example input'
-                ? 'exampleInput'
-                : 'exampleOutput']: value,
-          }),
-        ),
-      );
-    }
+    expect(api.updateProblem).toHaveBeenCalledTimes(2);
     expect(screen.getByRole('tab', { name: 'Renamed' })).toBeTruthy();
   });
   it('keeps aggregate save state pending until the backend confirms and blocks navigation', async () => {
@@ -309,8 +299,14 @@ describe('Officer Problem workspace', () => {
     fireEvent.change(screen.getByLabelText('Problem title'), {
       target: { value: 'New title' },
     });
-    fireEvent.blur(screen.getByLabelText('Problem title'));
-    expect(onSaveStateChange).toHaveBeenLastCalledWith({ pending: true });
+    expect(api.updateProblem).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    await waitFor(() =>
+      expect(onSaveStateChange.mock.calls.at(-1)?.[0]).toMatchObject({
+        dirty: true,
+        saving: true,
+      }),
+    );
     expect(screen.queryByText('Problem saved ✓')).toBeNull();
     expect(
       (
@@ -324,16 +320,16 @@ describe('Officer Problem workspace', () => {
       expect(onSaveStateChange).toHaveBeenLastCalledWith(null),
     );
   });
-  it('clears a failed-save state when edits return to persisted content', async () => {
-    api.updateProblem.mockRejectedValue(new Error('offline'));
+  it('returns to clean state when Problem edits are reverted without a write', async () => {
     await loaded();
     const title = screen.getByLabelText('Problem title');
     fireEvent.change(title, { target: { value: 'Unsaved' } });
-    fireEvent.blur(title);
-    await screen.findByRole('alert');
     fireEvent.change(title, { target: { value: 'Two Sum' } });
     expect(screen.queryByRole('alert')).toBeNull();
-    expect(onSaveStateChange).toHaveBeenLastCalledWith(null);
+    expect(api.updateProblem).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(onSaveStateChange).toHaveBeenLastCalledWith(null),
+    );
   });
   it('uses compact actions to rename, reorder after confirmation and recover from reorder failure', async () => {
     await loaded();
@@ -397,7 +393,7 @@ describe('Officer Problem workspace', () => {
     expect(api.deleteProblem).toHaveBeenLastCalledWith('session', 'first');
   });
 
-  it('loads the selected Problem solutions and blocks tab changes until autosave confirms', async () => {
+  it('keeps Solution edits local and blocks tab changes until explicit save confirms', async () => {
     const initialBusyChanges = onBusyChange.mock.calls.length;
     await loaded();
     const python = await screen.findByLabelText('Python Solution, editable');
@@ -412,6 +408,8 @@ describe('Officer Problem workspace', () => {
       (screen.getByRole('tab', { name: 'Anagram' }) as HTMLButtonElement)
         .disabled,
     ).toBe(true);
+    expect(api.updateSolution).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
     await waitFor(() =>
       expect(api.updateSolution).toHaveBeenCalledWith(
         'session',

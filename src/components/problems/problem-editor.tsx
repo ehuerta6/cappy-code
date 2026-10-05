@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   updateProblem,
   validateProblemContent,
@@ -41,15 +41,8 @@ export default function ProblemEditor({
     const next = { ...content, [field]: value };
     setContent(next);
     setError(null);
-    const hasUnsavedFields = Object.keys(next).some(
-      (key) =>
-        next[key as keyof ProblemContent] !==
-        saved[key as keyof ProblemContent],
-    );
-    onSaveStateChange(hasUnsavedFields ? { pending: true } : null);
-    onBusyChange(hasUnsavedFields);
   }
-  async function save() {
+  const save = useCallback(async () => {
     if (!dirty || busy.current) return;
     let fields;
     try {
@@ -58,57 +51,57 @@ export default function ProblemEditor({
       setError(
         error instanceof Error ? error.message : 'Check problem content.',
       );
-      onSaveStateChange({
-        pending: false,
-        error: 'Problem metadata needs attention.',
-        retry: () => void save(),
-      });
       return;
     }
     busy.current = true;
     setSaving(true);
     setError(null);
-    onBusyChange(true);
-    onSaveStateChange({ pending: true });
     try {
-      await updateProblem(sessionId, record.id, fields);
+      const updates = Object.fromEntries(
+        (Object.keys(fields) as Array<keyof ProblemContent>)
+          .filter((field) => fields[field] !== saved[field])
+          .map((field) => [field, fields[field]]),
+      ) as Partial<ProblemContent>;
+      if (Object.keys(updates).length === 0) {
+        setContent(fields);
+        setSaved(fields);
+        onSaved(fields);
+        return;
+      }
+      await updateProblem(sessionId, record.id, updates);
       setContent(fields);
       setSaved(fields);
       onSaved(fields);
-      onBusyChange(false);
-      onSaveStateChange(null);
     } catch {
       setError(
         'Save failed. Your edits are still here. Check your connection and retry.',
       );
-      onSaveStateChange({
-        pending: false,
-        error: 'Problem metadata could not be saved.',
-        retry: () => void save(),
-      });
     } finally {
       busy.current = false;
       setSaving(false);
     }
-  }
+  }, [dirty, content, onSaved, record.id, sessionId]);
+
+  useEffect(() => {
+    const isDirty = dirty || Boolean(error);
+    onBusyChange(isDirty || saving);
+    onSaveStateChange(
+      isDirty || saving
+        ? {
+            dirty: isDirty,
+            saving,
+            error: error ?? undefined,
+            save,
+          }
+        : null,
+    );
+  }, [dirty, error, onBusyChange, onSaveStateChange, save, saving]);
   return (
     <div
       role="tabpanel"
       id={`problem-panel-${record.id}`}
       aria-labelledby={`problem-tab-${record.id}`}
     >
-      {error && (
-        <div role="alert">
-          <p>{error}</p>
-          <button
-            className="min-h-11 rounded border border-border-strong bg-surface px-3 py-2 hover:bg-hover disabled:cursor-default disabled:bg-raised disabled:text-muted"
-            onClick={() => void save()}
-            disabled={saving || disabled}
-          >
-            Retry problem save
-          </button>
-        </div>
-      )}
       <label className="my-5 flex max-w-3xl flex-col gap-2">
         Problem title
         <input
@@ -116,7 +109,6 @@ export default function ProblemEditor({
           id="problem-title"
           value={content.title}
           onChange={(event) => edit('title', event.target.value)}
-          onBlur={() => void save()}
           disabled={saving || disabled}
           required
         />
@@ -128,7 +120,6 @@ export default function ProblemEditor({
           rows={5}
           value={content.description}
           onChange={(event) => edit('description', event.target.value)}
-          onBlur={() => void save()}
           disabled={saving || disabled}
         />
       </label>
@@ -147,7 +138,6 @@ export default function ProblemEditor({
               rows={3}
               value={content.exampleInput}
               onChange={(event) => edit('exampleInput', event.target.value)}
-              onBlur={() => void save()}
               disabled={saving || disabled}
             />
           </label>
@@ -158,7 +148,6 @@ export default function ProblemEditor({
               rows={3}
               value={content.exampleOutput}
               onChange={(event) => edit('exampleOutput', event.target.value)}
-              onBlur={() => void save()}
               disabled={saving || disabled}
             />
           </label>

@@ -101,6 +101,13 @@ describe('officer problem persistence', () => {
       content,
     );
   });
+  it('writes only Problem content fields included in the save', async () => {
+    await updateProblem('session', 'problem', { description: 'New statement' });
+    expect(sdk.updateDoc).toHaveBeenCalledExactlyOnceWith(
+      { path: 'sessions/session/problems/problem' },
+      { description: 'New statement' },
+    );
+  });
   it('updates only the selected problem reveal field', async () => {
     await setAnswersVisible('session', 'problem', true);
     expect(sdk.updateDoc).toHaveBeenCalledExactlyOnceWith(
