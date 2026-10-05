@@ -12,7 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const member = vi.hoisted(() => ({
   getMemberSession: vi.fn(),
   listMemberProblems: vi.fn(),
-  getRevealedMemberSolutions: vi.fn(),
+  getMemberSolutions: vi.fn(),
 }));
 const listeners = vi.hoisted(() => ({
   subscribeToAnswersVisible: vi.fn(),
@@ -102,7 +102,7 @@ beforeEach(() => {
   listeners.answers.length = 0;
   member.getMemberSession.mockResolvedValue(session);
   member.listMemberProblems.mockResolvedValue(problems);
-  member.getRevealedMemberSolutions.mockResolvedValue(solutions);
+  member.getMemberSolutions.mockResolvedValue(solutions);
   listeners.subscribeToAnswersVisible.mockImplementation(
     (
       sessionId: string,
@@ -137,16 +137,16 @@ async function openSession() {
 describe('Member answer visibility realtime', () => {
   it('loads Solutions only after realtime reveal and removes them after Hide Answers', async () => {
     await openSession();
-    expect(member.getRevealedMemberSolutions).not.toHaveBeenCalled();
+    expect(member.getMemberSolutions).not.toHaveBeenCalled();
     act(() => listeners.answers[0].onValue(false));
     expect(screen.getByText('Answers hidden')).toBeTruthy();
-    expect(member.getRevealedMemberSolutions).not.toHaveBeenCalled();
+    expect(member.getMemberSolutions).not.toHaveBeenCalled();
 
     act(() => listeners.answers[0].onValue(true));
     expect(
       await screen.findByLabelText('Python Solution, read-only'),
     ).toBeTruthy();
-    expect(member.getRevealedMemberSolutions).toHaveBeenCalledExactlyOnceWith(
+    expect(member.getMemberSolutions).toHaveBeenCalledExactlyOnceWith(
       'session',
       'first',
     );
@@ -168,8 +168,31 @@ describe('Member answer visibility realtime', () => {
     await waitFor(() => expect(listeners.answers).toHaveLength(2));
     expect(oldListener.unsubscribe).toHaveBeenCalledOnce();
     act(() => oldListener.onValue(true));
-    expect(member.getRevealedMemberSolutions).not.toHaveBeenCalled();
+    expect(member.getMemberSolutions).not.toHaveBeenCalled();
     expect(screen.getByText('Second description')).toBeTruthy();
+  });
+
+  it('loads ended-session Solutions without an answer-visibility listener or gate', async () => {
+    member.getMemberSession.mockResolvedValueOnce({
+      ...session,
+      session: { ...session.session, status: 'ended' },
+    });
+    render(<MemberSessionPage sessionId="session" />);
+
+    expect(
+      await screen.findByLabelText('Python Solution, read-only'),
+    ).toBeTruthy();
+    expect(screen.getByLabelText('Java Solution, read-only')).toBeTruthy();
+    expect(screen.getByLabelText('C++ Solution, read-only')).toBeTruthy();
+    expect(screen.queryByText('Answers hidden')).toBeNull();
+    expect(
+      screen.queryByText('Waiting for the officer to reveal the solution…'),
+    ).toBeNull();
+    expect(member.getMemberSolutions).toHaveBeenCalledExactlyOnceWith(
+      'session',
+      'first',
+    );
+    expect(listeners.subscribeToAnswersVisible).not.toHaveBeenCalled();
   });
 
   it('fails closed on listener errors without showing raw Firebase details', async () => {
@@ -188,7 +211,7 @@ describe('Member answer visibility realtime', () => {
     ).toBeTruthy();
     expect(screen.queryByText(/permission-denied/)).toBeNull();
     expect(screen.queryByLabelText('Python Solution, read-only')).toBeNull();
-    expect(member.getRevealedMemberSolutions).toHaveBeenCalledOnce();
+    expect(member.getMemberSolutions).toHaveBeenCalledOnce();
   });
 
   it('unsubscribes the Problem listener on unmount', async () => {

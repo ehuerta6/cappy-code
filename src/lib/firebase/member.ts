@@ -152,7 +152,7 @@ export async function listMemberProblems(
     );
 }
 
-export async function getRevealedMemberSolutions(
+export async function getMemberSolutions(
   sessionId: string,
   problemId: string,
 ): Promise<MemberSolutions> {

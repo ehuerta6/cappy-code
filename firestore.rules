@@ -12,6 +12,11 @@ service cloud.firestore {
         in ['live', 'ended'];
     }
 
+    function sessionIsEnded(sessionId) {
+      return get(/databases/$(database)/documents/sessions/$(sessionId)).data.status
+        == 'ended';
+    }
+
     function answersAreVisible(sessionId, problemId) {
       return get(
         /databases/$(database)/documents/sessions/$(sessionId)/problems/$(problemId)
@@ -30,7 +35,8 @@ service cloud.firestore {
           allow read: if (isOfficer() && language in ['python', 'java', 'cpp']) ||
             (language in ['python', 'java', 'cpp'] &&
              sessionIsPublic(sessionId) &&
-             answersAreVisible(sessionId, problemId));
+             (sessionIsEnded(sessionId) ||
+              answersAreVisible(sessionId, problemId)));
           allow write: if isOfficer() && language in ['python', 'java', 'cpp'];
         }
       }

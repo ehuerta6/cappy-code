@@ -6,7 +6,7 @@ const api = vi.hoisted(() => ({
   listMemberSessions: vi.fn(),
   getMemberSession: vi.fn(),
   listMemberProblems: vi.fn(),
-  getRevealedMemberSolutions: vi.fn(),
+  getMemberSolutions: vi.fn(),
 }));
 const realtime = vi.hoisted(() => ({
   answersVisible: false,
@@ -81,7 +81,7 @@ beforeEach(() => {
   api.listMemberSessions.mockResolvedValue([session]);
   api.getMemberSession.mockResolvedValue(session);
   api.listMemberProblems.mockResolvedValue([problem]);
-  api.getRevealedMemberSolutions.mockResolvedValue(solutions);
+  api.getMemberSolutions.mockResolvedValue(solutions);
 });
 afterEach(() => {
   cleanup();
@@ -102,7 +102,7 @@ describe('public member page integration', () => {
     render(<MemberSessionPage sessionId="intro" />);
     expect(await screen.findByText('Find the pair.')).toBeTruthy();
     expect(screen.getByText('Answers hidden')).toBeTruthy();
-    expect(api.getRevealedMemberSolutions).not.toHaveBeenCalled();
+    expect(api.getMemberSolutions).not.toHaveBeenCalled();
   });
 
   it('requests revealed Solutions and renders all three editors read-only', async () => {
@@ -114,11 +114,56 @@ describe('public member page integration', () => {
     expect(
       await screen.findByLabelText('Python Solution, read-only'),
     ).toBeTruthy();
-    expect(api.getRevealedMemberSolutions).toHaveBeenCalledExactlyOnceWith(
+    expect(api.getMemberSolutions).toHaveBeenCalledExactlyOnceWith(
       'intro',
       'arrays',
     );
     expect(screen.getByLabelText('Java Solution, read-only')).toBeTruthy();
     expect(screen.getByLabelText('C++ Solution, read-only')).toBeTruthy();
+  });
+
+  it('keeps the public archive useful with no live session and lists past sessions', async () => {
+    api.listMemberSessions.mockResolvedValueOnce([
+      {
+        id: 'past-session',
+        session: { ...session.session, status: 'ended' },
+      },
+    ]);
+    render(<MemberHome />);
+
+    expect(await screen.findByText('No live session right now.')).toBeTruthy();
+    expect(
+      screen.getByRole('link', { name: /Intro practice/ }).getAttribute('href'),
+    ).toBe('/sessions/past-session');
+  });
+
+  it('shows explicit empty states when there are no live or past sessions', async () => {
+    api.listMemberSessions.mockResolvedValueOnce([]);
+    render(<MemberHome />);
+
+    expect(await screen.findByText('No live session right now.')).toBeTruthy();
+    expect(screen.getByText('No past sessions yet.')).toBeTruthy();
+  });
+
+  it('loads ended-session Solutions regardless of answersVisible', async () => {
+    api.getMemberSession.mockResolvedValueOnce({
+      ...session,
+      session: { ...session.session, status: 'ended' },
+    });
+    api.listMemberProblems.mockResolvedValueOnce([
+      { ...problem, problem: { ...problem.problem, answersVisible: false } },
+    ]);
+    render(<MemberSessionPage sessionId="intro" />);
+
+    expect(
+      await screen.findByLabelText('Python Solution, read-only'),
+    ).toBeTruthy();
+    expect(screen.getByLabelText('Java Solution, read-only')).toBeTruthy();
+    expect(screen.getByLabelText('C++ Solution, read-only')).toBeTruthy();
+    expect(screen.queryByText('Answers hidden')).toBeNull();
+    expect(api.getMemberSolutions).toHaveBeenCalledExactlyOnceWith(
+      'intro',
+      'arrays',
+    );
   });
 });

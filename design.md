@@ -19,8 +19,8 @@ never as a competing illustration. No giant hero header or onboarding flow.
 
 ## 2. Product UX model
 
-- **Member Mode:** anonymous, public, read-only access to eligible Sessions. No
-  account, content editing, or submission flow.
+- **Member Mode:** anonymous, public, read-only access to all live and ended
+  Sessions. No account, content editing, or submission flow.
 - **Officer Mode:** Firebase Authentication with one shared CIC officer account
   for the POC. Officers prepare content and control presentation.
 - **Session:** `draft`, `live`, or `ended`; contains ordered Problems. Problem
@@ -34,16 +34,15 @@ never as a competing illustration. No giant hero header or onboarding flow.
   realtime for members viewing that Problem. Browser `localStorage` is not
   canonical persistence.
 
-Draft Sessions and their metadata are officer-only. Member access to live and
-ended Sessions follows publication rules; history does not make every Session
-public. Solution reads also require the parent Problem's `answersVisible` under
-Firestore Security Rules. Visual hiding is not the authorization boundary.
+Draft Sessions and their metadata are officer-only. Live and ended Sessions are
+public. During a live Session, Solution reads require the parent Problem's
+`answersVisible`; ended Sessions expose every prepared fixed-language Solution.
+Visual hiding is not the authorization boundary.
 
 Scope clarification: repository docs say “multiple” Problems; Issue #49 normally
 expects 1–3 and this task uses that range. This is a layout target, not a new
-validation implementation. Publication eligibility mechanics and ended-Session
-editing policy are unspecified in the product docs; this spec does not invent
-publishing controls, reopening, or automatic public access.
+validation implementation. Ended Sessions are public and their Solutions are
+available for study; ending a Session does not rewrite child Problems.
 
 ## 3. Visual language
 
@@ -151,14 +150,29 @@ use a narrower reading width around 80 characters; Solutions use the full width.
 Do not make all content a giant card. Avoid sticky layers that cover code or
 consume projector space.
 
-## 7. Member live session
+## 7. Public member home and session views
+
+The public home always has **Live now** and **Past sessions** sections. Show a
+current live Session when available; otherwise show “No live session right now.”
+List ended Sessions under Past sessions, newest first. When none exist, show “No
+past sessions yet.” Draft Sessions never appear. Members do not need an account.
+
+Members can open ended Sessions as a read-only study archive and independently
+browse each Problem. Ended Sessions load all three prepared Solution panels and
+Output without an AnswerGate, regardless of stored `answersVisible` values.
+
+### Session view
+
+Members can view live and ended Sessions. Draft Sessions never appear in public
+discovery. Ended Sessions appear newest first under **Past sessions** and are
+independently browsable study archives.
 
 Hierarchy, in document order:
 
 ```text
 AppHeader
 SessionHeader (title, date, status; optional small CIC Intro Session context)
-ProblemTabs (local selection)
+ProblemTabs (ordered Problems, local selection)
 ProblemContent (title, description)
 Examples / Constraints
 Solutions (AnswerGate or SolutionGrid)
@@ -171,7 +185,8 @@ explicit **Input** and **Output** labels, and a separate Constraints heading/lis
 Use code-style raised surfaces for example values, preserving whitespace and
 horizontal scrolling for long values. No giant enclosing Problem card.
 
-ProblemTabs are a restrained integrated bar, not Language selectors:
+ProblemTabs are an ordered, restrained integrated bar in each view, not Language
+selectors. Officer views also provide Problem management entry where applicable:
 `Contains Duplicate | Valid Anagram | Two Sum`. Use primary text and an accent
 underline for the active tab, secondary text and minimal decoration for others.
 
@@ -184,26 +199,29 @@ removed, select an available Problem and announce the change.
 
 The Solutions heading stays stable across states.
 
-| State                       | Treatment                                                                                 |
-| --------------------------- | ----------------------------------------------------------------------------------------- |
-| `answersVisible: false`     | One AnswerGate: **Answers hidden** / “Waiting for the officer to reveal the solution…”    |
-| Revealed, content loading   | One restrained “Loading solutions…” status; no blank Monaco panels or source placeholders |
-| Revealed, content available | All three integrated Solution panels                                                      |
-| Revealed, read fails        | “Solutions could not be loaded” with Retry; no stale hidden content                       |
-| Answers hidden again        | Remove source/output from the member view and restore AnswerGate                          |
+| State                         | Treatment                                                                              |
+| ----------------------------- | -------------------------------------------------------------------------------------- |
+| Live, `answersVisible: false` | One AnswerGate: **Answers hidden** / “Waiting for the officer to reveal the solution…” |
+| Live, revealed and loading    | One restrained “Loading solutions…” status; no blank panels or placeholders            |
+| Live, revealed and available  | All three integrated Solution panels                                                   |
+| Live, revealed read fails     | “Solutions could not be loaded” with Retry; no stale hidden content                    |
+| Live, answers hidden again    | Remove source/output from the member view and restore AnswerGate                       |
+| Ended                         | Load all three prepared Solution panels; never render AnswerGate                       |
 
 AnswerGate uses a quiet rule/surface and generous whitespace, optionally a small
 muted icon. Never mount empty editors, blur secret content, or use giant locks.
-Hidden source and prepared output must not be fetched or exposed to members;
-Firestore Security Rules enforce reads. When answers are hidden again, remove
-previously displayed content and release its member view state. Hiding cannot
-undo what a member already saw during an authorized reveal.
+Hidden live-session source and prepared output must not be fetched or exposed to
+Members; Firestore Security Rules enforce reads. When answers are hidden again,
+remove previously displayed content and release its member view state. Hiding
+cannot undo what a member already saw during an authorized reveal. Ended-session
+solutions are public regardless of the stored reveal state.
 
 Reveal the three panels together over about **200ms** using opacity and at most
 4px vertical motion. No bounce, scale, stagger, or celebration. Reduced-motion
 preferences remove motion. Do not animate hiding in a way that prolongs exposure.
-For an ended Session with hidden answers, use “Answers are hidden for this
-Problem” instead of promising a future officer reveal.
+Ended Sessions bypass the AnswerGate and load all prepared Solutions regardless
+of the Problem's stored `answersVisible` value. Show/Hide Answers controls only
+affect live Sessions.
 
 ## 9. Solution panels / Monaco
 
@@ -313,9 +331,9 @@ screens wrap metadata beneath the title without losing status.
 **+ New session** creates/opens a draft directly, without a wizard. Use a quiet
 “No Sessions yet” message and the same creation action when the library is empty.
 Loading and failures occupy the list region with explicit text and Retry; they
-must not masquerade as an empty library. Officer history includes ended Sessions;
-member history includes only those allowed by publication rules and retains each
-Problem's reveal state.
+must not masquerade as an empty library. Officer history includes ended Sessions.
+Member home lists all ended Sessions newest first under **Past sessions**. Each
+ended Session exposes all prepared Solutions regardless of stored `answersVisible`.
 
 ## 12. Empty session
 
@@ -432,19 +450,20 @@ component boundaries. Do not implement them in this issue.
 2. Session status (`draft`, `live`, `ended`) and reveal status are separate concepts.
 3. Member and officer Problem selection is local to each view.
 4. Draft Sessions and their metadata are never part of the public member experience.
-5. Go Live has an intentional disabled state when the Session contains no Problems.
-6. Dangerous live-Session actions require clear confirmation, especially ending a
+5. The public home shows live sessions and a newest-first Past sessions archive;
+   it remains useful when no Session is live.
+6. Go Live has an intentional disabled state when the Session contains no Problems.
+7. Dangerous live-Session actions require clear confirmation, especially ending a
    Session.
-7. Officer editing is designed around autosave with visible success/failure states.
-8. Hidden state never exposes Solution source or prepared output before reveal;
+8. Officer editing is designed around autosave with visible success/failure states.
+9. Live hidden state never exposes Solution source or prepared output before reveal;
    backend authorization and the member UI must agree.
-9. Past Sessions preserve intended per-Problem revealed/hidden states; ending a
-   Session never automatically makes all Solutions public. Publication eligibility
-   still governs member access.
-10. Three-Language comparison is central: Python, Java, and C++ are shown together,
+10. Every fixed-language Solution is public for ended Sessions. Ending a Session
+    changes only its status and never rewrites child Problems.
+11. Three-Language comparison is central: Python, Java, and C++ are shown together,
     with Monaco editable for officers and read-only for members.
 
 No runtime AI/LLMs, translation/transpilation, code generation, execution,
-compilers/interpreters, online judging, submissions, or gamification. This issue
-adds design documentation and the explicitly authorized supplied app icon only;
-UI libraries, React components, CSS redesign, and product behavior are later work.
+compilers/interpreters, online judging, submissions, or gamification. This design
+describes product behavior and visual responsibilities. Implementation is
+delivered through focused GitHub Issues.

@@ -55,22 +55,32 @@ export function PublicSessionDiscovery({ state }: { state: DiscoveryState }) {
             </button>
           </div>
         ) : state.status === 'empty' ? (
-          <p className={styles.quiet}>No public sessions are available.</p>
+          <>
+            <SessionGroup
+              title="Live now"
+              sessions={[]}
+              emptyMessage="No live session right now."
+            />
+            <SessionGroup
+              title="Past sessions"
+              sessions={[]}
+              emptyMessage="No past sessions yet."
+            />
+          </>
         ) : (
           <>
             <SessionGroup
-              title="Live"
+              title="Live now"
               sessions={sessions.filter((session) => session.status === 'live')}
+              emptyMessage="No live session right now."
             />
             <SessionGroup
               title="Past sessions"
               sessions={sessions.filter(
                 (session) => session.status === 'ended',
               )}
+              emptyMessage="No past sessions yet."
             />
-            {sessions.length === 0 ? (
-              <p className={styles.quiet}>No public sessions are available.</p>
-            ) : null}
           </>
         )}
       </section>
@@ -81,24 +91,29 @@ export function PublicSessionDiscovery({ state }: { state: DiscoveryState }) {
 function SessionGroup({
   title,
   sessions,
+  emptyMessage,
 }: {
   title: string;
   sessions: PublicSessionSummary[];
+  emptyMessage: string;
 }) {
-  if (!sessions.length) return null;
   return (
     <section className={styles.sessionGroup} aria-label={title}>
       <h2>{title}</h2>
-      <ul>
-        {sessions.map((session) => (
-          <li key={session.id}>
-            <Link href={`/sessions/${encodeURIComponent(session.id)}`}>
-              <span>{session.title}</span>
-              <time dateTime={session.date}>{formatDate(session.date)}</time>
-            </Link>
-          </li>
-        ))}
-      </ul>
+      {sessions.length ? (
+        <ul>
+          {sessions.map((session) => (
+            <li key={session.id}>
+              <Link href={`/sessions/${encodeURIComponent(session.id)}`}>
+                <span>{session.title}</span>
+                <time dateTime={session.date}>{formatDate(session.date)}</time>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className={styles.quiet}>{emptyMessage}</p>
+      )}
     </section>
   );
 }
@@ -314,7 +329,12 @@ function ProblemContent({
   loadRevealedSolutions: (problemId: string) => Promise<ProblemSolutions>;
 }) {
   const [visibilityRetry, setVisibilityRetry] = useState(0);
-  const visibility = useAnswersVisible(session.id, problem.id, visibilityRetry);
+  const isEnded = session.status === 'ended';
+  const visibility = useAnswersVisible(
+    isEnded ? null : session.id,
+    isEnded ? null : problem.id,
+    visibilityRetry,
+  );
 
   return (
     <article
@@ -343,7 +363,14 @@ function ProblemContent({
       </section>
       <section className={styles.solutions} aria-labelledby="solutions-heading">
         <h2 id="solutions-heading">Solutions</h2>
-        {visibility.status === 'loading' ? (
+        {isEnded ? (
+          <RevealedSolutions
+            key={`${session.id}/${problem.id}`}
+            sessionId={session.id}
+            problemId={problem.id}
+            loadRevealedSolutions={loadRevealedSolutions}
+          />
+        ) : visibility.status === 'loading' ? (
           <p role="status">Syncing answer visibility…</p>
         ) : visibility.status === 'error' ? (
           <div className={styles.notice} role="status">
@@ -382,11 +409,7 @@ function ProblemContent({
               />
             </svg>
             <h3>Answers hidden</h3>
-            <p>
-              {session.status === 'ended'
-                ? 'Answers are hidden for this Problem.'
-                : 'Waiting for the officer to reveal the solution…'}
-            </p>
+            <p>Waiting for the officer to reveal the solution…</p>
           </div>
         ) : (
           <RevealedSolutions

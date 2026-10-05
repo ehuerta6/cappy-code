@@ -14,27 +14,27 @@ CIC Intro officers are the authenticated content managers and presenters. Fireba
 
 ### Members
 
-Members are anonymous viewers. They do not create accounts or authenticate. Member Mode provides read-only access only to sessions whose status and publication rules permit member access, such as an eligible `live` session or a published `ended` session. A `draft` session is officer-only. Problem descriptions and examples are safe member-facing metadata for an eligible session, but they are not always publicly readable. Solution documents are readable only when their problem's `answersVisible` is true and the session permits member access under Firestore Security Rules.
+Members are anonymous viewers. They do not create accounts or authenticate. Member Mode provides anonymous, read-only access to every live and ended session. Draft sessions are officer-only. Problem descriptions and examples are public for live and ended sessions. Live-session Solution documents are readable only when their Problem's `answersVisible` is true. Every fixed-language Solution for an ended session is publicly readable under Firestore Security Rules.
 
 ## Persistence and architecture
 
 Firestore is the canonical persistence layer. It stores session content, session history, prepared solutions, and each problem's answer visibility. Firebase Authentication protects Officer Mode; public membership does not depend on authentication.
 
-Keep problem metadata separate from solution documents. Metadata includes the problem title, description, examples, order, and `answersVisible`. These fields are member-readable only when the session's status/publication rules permit access; a draft's metadata remains officer-only. Protected solution documents include manually prepared Python, Java, and C++ source and prepared static output for each language. Separation lets Firestore Security Rules enforce answer access independently of what the UI renders.
+Keep problem metadata separate from solution documents. Metadata includes the problem title, description, examples, order, and `answersVisible`. These fields are member-readable for live and ended sessions; a draft's metadata remains officer-only. Live solutions are protected until revealed, while ended-session solutions are public. Solution documents include manually prepared Python, Java, and C++ source and prepared static output for each language. Separation lets Firestore Security Rules enforce answer access independently of what the UI renders.
 
-Firestore Security Rules are the actual hidden-answer permission boundary. A hidden answer must not be readable by an anonymous member client. Solution-document reads require the parent problem's `answersVisible` to be true and the session to permit member access. Rules also restrict session and problem management to authenticated officers. UI state such as **Hide Answers** is not a substitute for these rules.
+Firestore Security Rules are the actual hidden-answer permission boundary. A hidden answer must not be readable by an anonymous member client. Live Solution-document reads require the parent Problem's `answersVisible` to be true. Ended-session Solution reads do not depend on `answersVisible`; draft Solutions remain officer-only. Rules also restrict session and problem management to authenticated officers. UI state such as **Hide Answers** is not a substitute for these rules.
 
 ## Session model and presentation behavior
 
 Sessions have three states:
 
 - `draft` — officers prepare and order session problems and their content; members cannot read the session or its problem metadata.
-- `live` — member access is allowed by publication rules; the officer controls the active problem and each problem's answer visibility.
-- `ended` — the live presentation is over and the session remains in officer session history; member reads are allowed only if the session is published under the publication rules.
+- `live` — members can read the session and its problem metadata; the officer controls each problem's answer visibility, which gates member Solution access.
+- `ended` — the session remains in officer history and appears in the public Past sessions archive; all prepared Solutions are public regardless of `answersVisible`.
 
 A session contains multiple ordered problems. Each problem has a description and examples, its own `answersVisible` field, and separately stored solution content. Members choose problems independently in their own view.
 
-The officer dashboard provides session creation and management, access to session history, and controls for starting and ending sessions. **Show Answers** and **Hide Answers** update `answersVisible` on the selected problem. Members viewing that problem receive reveal changes in realtime; their problem selection remains local.
+The public home shows Live now and Past sessions, including an explicit no-live state. **Show Answers** and **Hide Answers** update `answersVisible` only for a live session; members viewing that Problem receive changes in realtime. Ending a Session changes only its status and does not rewrite child Problems.
 
 ## Editors and presentation UI
 

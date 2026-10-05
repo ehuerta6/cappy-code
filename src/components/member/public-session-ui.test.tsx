@@ -145,6 +145,8 @@ describe('public member UI scaffold', () => {
     expect(
       screen.getByRole('link', { name: /Past practice/ }).getAttribute('href'),
     ).toBe('/sessions/past');
+    expect(screen.getByRole('heading', { name: 'Live now' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Past sessions' })).toBeTruthy();
     expect(screen.queryByText('Private draft')).toBeNull();
     expect(screen.getByRole('link', { name: 'Officer Login' })).toBeTruthy();
     expect(
@@ -161,7 +163,8 @@ describe('public member UI scaffold', () => {
     );
     expect(screen.getByRole('status').textContent).toBe('Loading sessions…');
     rerender(<PublicSessionDiscovery state={{ status: 'empty' }} />);
-    expect(screen.getByText('No public sessions are available.')).toBeTruthy();
+    expect(screen.getByText('No live session right now.')).toBeTruthy();
+    expect(screen.getByText('No past sessions yet.')).toBeTruthy();
     rerender(
       <PublicSessionDiscovery state={{ status: 'error', onRetry: retry }} />,
     );
@@ -335,15 +338,25 @@ describe('public member UI scaffold', () => {
     expect(load).toHaveBeenCalledTimes(2);
   });
 
-  it('uses a non-promissory hidden state for ended sessions', () => {
+  it('loads ended-session Solutions even when answersVisible is false', async () => {
     const ended = { ...liveSession, status: 'ended' as const };
+    const load = vi.fn().mockResolvedValue(solutions);
     render(
-      <PublicSessionView state={{ ...viewState(vi.fn()), session: ended }} />,
+      <PublicSessionView
+        state={{
+          ...viewState(load, [{ ...problems[1], answersVisible: false }]),
+          session: ended,
+        }}
+      />,
     );
     expect(
-      screen.getByText('Answers are hidden for this Problem.'),
+      await screen.findByLabelText('Python Solution, read-only'),
     ).toBeTruthy();
+    expect(screen.getByLabelText('Java Solution, read-only')).toBeTruthy();
+    expect(screen.getByLabelText('C++ Solution, read-only')).toBeTruthy();
+    expect(screen.queryByText('Answers hidden')).toBeNull();
     expect(screen.queryByText(/Waiting for the officer/)).toBeNull();
+    expect(load).toHaveBeenCalledExactlyOnceWith('first');
   });
 
   it('keeps draft and unavailable sessions indistinguishable to members', () => {

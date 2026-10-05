@@ -71,10 +71,11 @@ const second = {
 };
 const onBusyChange = vi.fn();
 const onProblemCountStateChange = vi.fn();
-function start() {
+function start(sessionStatus: 'draft' | 'live' | 'ended' = 'draft') {
   render(
     <OfficerProblems
       sessionId="session"
+      sessionStatus={sessionStatus}
       onBusyChange={onBusyChange}
       onProblemCountStateChange={onProblemCountStateChange}
     />,
@@ -158,7 +159,8 @@ describe('Officer Problem workspace', () => {
     expect(api.updateProblem).not.toHaveBeenCalled();
   });
   it('reveals answers only after confirmation and hides only the selected problem', async () => {
-    await loaded();
+    start('live');
+    await screen.findByRole('tab', { name: 'Two Sum' });
     let confirm!: () => void;
     api.setAnswersVisible.mockReturnValueOnce(
       new Promise<void>((resolve) => {
@@ -188,13 +190,23 @@ describe('Officer Problem workspace', () => {
       second,
     ]);
     api.setAnswersVisible.mockRejectedValueOnce(new Error('offline'));
-    await loaded();
+    start('live');
+    await screen.findByRole('tab', { name: 'Two Sum' });
     fireEvent.click(screen.getByRole('button', { name: 'Hide Answers' }));
     expect((await screen.findByRole('alert')).textContent).toContain(
       'Hiding answers failed',
     );
     expect(screen.getByRole('button', { name: 'Hide Answers' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Show Answers' })).toBeNull();
+  });
+  it('shows ended solutions without answer visibility controls', async () => {
+    start('ended');
+    await screen.findByRole('tab', { name: 'Two Sum' });
+    expect(
+      screen.getByText('Solutions are public in ended sessions.'),
+    ).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Show Answers' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Hide Answers' })).toBeNull();
   });
   it('creates and selects confirmed metadata while creation is visibly pending', async () => {
     let resolve!: (record: typeof first) => void;
