@@ -1,6 +1,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
+import brandIcon from '@/app/icon.png';
 import ThemeToggle from './theme-toggle';
 import styles from './app-header.module.css';
 
@@ -17,7 +18,7 @@ export default function AppHeader({
     <header className={styles.header}>
       <div className={styles.inner}>
         <Link className={styles.brand} href="/" aria-label="CappyCode home">
-          <Image src="/icon.png" width={28} height={28} alt="" priority />
+          <Image src={brandIcon} width={28} height={28} alt="" priority />
           <span>CappyCode</span>
         </Link>
         <div className={styles.actions}>
