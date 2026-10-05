@@ -22,6 +22,7 @@ export interface Problem {
   exampleOutput: string;
   order: number;
   answersVisible: boolean;
+  leetcodeUrl?: string;
 }
 
 export interface Solution {

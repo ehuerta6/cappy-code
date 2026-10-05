@@ -3,6 +3,7 @@ import 'client-only';
 import {
   addDoc,
   collection,
+  deleteField,
   doc,
   getDocsFromServer,
   updateDoc,
@@ -11,6 +12,7 @@ import {
   type WriteBatch,
 } from 'firebase/firestore';
 import { languages, type Problem } from '../domain';
+import { validateLeetcodeProblemUrl } from '../problem-metadata';
 import { getOfficerAuth } from './auth';
 import { getFirestoreDb } from './client';
 import { problemPath, sessionPath, solutionPath } from './paths';
@@ -22,7 +24,11 @@ export interface ProblemRecord {
 export type ProblemContent = Pick<
   Problem,
   'title' | 'description' | 'exampleInput' | 'exampleOutput'
->;
+> & { leetcodeUrl: string };
+
+type ProblemContentInput = Omit<ProblemContent, 'leetcodeUrl'> & {
+  leetcodeUrl?: string;
+};
 
 function officerDb() {
   const user = getOfficerAuth().currentUser;
@@ -32,7 +38,7 @@ function officerDb() {
 }
 
 export function validateProblemContent(
-  content: ProblemContent,
+  content: ProblemContentInput,
 ): ProblemContent {
   if (typeof content.title !== 'string' || !content.title.trim())
     throw new Error('Enter a problem title.');
@@ -47,6 +53,7 @@ export function validateProblemContent(
     description: content.description,
     exampleInput: content.exampleInput,
     exampleOutput: content.exampleOutput,
+    leetcodeUrl: validateLeetcodeProblemUrl(content.leetcodeUrl) ?? '',
   };
 }
 
@@ -60,23 +67,32 @@ export async function listProblems(
     if (document.metadata.hasPendingWrites)
       throw new Error('Problem changes are still awaiting confirmation.');
     const data = document.data();
+    const leetcodeUrl =
+      data.leetcodeUrl === undefined
+        ? undefined
+        : validateLeetcodeProblemUrl(data.leetcodeUrl);
     if (
       typeof data.order !== 'number' ||
       !Number.isFinite(data.order) ||
       typeof data.answersVisible !== 'boolean'
     )
       throw new Error('A stored problem has invalid fields.');
+    const content = validateProblemContent({
+      title: data.title,
+      description: data.description,
+      exampleInput: data.exampleInput,
+      exampleOutput: data.exampleOutput,
+    });
     return {
       id: document.id,
       problem: {
-        ...validateProblemContent({
-          title: data.title,
-          description: data.description,
-          exampleInput: data.exampleInput,
-          exampleOutput: data.exampleOutput,
-        }),
+        title: content.title,
+        description: content.description,
+        exampleInput: content.exampleInput,
+        exampleOutput: content.exampleOutput,
         order: data.order,
         answersVisible: data.answersVisible,
+        ...(leetcodeUrl ? { leetcodeUrl } : {}),
       },
     };
   });
@@ -110,7 +126,7 @@ export async function updateProblem(
   problemId: string,
   content: Partial<ProblemContent>,
 ): Promise<void> {
-  const updates: Partial<ProblemContent> = {};
+  const updates: Record<string, unknown> = {};
   if (content.title !== undefined) {
     if (typeof content.title !== 'string' || !content.title.trim())
       throw new Error('Enter a problem title.');
@@ -126,6 +142,10 @@ export async function updateProblem(
         throw new Error('Problem content must be text.');
       updates[field] = content[field];
     }
+  }
+  if (content.leetcodeUrl !== undefined) {
+    const leetcodeUrl = validateLeetcodeProblemUrl(content.leetcodeUrl);
+    updates.leetcodeUrl = leetcodeUrl ?? deleteField();
   }
   if (Object.keys(updates).length === 0)
     throw new Error('Select Problem content to save.');

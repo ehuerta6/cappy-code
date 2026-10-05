@@ -10,6 +10,7 @@ const sdk = vi.hoisted(() => ({
   addDoc: vi.fn(),
   getDocsFromServer: vi.fn(),
   updateDoc: vi.fn(),
+  deleteField: vi.fn(() => 'DELETE_FIELD'),
   batchUpdate: vi.fn(),
   batchDelete: vi.fn(),
   commit: vi.fn(),
@@ -23,6 +24,7 @@ vi.mock('firebase/firestore', () => ({
   addDoc: sdk.addDoc,
   getDocsFromServer: sdk.getDocsFromServer,
   updateDoc: sdk.updateDoc,
+  deleteField: sdk.deleteField,
   writeBatch: () => ({
     update: sdk.batchUpdate,
     delete: sdk.batchDelete,
@@ -108,6 +110,36 @@ describe('officer problem persistence', () => {
       { description: 'New statement' },
     );
   });
+  it('accepts a blank LeetCode field and removes any saved URL', async () => {
+    await updateProblem('session', 'problem', { leetcodeUrl: '   ' });
+    expect(sdk.updateDoc).toHaveBeenCalledExactlyOnceWith(
+      { path: 'sessions/session/problems/problem' },
+      { leetcodeUrl: 'DELETE_FIELD' },
+    );
+  });
+  it('saves only a valid HTTPS LeetCode Problem URL', async () => {
+    await updateProblem('session', 'problem', {
+      leetcodeUrl: ' https://leetcode.com/problems/two-sum/ ',
+    });
+    expect(sdk.updateDoc).toHaveBeenCalledExactlyOnceWith(
+      { path: 'sessions/session/problems/problem' },
+      { leetcodeUrl: 'https://leetcode.com/problems/two-sum/' },
+    );
+  });
+  it.each([
+    'http://leetcode.com/problems/two-sum/',
+    'https://example.com/problems/two-sum/',
+    'https://leetcode.com/problemset/all/',
+    'not a URL',
+  ])(
+    'rejects invalid LeetCode URLs before a Firestore write: %s',
+    async (url) => {
+      await expect(
+        updateProblem('session', 'problem', { leetcodeUrl: url }),
+      ).rejects.toThrow('valid HTTPS LeetCode Problem URL');
+      expect(sdk.updateDoc).not.toHaveBeenCalled();
+    },
+  );
   it('updates only the selected problem reveal field', async () => {
     await setAnswersVisible('session', 'problem', true);
     expect(sdk.updateDoc).toHaveBeenCalledExactlyOnceWith(
@@ -126,6 +158,23 @@ describe('officer problem persistence', () => {
     const records = await listProblems('session');
     expect(records.map((record) => record.id)).toEqual(['a', 'b', 'z']);
     expect(records[0].problem).toEqual(problem);
+  });
+  it('loads old Problem records without inventing a LeetCode field and reads a link', async () => {
+    sdk.getDocsFromServer.mockResolvedValue({
+      docs: [
+        document('legacy', 0),
+        document('linked', 1, {
+          ...problem,
+          order: 1,
+          leetcodeUrl: 'https://leetcode.com/problems/two-sum/',
+        }),
+      ],
+    });
+    const records = await listProblems('session');
+    expect(records[0].problem).not.toHaveProperty('leetcodeUrl');
+    expect(records[1].problem.leetcodeUrl).toBe(
+      'https://leetcode.com/problems/two-sum/',
+    );
   });
   it('writes dense order values atomically and preserves the order on reload', async () => {
     sdk.getDocsFromServer.mockResolvedValue({

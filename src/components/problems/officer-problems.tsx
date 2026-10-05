@@ -17,7 +17,7 @@ import {
   type ProblemRecord,
 } from '@/lib/firebase/problems';
 import type { ProblemCountState } from '@/lib/firebase/sessions';
-import type { SessionStatus } from '@/lib/domain';
+import type { Problem, SessionStatus } from '@/lib/domain';
 import ProblemEditor from './problem-editor';
 import OfficerSolutions from '../solutions/officer-solutions';
 import type {
@@ -66,11 +66,12 @@ export default function OfficerProblems({
     (content: ProblemContent) => {
       if (!selectedId) return;
       setRecords((currentRecords) =>
-        currentRecords.map((record) =>
-          record.id === selectedId
-            ? { ...record, problem: { ...record.problem, ...content } }
-            : record,
-        ),
+        currentRecords.map((record) => {
+          if (record.id !== selectedId) return record;
+          const problem: Problem = { ...record.problem, ...content };
+          if (!content.leetcodeUrl) delete problem.leetcodeUrl;
+          return { ...record, problem };
+        }),
       );
     },
     [selectedId],
@@ -311,6 +312,49 @@ export default function OfficerProblems({
               </button>
             </div>
           )}
+          {sessionStatus === 'ended' && records.length > 0 ? (
+            <section
+              className="mb-6 border-b border-border-soft pb-5"
+              aria-labelledby="problem-history-heading"
+            >
+              <h3
+                className="mb-2 mt-0 text-base font-semibold leading-6"
+                id="problem-history-heading"
+              >
+                Problem history
+              </h3>
+              <ol className="m-0 grid max-w-4xl gap-4 pl-6">
+                {records.map(({ id, problem }) => (
+                  <li className="min-w-0 pl-1" key={id}>
+                    <h4 className="m-0 break-words font-semibold">
+                      {problem.title}
+                    </h4>
+                    <dl className="m-0 mt-1 grid gap-x-2 gap-y-1 text-sm leading-6 sm:grid-cols-[max-content_minmax(0,1fr)]">
+                      <dt className="font-semibold text-muted">Description</dt>
+                      <dd className="m-0 min-w-0 whitespace-pre-wrap break-words">
+                        {problem.description || 'No description provided'}
+                      </dd>
+                      <dt className="font-semibold text-muted">LeetCode</dt>
+                      <dd className="m-0 min-w-0 break-all">
+                        {problem.leetcodeUrl ? (
+                          <a
+                            className="text-accent underline underline-offset-2 hover:text-accent-hover focus-visible:rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                            href={problem.leetcodeUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            {problem.leetcodeUrl}
+                          </a>
+                        ) : (
+                          'No LeetCode link provided'
+                        )}
+                      </dd>
+                    </dl>
+                  </li>
+                ))}
+              </ol>
+            </section>
+          ) : null}
           {records.length === 0 ? (
             <div>
               <h3>No problems yet</h3>

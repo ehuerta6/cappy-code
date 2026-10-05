@@ -22,6 +22,7 @@ export interface PublicProblem {
   exampleOutput: string;
   order: number;
   answersVisible: boolean;
+  leetcodeUrl?: string;
 }
 
 export type DiscoveryState =
@@ -400,6 +401,16 @@ function ProblemContent({
       <h2 className="mb-2 mt-0 text-2xl font-semibold leading-8">
         {problem.title}
       </h2>
+      {problem.leetcodeUrl ? (
+        <a
+          className="mb-3 inline-block text-sm text-muted underline decoration-border-strong underline-offset-4 hover:text-ink focus-visible:rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          href={problem.leetcodeUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          View on LeetCode ↗
+        </a>
+      ) : null}
       {problem.description ? (
         <p className="mb-5 max-w-[80ch] whitespace-pre-wrap text-base leading-[26px]">
           {problem.description}

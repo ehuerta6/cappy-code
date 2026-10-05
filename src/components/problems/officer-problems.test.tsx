@@ -210,6 +210,36 @@ describe('Officer Problem workspace', () => {
     expect(screen.queryByRole('button', { name: 'Show answers' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Hide answers' })).toBeNull();
   });
+  it('shows an ordered ended-session Problem history with linked and custom entries', async () => {
+    api.listProblems.mockResolvedValue([
+      {
+        ...first,
+        problem: {
+          ...first.problem,
+          leetcodeUrl: 'https://leetcode.com/problems/two-sum/',
+        },
+      },
+      second,
+    ]);
+    start('ended');
+    const history = await screen.findByRole('region', {
+      name: 'Problem history',
+    });
+    expect(
+      Array.from(history.querySelectorAll('ol > li h4')).map(
+        (heading) => heading.textContent,
+      ),
+    ).toEqual(['Two Sum', 'Anagram']);
+    expect(screen.getAllByText('Find pair')).toHaveLength(2);
+    expect(
+      screen
+        .getByRole('link', {
+          name: 'https://leetcode.com/problems/two-sum/',
+        })
+        .getAttribute('href'),
+    ).toBe('https://leetcode.com/problems/two-sum/');
+    expect(screen.getByText('No LeetCode link provided')).toBeTruthy();
+  });
   it('creates and selects confirmed metadata while creation is visibly pending', async () => {
     let resolve!: (record: typeof first) => void;
     api.createProblem.mockReturnValue(
@@ -265,6 +295,9 @@ describe('Officer Problem workspace', () => {
     fireEvent.change(screen.getByLabelText('Example output'), {
       target: { value: '9' },
     });
+    fireEvent.change(screen.getByLabelText('LeetCode link (optional)'), {
+      target: { value: 'https://leetcode.com/problems/two-sum/' },
+    });
     expect(api.updateProblem).not.toHaveBeenCalled();
     expect(
       (screen.getByRole('tab', { name: 'Anagram' }) as HTMLButtonElement)
@@ -284,9 +317,26 @@ describe('Officer Problem workspace', () => {
       description: 'New statement',
       exampleInput: '4 5',
       exampleOutput: '9',
+      leetcodeUrl: 'https://leetcode.com/problems/two-sum/',
     });
     expect(api.updateProblem).toHaveBeenCalledTimes(2);
     expect(screen.getByRole('tab', { name: 'Renamed' })).toBeTruthy();
+  });
+  it('rejects an invalid LeetCode URL before saving and preserves the entered value', async () => {
+    await loaded();
+    const input = screen.getByLabelText(
+      'LeetCode link (optional)',
+    ) as HTMLInputElement;
+    fireEvent.change(input, {
+      target: { value: 'http://example.com/not-a-problem' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    expect((await screen.findByRole('alert')).textContent).toContain(
+      'Enter a valid HTTPS LeetCode Problem URL.',
+    );
+    expect(input.value).toBe('http://example.com/not-a-problem');
+    expect(input.getAttribute('aria-invalid')).toBe('true');
+    expect(api.updateProblem).not.toHaveBeenCalled();
   });
   it('keeps aggregate save state pending until the backend confirms and blocks navigation', async () => {
     let resolve!: () => void;

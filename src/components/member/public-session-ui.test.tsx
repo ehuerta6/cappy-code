@@ -95,6 +95,7 @@ const problems: PublicProblem[] = [
     exampleOutput: 'first output',
     order: 0,
     answersVisible: false,
+    leetcodeUrl: 'https://leetcode.com/problems/two-sum/',
   },
 ];
 const solutions: ProblemSolutions = {
@@ -187,6 +188,14 @@ describe('public member UI scaffold', () => {
     expect(screen.getByText('First description')).toBeTruthy();
     expect(screen.getByText('first input')).toBeTruthy();
     expect(screen.getByText('first output')).toBeTruthy();
+    const leetcodeLink = screen.getByRole('link', {
+      name: 'View on LeetCode ↗',
+    });
+    expect(leetcodeLink.getAttribute('href')).toBe(
+      'https://leetcode.com/problems/two-sum/',
+    );
+    expect(leetcodeLink.getAttribute('target')).toBe('_blank');
+    expect(leetcodeLink.getAttribute('rel')).toBe('noopener noreferrer');
     fireEvent.keyDown(screen.getByRole('tab', { name: 'First problem' }), {
       key: 'ArrowRight',
     });
@@ -194,6 +203,8 @@ describe('public member UI scaffold', () => {
       screen.getByRole('tab', { name: 'Second problem' }),
     );
     expect(screen.getByText('Second description')).toBeTruthy();
+    expect(screen.queryByRole('link', { name: /View on LeetCode/ })).toBeNull();
+    expect(screen.queryByText('No LeetCode link provided')).toBeNull();
     fireEvent.keyDown(screen.getByRole('tab', { name: 'Second problem' }), {
       key: 'ArrowLeft',
     });
