@@ -124,6 +124,14 @@ describe('officer session persistence', () => {
     expect(sdk.getDocsFromServer).toHaveBeenCalledWith({ path: 'sessions' });
   });
 
+  it('keeps Sessions available when a Problem count cannot be read', async () => {
+    sdk.getCountFromServer.mockRejectedValueOnce(new Error('offline'));
+    const records = await listSessions();
+    expect(records).toHaveLength(1);
+    expect(records[0].problemCount).toBeNull();
+    expect(records[0].session).toEqual(session);
+  });
+
   it('rejects pending timestamps instead of representing them as persisted success', async () => {
     sdk.getDocsFromServer.mockResolvedValue({
       docs: [document('pending', session, true)],

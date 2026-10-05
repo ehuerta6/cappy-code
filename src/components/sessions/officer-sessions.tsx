@@ -157,8 +157,9 @@ export default function OfficerSessions() {
                             )}
                           </time>
                           <span>
-                            {record.problemCount}{' '}
-                            {record.problemCount === 1 ? 'Problem' : 'Problems'}
+                            {record.problemCount === null
+                              ? 'Problem count unavailable'
+                              : `${record.problemCount} ${record.problemCount === 1 ? 'Problem' : 'Problems'}`}
                           </span>
                         </span>
                         <span

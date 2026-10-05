@@ -80,14 +80,14 @@ const second = {
   },
 };
 const onBusyChange = vi.fn();
-const onProblemCountChange = vi.fn();
+const onProblemCountStateChange = vi.fn();
 function start(sessionStatus: 'draft' | 'live' | 'ended' = 'draft') {
   render(
     <OfficerProblems
       sessionId="session"
       sessionStatus={sessionStatus}
       onBusyChange={onBusyChange}
-      onProblemCountChange={onProblemCountChange}
+      onProblemCountStateChange={onProblemCountStateChange}
     />,
   );
 }
@@ -264,7 +264,10 @@ describe('Officer Problem workspace', () => {
     ).toBe('true');
     expect(api.createProblem).toHaveBeenCalledWith('session');
     expect(api.listProblems).toHaveBeenCalledTimes(1);
-    expect(onProblemCountChange).toHaveBeenLastCalledWith(3);
+    expect(onProblemCountStateChange).toHaveBeenLastCalledWith({
+      status: 'ready',
+      count: 3,
+    });
   });
   it('keeps failed creation empty with a recoverable error', async () => {
     api.listProblems.mockResolvedValue([]);
