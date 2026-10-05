@@ -51,7 +51,6 @@ const timestamp = Timestamp.fromMillis(1000);
 const session = {
   ...metadata,
   status: 'draft',
-  activeProblemId: null,
   createdAt: timestamp,
   updatedAt: timestamp,
 };
@@ -82,7 +81,7 @@ beforeEach(() => {
 });
 
 describe('officer session persistence', () => {
-  it('creates only the required fields with draft, null pointer and server timestamps', async () => {
+  it('creates only required fields with draft status and server timestamps', async () => {
     expect(await createSession({ ...metadata, title: ' Arrays ' })).toBe(
       'new-session',
     );
@@ -122,6 +121,17 @@ describe('officer session persistence', () => {
     expect(records[1].session).toEqual(session);
     expect(records[1].session).not.toHaveProperty('id');
     expect(sdk.getDocsFromServer).toHaveBeenCalledWith({ path: 'sessions' });
+  });
+
+  it('ignores a legacy activeProblemId field when reading a Session', async () => {
+    sdk.getDocsFromServer.mockResolvedValue({
+      docs: [
+        document('legacy', { ...session, activeProblemId: 'old-problem' }),
+      ],
+    });
+    const [record] = await listSessions();
+    expect(record.session).not.toHaveProperty('activeProblemId');
+    expect(record.session).toMatchObject({ title: 'Arrays', status: 'draft' });
   });
 
   it('keeps Sessions available when a Problem count cannot be read', async () => {

@@ -9,17 +9,12 @@ const api = vi.hoisted(() => ({
   getRevealedMemberSolutions: vi.fn(),
 }));
 const realtime = vi.hoisted(() => ({
-  activeProblemId: null as string | null,
   answersVisible: false,
 }));
 
 vi.mock('@/lib/firebase/member', () => api);
-vi.mock('@/hooks/use-presentation-state', async (original) => ({
-  ...(await original<typeof import('@/hooks/use-presentation-state')>()),
-  useActiveProblemId: () => ({
-    status: 'ready',
-    value: realtime.activeProblemId,
-  }),
+vi.mock('@/hooks/use-answer-visibility', async (original) => ({
+  ...(await original<typeof import('@/hooks/use-answer-visibility')>()),
   useAnswersVisible: () => ({
     status: 'ready',
     value: realtime.answersVisible,
@@ -77,7 +72,6 @@ const solutions = {
 };
 
 beforeEach(() => {
-  realtime.activeProblemId = null;
   realtime.answersVisible = false;
   vi.stubGlobal('matchMedia', () => ({
     matches: false,

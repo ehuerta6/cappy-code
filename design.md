@@ -23,15 +23,16 @@ never as a competing illustration. No giant hero header or onboarding flow.
   account, content editing, or submission flow.
 - **Officer Mode:** Firebase Authentication with one shared CIC officer account
   for the POC. Officers prepare content and control presentation.
-- **Session:** `draft`, `live`, or `ended`; contains ordered Problems and a
-  session-level `activeProblemId`. Design for 1–3 Problems, plus the empty draft
-  preparation state.
+- **Session:** `draft`, `live`, or `ended`; contains ordered Problems. Problem
+  navigation stays local to each view. Design for 1–3 Problems, plus the empty
+  draft preparation state.
 - **Problem:** title, description, examples, constraints, order, and its own
   `answersVisible`. Public metadata and protected Solution documents are separate.
 - **Solution:** manually prepared source and static output for each **Language**:
   Python, Java, and C++. All three are presented together.
-- Firestore is canonical persistence and synchronizes presentation state in
-  realtime. Browser `localStorage` is not canonical persistence.
+- Firestore is canonical persistence. Problem answer visibility updates in
+  realtime for members viewing that Problem. Browser `localStorage` is not
+  canonical persistence.
 
 Draft Sessions and their metadata are officer-only. Member access to live and
 ended Sessions follows publication rules; history does not make every Session
@@ -157,7 +158,7 @@ Hierarchy, in document order:
 ```text
 AppHeader
 SessionHeader (title, date, status; optional small CIC Intro Session context)
-ProblemTabs + FollowPresenterControl
+ProblemTabs (local selection)
 ProblemContent (title, description)
 Examples / Constraints
 Solutions (AnswerGate or SolutionGrid)
@@ -174,18 +175,10 @@ ProblemTabs are a restrained integrated bar, not Language selectors:
 `Contains Duplicate | Valid Anagram | Two Sum`. Use primary text and an accent
 underline for the active tab, secondary text and minimal decoration for others.
 
-Place the labeled checkbox/switch **Follow presenter** at the right of the same
-row when space permits. It defaults ON and follows session `activeProblemId`.
-Selecting another Problem manually turns it OFF; OFF allows independent browsing.
-Re-enabling immediately selects the current `activeProblemId`. No modal or
-confirmation is involved. Explain the behavior in a short accessible description.
-Reveal updates still apply to the viewed Problem while Follow Presenter is OFF.
-
-If a viewed Problem is removed, select an available Problem and announce the
-change; preserve the member's Follow Presenter preference. An unresolved presenter
-pointer shows a brief synchronization state rather than an unrelated Problem as
-if it were the presenter's selection. Ended Sessions retain the final pointer;
-following it does not imply the Session is still live.
+Problem selection belongs to each view. The member and officer tabs use local
+selection and never change another viewer's selected Problem. Selecting a Problem
+updates the displayed content in that view only. If the selected Problem is
+removed, select an available Problem and announce the change.
 
 ## 8. Answer reveal states
 
@@ -282,30 +275,20 @@ placeholder text.
 ### Problem management
 
 Use `Contains Duplicate | Valid Anagram | Two Sum | +` with a labeled Add Problem
-button. Click selects a Problem locally for preparation. During a live Session,
-provide a separate contextual **Present this problem** action that persists
-`activeProblemId`; changing the preparation selection alone does not move the
-presenter pointer. Drag reorders; a keyboard-accessible contextual menu offers
+button. Click selects a Problem locally for preparation. The officer's selection
+does not synchronize to Members. Drag reorders; a keyboard-accessible contextual menu offers
 Rename, Delete, and Move earlier/later. Do not place permanent management
 buttons on every tab. Rename uses a compact inline input; `+` creates/selects a
 new Problem directly.
 
 Deletion uses a compact confirmation popover naming the Problem and consequences,
-with Cancel and Delete. Dangerous live actions, especially deleting the active
-Problem, require explicit confirmation and explain which remaining Problem becomes
-active. Deleting the final Problem exposes EmptySessionState and no valid presenter
-pointer; do not silently end a live Session. Return focus to a remaining tab or
-Add Problem. Keep contextual menus accessible by keyboard as well as pointer.
+with Cancel and Delete. Dangerous live actions require explicit confirmation.
+Deleting the final Problem exposes EmptySessionState; do not silently end a live
+Session. Return focus to a remaining tab or Add Problem. Keep contextual menus accessible by keyboard as well as pointer.
 
-Reveal and navigation are independent:
+Problem selection is local to each view. Reveal state belongs to each Problem:
 
 ```text
-Session
-└── activeProblemId
-
-Problem
-└── answersVisible
-
 Contains Duplicate: revealed
 Valid Anagram:      hidden
 Two Sum:            hidden
@@ -364,9 +347,9 @@ read-only “No Problems available” state without officer controls or blank ed
   approximately one full Language panel visible and a small next-panel cue.
   Each panel fits the available width; code can scroll internally without shrinking
   fonts. All three Languages remain reachable in the same fixed order.
-- Scroll ProblemTabs horizontally for long titles; wrap Follow Presenter below
-  them if it cannot fit. Wrap officer actions with Show/Hide Answers still directly
-  visible. Do not clip controls or hide presentation actions in overflow.
+- Scroll ProblemTabs horizontally for long titles. Wrap officer actions with
+  Show/Hide Answers still directly visible. Do not clip controls or hide these
+  actions in overflow.
 
 Use actual content/readability to determine wrapping rather than hard device
 categories. Maintain usable text at 200% zoom and let document content reflow;
@@ -388,11 +371,10 @@ and Problem content dominant and avoid large sticky headers or decorative chrome
 ## 15. Accessibility
 
 Use semantic landmarks/headings, buttons for actions, links for navigation,
-labeled inputs, and an actual checkbox/switch for Follow Presenter. ProblemTabs
-use tablist/tab/tabpanel semantics with explicit selection, arrow-key navigation,
-Home/End, and Enter/Space activation. Merely moving keyboard focus must not disable
-Follow Presenter; activating another Problem does. Provide keyboard alternatives
-for drag reordering, and return focus predictably after deletion/popover dismissal.
+labeled inputs. ProblemTabs use tablist/tab/tabpanel semantics with explicit
+selection, arrow-key navigation, Home/End, and Enter/Space activation. Provide
+keyboard alternatives for drag reordering, and return focus predictably after
+deletion/popover dismissal.
 
 Every control has visible focus and a meaningful accessible name. Use at least
 44px practical touch targets on mobile. Do not trap keyboard focus in Monaco;
@@ -406,13 +388,13 @@ boundary. Use stronger accessible treatment where needed. Status includes words
 and/or meaningful icons: Live, Ended, Answers hidden, Saved, Save failed; never
 color alone. Selected state includes underline and semantic state.
 
-Announce save errors, reveal changes, and presenter-driven Problem changes politely
+Announce save errors and reveal changes politely
 without moving the member's keyboard focus. Avoid announcing every autosave
 keystroke. Intentional loading, empty, disabled, permission/unavailable, and error
 states use useful text and recovery actions where applicable. An inaccessible
 Session shows “Session unavailable” without exposing draft metadata. During loss
-of synchronization, show a connection status rather than falsely implying the
-presenter's state is current; hidden/unauthorized Solutions must not remain visible.
+of answer-visibility updates, show a connection status; hidden/unauthorized
+Solutions must not remain visible.
 Honor reduced motion and text zoom in both themes.
 
 ## 16. Reusable component vocabulary
@@ -420,50 +402,47 @@ Honor reduced motion and text zoom in both themes.
 These names describe design responsibilities, not mandatory one-to-one React
 component boundaries. Do not implement them in this issue.
 
-| Vocabulary               | Responsibility                                           |
-| ------------------------ | -------------------------------------------------------- |
-| `AppHeader`              | Compact brand, mode/access context, theme control        |
-| `SessionHeader`          | Session title, date, and context                         |
-| `SessionStatus`          | Labeled draft/live/ended state                           |
-| `ProblemTabs`            | Ordered Problem navigation and officer management entry  |
-| `ProblemTab`             | Problem label, selected state, contextual actions        |
-| `FollowPresenterControl` | Member follow preference and behavior description        |
-| `ProblemContent`         | Integrated Problem document hierarchy                    |
-| `ProblemDescription`     | Readable statement or officer editing field              |
-| `ProblemExample`         | Labeled example Input/Output pair                        |
-| `CodeBlock`              | Compact whitespace-preserving static example surface     |
-| `AnswerGate`             | Unified hidden-answer message without Solution content   |
-| `SolutionGrid`           | Equal comparison columns or responsive horizontal rail   |
-| `SolutionPanel`          | Integrated Language header, source, and output           |
-| `LanguageHeader`         | Language name and optional restrained identity           |
-| `EditorShell`            | Monaco sizing, theme, loading, focus, and editability    |
-| `PreparedOutput`         | Labeled static output or officer output field            |
-| `OfficerToolbar`         | Visible officer context, autosave, presentation controls |
-| `SessionActions`         | Lifecycle and selected-Problem reveal actions            |
-| `SaveStatus`             | Saving / confirmed saved / actionable failure            |
-| `SessionList`            | Grouped Session library, including loading/error states  |
-| `SessionRow`             | Whole-row navigation with date, title, count, status     |
-| `EmptySessionState`      | Quiet no-Problem state and officer Add Problem action    |
+| Vocabulary           | Responsibility                                           |
+| -------------------- | -------------------------------------------------------- |
+| `AppHeader`          | Compact brand, mode/access context, theme control        |
+| `SessionHeader`      | Session title, date, and context                         |
+| `SessionStatus`      | Labeled draft/live/ended state                           |
+| `ProblemTabs`        | Ordered Problem navigation and officer management entry  |
+| `ProblemTab`         | Problem label, selected state, contextual actions        |
+| `ProblemTabs`        | Independent local Problem selection in each view         |
+| `ProblemContent`     | Integrated Problem document hierarchy                    |
+| `ProblemDescription` | Readable statement or officer editing field              |
+| `ProblemExample`     | Labeled example Input/Output pair                        |
+| `CodeBlock`          | Compact whitespace-preserving static example surface     |
+| `AnswerGate`         | Unified hidden-answer message without Solution content   |
+| `SolutionGrid`       | Equal comparison columns or responsive horizontal rail   |
+| `SolutionPanel`      | Integrated Language header, source, and output           |
+| `LanguageHeader`     | Language name and optional restrained identity           |
+| `EditorShell`        | Monaco sizing, theme, loading, focus, and editability    |
+| `PreparedOutput`     | Labeled static output or officer output field            |
+| `OfficerToolbar`     | Visible officer context, autosave, presentation controls |
+| `SessionActions`     | Lifecycle and selected-Problem reveal actions            |
+| `SaveStatus`         | Saving / confirmed saved / actionable failure            |
+| `SessionList`        | Grouped Session library, including loading/error states  |
+| `SessionRow`         | Whole-row navigation with date, title, count, status     |
+| `EmptySessionState`  | Quiet no-Problem state and officer Add Problem action    |
 
 ## 17. UX invariants / product rules
 
 1. Reveal state belongs to each **Problem**: `answersVisible` is not Session-wide.
 2. Session status (`draft`, `live`, `ended`) and reveal status are separate concepts.
-3. Follow Presenter OFF permits independent Problem browsing.
-4. Manually selecting another Problem while Follow Presenter is ON disables it.
-5. Re-enabling Follow Presenter immediately jumps to the presenter's current
-   session-level `activeProblemId`.
-6. Draft Sessions and their metadata are never part of the public member experience.
-7. Go Live has an intentional disabled state when the Session contains no Problems.
-8. Dangerous live-Session actions require clear confirmation, especially deleting
-   the active Problem and ending the Session.
-9. Officer editing is designed around autosave with visible success/failure states.
-10. Hidden state never exposes Solution source or prepared output before reveal;
-    backend authorization and the member UI must agree.
-11. Past Sessions preserve intended per-Problem revealed/hidden states; ending a
-    Session never automatically makes all Solutions public. Publication eligibility
-    still governs member access.
-12. Three-Language comparison is central: Python, Java, and C++ are shown together,
+3. Member and officer Problem selection is local to each view.
+4. Draft Sessions and their metadata are never part of the public member experience.
+5. Go Live has an intentional disabled state when the Session contains no Problems.
+6. Dangerous live-Session actions require clear confirmation, especially ending a
+   Session.
+7. Officer editing is designed around autosave with visible success/failure states.
+8. Hidden state never exposes Solution source or prepared output before reveal;
+   backend authorization and the member UI must agree.
+9. Past Sessions preserve intended per-Problem revealed/hidden states; ending a
+   Session never automatically makes all Solutions public. Publication eligibility
+   still governs member access.
+10. Three-Language comparison is central: Python, Java, and C++ are shown together,
     with Monaco editable for officers and read-only for members.
 
 No runtime AI/LLMs, translation/transpilation, code generation, execution,

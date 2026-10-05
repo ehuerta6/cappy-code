@@ -63,14 +63,13 @@ responses. Firestore Security Rules independently enforce backend access.
 
 | Path                                                             | Type       | Fields                                                                             |
 | ---------------------------------------------------------------- | ---------- | ---------------------------------------------------------------------------------- |
-| `sessions/{sessionId}`                                           | `Session`  | `title`, `date`, `status`, `activeProblemId`, `createdAt`, `updatedAt`             |
+| `sessions/{sessionId}`                                           | `Session`  | `title`, `date`, `status`, `createdAt`, `updatedAt`                                |
 | `sessions/{sessionId}/problems/{problemId}`                      | `Problem`  | `title`, `description`, `exampleInput`, `exampleOutput`, `order`, `answersVisible` |
 | `sessions/{sessionId}/problems/{problemId}/solutions/{language}` | `Solution` | `code`, `output`                                                                   |
 
 - `Language` is exactly `python | java | cpp`; each language identifies its own Solution document.
 - `SessionStatus` is `draft | live | ended`.
 - `date` is a calendar date string in `YYYY-MM-DD` format. `createdAt` and `updatedAt` are Firestore `Timestamp` values in resolved persisted records; later write workflows can use SDK `serverTimestamp()` and must handle pending timestamp snapshots if needed.
-- `activeProblemId` is a problem document ID or `null` when no problem is selected.
 - `order` is a numeric sort key within the session. Problem reordering writes dense zero-based integers; ties on reads sort by document ID.
 - `output` is officer-prepared static text, not an execution result.
 
@@ -92,10 +91,10 @@ before Firestore access. Firebase sends the actual Auth token to Firestore;
 Security Rules remain the backend boundary.
 
 Creation writes `Untitled Session`, the browser's current local calendar date,
-`draft`, `activeProblemId: null`, and server timestamps. It creates no Problems.
+`draft`, and server timestamps. It creates no Problems.
 Calendar dates remain `YYYY-MM-DD` strings. Edits validate title/date and write
 only those fields plus `updatedAt: serverTimestamp()`, preserving `createdAt`,
-status, and the presenter pointer. Writes resolve only after backend confirmation.
+and status. Writes resolve only after backend confirmation.
 The list uses `getDocsFromServer`; failed/offline reads remain errors rather than
 using static content or presenting cached data as current. It validates stored
 fields and rejects documents with pending writes or unresolved timestamps rather
@@ -169,8 +168,8 @@ Problem deletion commits the three known Solution deletes and metadata delete
 in one atomic batch, without reading protected source or output.
 
 From a selected Session, **Manage problems** opens the preparation workspace.
-Problem tabs use local Officer selection and never mutate `Session.activeProblemId`
-or reveal state. Arrow keys/Home/End move focus, and Enter/Space activate tabs.
+Problem tabs use local Officer selection and never mutate session metadata
+or answer visibility. Arrow keys/Home/End move focus, and Enter/Space activate tabs.
 A compact contextual action group supports Rename, Delete and Move earlier/later;
 Move actions replace drag infrastructure with a keyboard-accessible interaction.
 Deletion uses a named confirmation with Cancel, keyboard dismissal, and focus
@@ -238,29 +237,24 @@ documents, and Firestore Rules independently deny a hidden or no-longer-public
 read. The reusable `SolutionWorkspace` renders only those returned records in
 read-only Monaco panels with their prepared output.
 
-## Realtime presenter state (#43)
+## Realtime answer visibility
 
-`src/lib/firebase/presentation.ts` provides `setActiveProblem`, which requires a
-non-anonymous Officer and verifies a non-null Problem ID exists under the target
-Session before writing `Session.activeProblemId`. Officers explicitly choose
-**Present this problem** from the live Problem workspace; changing the local
-Problem editing selection does not change the presenter pointer. Draft and ended
-Sessions do not show this control.
+`src/lib/firebase/answer-visibility.ts` subscribes to the viewed Problem's
+`answersVisible` field. The hook in `src/hooks/use-answer-visibility.ts` tracks
+one Problem at a time and unsubscribes on change or unmount. Member and Officer
+tab selections are local to each view and do not synchronize through Firestore.
 
-`subscribeToActiveProblem` listens to the Session document, and
-`subscribeToAnswersVisible` listens to the viewed Problem document. The small
-hooks in `src/hooks/use-presentation-state.ts` track one Session/Problem at a
-time and unsubscribe on change or unmount. Members start with Follow Presenter
-enabled, use the persisted active pointer on initial load when it names an
-available Problem, and otherwise use the first ordered Problem as the initial
-fallback. Manual selection disables following; re-enabling follows the current
-pointer immediately. Follow preference and independent selection remain local.
+The officer's **Show Answers** and **Hide Answers** controls update the selected
+Problem's `answersVisible` field. Members viewing that Problem receive the change
+in realtime. The member view fetches fixed Solution documents only after the
+listener confirms `answersVisible: true`; when it reports false, the revealed
+Solution component unmounts and clears its loaded data. Firestore Rules also deny
+anonymous reads while answers are hidden. Listener and permission failures show
+generic retry states; raw Firebase errors are not rendered.
 
-The member view fetches fixed Solution documents only after the reveal listener
-confirms `answersVisible: true`. When it reports false, the revealed-Solution
-component unmounts and clears its loaded data. Listener and permission failures
-show generic retry states; raw Firebase errors are not rendered. Realtime reads
-continue to rely on the existing Firestore Rules, which are unchanged by #43.
+Legacy `activeProblemId` fields on existing Session documents are ignored by
+readers. New Session documents do not write that field. No data migration is
+required.
 
 ## Firestore Rules tests
 

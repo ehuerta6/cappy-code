@@ -49,7 +49,6 @@ export async function createSession(
   const reference = await addDoc(collection(db, 'sessions'), {
     ...fields,
     status: 'draft',
-    activeProblemId: null,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
@@ -72,10 +71,6 @@ export async function listSessions(): Promise<SessionRecord[]> {
         typeof data.title !== 'string' ||
         typeof data.date !== 'string' ||
         !['draft', 'live', 'ended'].includes(data.status) ||
-        !(
-          data.activeProblemId === null ||
-          typeof data.activeProblemId === 'string'
-        ) ||
         !(data.createdAt instanceof Timestamp) ||
         !(data.updatedAt instanceof Timestamp)
       ) {
@@ -102,7 +97,6 @@ export async function listSessions(): Promise<SessionRecord[]> {
         session: {
           ...metadata,
           status: data.status,
-          activeProblemId: data.activeProblemId,
           createdAt: data.createdAt,
           updatedAt: data.updatedAt,
         },

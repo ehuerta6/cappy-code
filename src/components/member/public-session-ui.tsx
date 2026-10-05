@@ -1,16 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { ProblemSolutions } from '@/lib/firebase/solutions';
 import AppHeader from '@/components/app-header';
 import SolutionWorkspace from '@/components/solutions/solution-workspace';
-import {
-  createFollowPresenterState,
-  reduceFollowPresenterState,
-  useActiveProblemId,
-  useAnswersVisible,
-} from '@/hooks/use-presentation-state';
+import { useAnswersVisible } from '@/hooks/use-answer-visibility';
 import styles from './public-session-ui.module.css';
 
 export interface PublicSessionSummary {
@@ -18,7 +13,6 @@ export interface PublicSessionSummary {
   title: string;
   date: string;
   status: 'live' | 'ended';
-  activeProblemId?: string | null;
 }
 
 export interface PublicProblem {
@@ -175,75 +169,27 @@ function SessionContent({
         : [],
     [state.problems],
   );
-  const [presenterState, dispatchPresenter] = useReducer(
-    reduceFollowPresenterState,
-    state.session.activeProblemId ?? null,
-    createFollowPresenterState,
+  const [selectedProblemId, setSelectedProblemId] = useState<string | null>(
+    null,
   );
-  const [selectionInitialized, setSelectionInitialized] = useState(false);
-  const [presentationRetry, setPresentationRetry] = useState(0);
-  const observedPresenterId = useRef(state.session.activeProblemId ?? null);
-  const presenter = useActiveProblemId(state.session.id, presentationRetry);
-  const activeProblemId =
-    presenter.status === 'ready'
-      ? presenter.value
-      : presenterState.activeProblemId;
+  const effectiveSelectedProblemId = problems.some(
+    (problem) => problem.id === selectedProblemId,
+  )
+    ? selectedProblemId
+    : (problems[0]?.id ?? null);
   const selectedProblem = problems.find(
-    (problem) => problem.id === presenterState.selectedProblemId,
-  );
-  const presenterProblem = problems.find(
-    (problem) => problem.id === presenterState.activeProblemId,
+    (problem) => problem.id === effectiveSelectedProblemId,
   );
 
   useEffect(() => {
-    if (state.problems.status !== 'ready' || selectionInitialized) return;
-    const initialActiveId =
-      presenter.status === 'ready'
-        ? presenter.value
-        : (state.session.activeProblemId ?? null);
-    const initialProblem = problems.find(
-      (problem) => problem.id === initialActiveId,
-    );
-    observedPresenterId.current = initialActiveId;
-    dispatchPresenter({
-      type: 'initial_selection_resolved',
-      problemId: initialProblem?.id ?? problems[0]?.id ?? null,
-    });
-    setSelectionInitialized(true);
-  }, [
-    problems,
-    presenter,
-    selectionInitialized,
-    state.problems.status,
-    state.session.activeProblemId,
-  ]);
-
-  useEffect(() => {
-    if (
-      !selectionInitialized ||
-      presenter.status !== 'ready' ||
-      observedPresenterId.current === presenter.value
-    ) {
-      return;
+    if (state.problems.status !== 'ready') return;
+    if (!problems.some((problem) => problem.id === selectedProblemId)) {
+      setSelectedProblemId(problems[0]?.id ?? null);
     }
-    observedPresenterId.current = presenter.value;
-    dispatchPresenter({
-      type: 'presenter_changed',
-      problemId: presenter.value,
-    });
-  }, [presenter, selectionInitialized]);
+  }, [problems, selectedProblemId, state.problems.status]);
 
   function selectProblem(problemId: string) {
-    if (problemId === presenterState.selectedProblemId) return;
-    dispatchPresenter({ type: 'select_problem', problemId });
-  }
-
-  function followPresenter() {
-    dispatchPresenter({
-      type: 'presenter_changed',
-      problemId: activeProblemId,
-    });
-    dispatchPresenter({ type: 'follow_presenter' });
+    setSelectedProblemId(problemId);
   }
 
   return (
@@ -286,52 +232,9 @@ function SessionContent({
           <div className={styles.problemNavigation}>
             <ProblemTabs
               problems={problems}
-              selectedId={presenterState.selectedProblemId ?? ''}
+              selectedId={effectiveSelectedProblemId ?? ''}
               onSelect={selectProblem}
             />
-            <div className={styles.followControl}>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={presenterState.isFollowing}
-                  aria-describedby="follow-presenter-description"
-                  onChange={(event) =>
-                    event.target.checked
-                      ? followPresenter()
-                      : dispatchPresenter({ type: 'unfollow_presenter' })
-                  }
-                />
-                Follow presenter
-              </label>
-              <span id="follow-presenter-description" className={styles.srOnly}>
-                Follow the officer’s selected Problem. Selecting a Problem
-                manually turns this off.
-              </span>
-              <span
-                className={styles.srOnly}
-                aria-live="polite"
-                aria-atomic="true"
-              >
-                {presenter.status === 'error'
-                  ? 'Presenter updates are unavailable.'
-                  : presenterState.isFollowing
-                    ? presenterProblem
-                      ? `Following ${presenterProblem.title}.`
-                      : presenterState.activeProblemId
-                        ? 'The presenter’s Problem is not available in this session.'
-                        : 'No Problem is currently selected by the presenter.'
-                    : 'Browsing Problems independently.'}
-              </span>
-              {presenter.status === 'error' ? (
-                <button
-                  className={styles.syncButton}
-                  type="button"
-                  onClick={() => setPresentationRetry((value) => value + 1)}
-                >
-                  Presenter unavailable · Retry sync
-                </button>
-              ) : null}
-            </div>
           </div>
           {selectedProblem ? (
             <ProblemContent
@@ -342,9 +245,7 @@ function SessionContent({
             />
           ) : (
             <p className={styles.quiet} role="status">
-              {presenter.status === 'ready' && presenter.value
-                ? 'The presenter’s Problem is not available in this session.'
-                : 'The presenter has not selected a Problem.'}
+              No problems are available in this session.
             </p>
           )}
         </>

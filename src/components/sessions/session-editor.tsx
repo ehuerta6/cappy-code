@@ -222,7 +222,6 @@ export default function SessionEditor({
         )}
         <OfficerProblems
           sessionId={record.id}
-          sessionStatus={status}
           onBusyChange={setProblemBusy}
           onProblemCountStateChange={setProblemCount}
         />

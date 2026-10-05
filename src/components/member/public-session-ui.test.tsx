@@ -17,16 +17,11 @@ import {
 } from './public-session-ui';
 
 const presentation = vi.hoisted(() => ({
-  activeProblemId: null as string | null,
   answersVisible: false,
 }));
 
-vi.mock('@/hooks/use-presentation-state', async (original) => ({
-  ...(await original<typeof import('@/hooks/use-presentation-state')>()),
-  useActiveProblemId: () => ({
-    status: 'ready',
-    value: presentation.activeProblemId,
-  }),
+vi.mock('@/hooks/use-answer-visibility', async (original) => ({
+  ...(await original<typeof import('@/hooks/use-answer-visibility')>()),
   useAnswersVisible: () => ({
     status: 'ready',
     value: presentation.answersVisible,
@@ -60,7 +55,6 @@ vi.mock('@monaco-editor/react', () => ({
 }));
 
 beforeEach(() => {
-  presentation.activeProblemId = null;
   presentation.answersVisible = false;
   window.localStorage.clear();
   document.documentElement.removeAttribute('data-theme');
@@ -190,22 +184,30 @@ describe('public member UI scaffold', () => {
     expect(screen.getByText('First description')).toBeTruthy();
     expect(screen.getByText('first input')).toBeTruthy();
     expect(screen.getByText('first output')).toBeTruthy();
-    const follow = screen.getByRole('checkbox', { name: 'Follow presenter' });
-    expect((follow as HTMLInputElement).checked).toBe(true);
     fireEvent.keyDown(screen.getByRole('tab', { name: 'First problem' }), {
       key: 'ArrowRight',
     });
     expect(document.activeElement).toBe(
       screen.getByRole('tab', { name: 'Second problem' }),
     );
-    expect(
-      (
-        screen.getByRole('checkbox', {
-          name: 'Follow presenter',
-        }) as HTMLInputElement
-      ).checked,
-    ).toBe(false);
     expect(screen.getByText('Second description')).toBeTruthy();
+    fireEvent.keyDown(screen.getByRole('tab', { name: 'Second problem' }), {
+      key: 'ArrowLeft',
+    });
+    expect(document.activeElement).toBe(
+      screen.getByRole('tab', { name: 'First problem' }),
+    );
+    fireEvent.keyDown(screen.getByRole('tab', { name: 'First problem' }), {
+      key: 'End',
+    });
+    expect(document.activeElement).toBe(
+      screen.getByRole('tab', { name: 'Second problem' }),
+    );
+    fireEvent.keyDown(screen.getByRole('tab', { name: 'Second problem' }), {
+      key: 'Home',
+    });
+    expect(screen.getByText('First description')).toBeTruthy();
+    expect(screen.queryByRole('checkbox')).toBeNull();
     expect(load).not.toHaveBeenCalled();
     expect(
       screen.queryByRole('button', { name: /edit|save|delete|show answers/i }),

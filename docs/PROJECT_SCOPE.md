@@ -10,7 +10,7 @@ CappyCode is not an IDE, code translator, transpiler, AI product, online judge, 
 
 ### Officers
 
-CIC Intro officers are the authenticated content managers and presenters. Firebase Authentication is used only for Officer Mode. The proof of concept has one shared CIC officer account. Officers can create and manage sessions, add and order problems, prepare solution content, and control live presentation state.
+CIC Intro officers are the authenticated content managers and presenters. Firebase Authentication is used only for Officer Mode. The proof of concept has one shared CIC officer account. Officers can create and manage sessions, add and order problems, prepare solution content, and control answer visibility.
 
 ### Members
 
@@ -18,7 +18,7 @@ Members are anonymous viewers. They do not create accounts or authenticate. Memb
 
 ## Persistence and architecture
 
-Firestore is the canonical persistence layer. It stores session content, session history, prepared solutions, and presentation state. Firebase Authentication protects Officer Mode; public membership does not depend on authentication.
+Firestore is the canonical persistence layer. It stores session content, session history, prepared solutions, and each problem's answer visibility. Firebase Authentication protects Officer Mode; public membership does not depend on authentication.
 
 Keep problem metadata separate from solution documents. Metadata includes the problem title, description, examples, order, and `answersVisible`. These fields are member-readable only when the session's status/publication rules permit access; a draft's metadata remains officer-only. Protected solution documents include manually prepared Python, Java, and C++ source and prepared static output for each language. Separation lets Firestore Security Rules enforce answer access independently of what the UI renders.
 
@@ -32,9 +32,9 @@ Sessions have three states:
 - `live` — member access is allowed by publication rules; the officer controls the active problem and each problem's answer visibility.
 - `ended` — the live presentation is over and the session remains in officer session history; member reads are allowed only if the session is published under the publication rules.
 
-A session contains multiple ordered problems. Each problem has a description and examples, its own `answersVisible` field, and separately stored solution content. The session-level `activeProblemId` identifies the problem currently selected by the officer. Members can enable **Follow Presenter** to move to the officer's active problem as presentation state changes.
+A session contains multiple ordered problems. Each problem has a description and examples, its own `answersVisible` field, and separately stored solution content. Members choose problems independently in their own view.
 
-The officer dashboard provides session creation and management, access to session history, and controls for starting, presenting, and ending sessions. **Show Answers** and **Hide Answers** update `answersVisible` on the selected problem. Realtime Firestore updates synchronize session `activeProblemId` and each problem's reveal state with eligible member views.
+The officer dashboard provides session creation and management, access to session history, and controls for starting and ending sessions. **Show Answers** and **Hide Answers** update `answersVisible` on the selected problem. Members viewing that problem receive reveal changes in realtime; their problem selection remains local.
 
 ## Editors and presentation UI
 

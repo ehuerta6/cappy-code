@@ -89,7 +89,7 @@ describe('officer problem persistence', () => {
   it('starts an empty session at order zero', async () => {
     expect((await createProblem('session')).problem.order).toBe(0);
   });
-  it('edits the four content fields without writing extra fields or reveal/presenter state', async () => {
+  it('edits the four content fields without writing extra fields or reveal state', async () => {
     await updateProblem('session', 'problem', {
       ...content,
       title: ' Two Sum ',
