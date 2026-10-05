@@ -12,8 +12,10 @@ import {
 import type { ProblemCountState } from '@/lib/firebase/sessions';
 import type { SessionStatus } from '@/lib/domain';
 import ProblemEditor from './problem-editor';
-import styles from './problems.module.css';
 import OfficerSolutions from '../solutions/officer-solutions';
+
+const buttonClass =
+  'min-h-11 rounded border border-border-strong bg-surface px-3 py-2 text-ink hover:bg-hover disabled:cursor-default disabled:bg-raised disabled:text-muted';
 
 export default function OfficerProblems({
   sessionId,
@@ -194,14 +196,19 @@ export default function OfficerProblems({
   }
 
   return (
-    <section className={styles.workspace} aria-label="Session problems">
-      <h2>Problems</h2>
+    <section
+      className="text-base leading-relaxed text-ink"
+      aria-label="Session problems"
+    >
+      <h2 className="mb-3 mt-0 text-lg font-semibold leading-[26px]">
+        Problems
+      </h2>
       {loading ? (
         <p role="status">Loading problems…</p>
       ) : loadError ? (
         <div role="alert">
           <p>Problems could not be loaded. Check your connection and retry.</p>
-          <button className={styles.button} onClick={reload}>
+          <button className={buttonClass} onClick={reload}>
             Retry loading problems
           </button>
         </div>
@@ -212,7 +219,7 @@ export default function OfficerProblems({
             <div role="alert">
               <p>{error}</p>
               <button
-                className={styles.button}
+                className={buttonClass}
                 disabled={blocked}
                 onClick={reload}
               >
@@ -226,7 +233,7 @@ export default function OfficerProblems({
               <p>Add the first problem to this session.</p>
               <button
                 ref={addButton}
-                className={styles.button}
+                className={buttonClass}
                 disabled={blocked}
                 onClick={add}
               >
@@ -235,9 +242,9 @@ export default function OfficerProblems({
             </div>
           ) : (
             <>
-              <div className={styles.toolbar}>
+              <div className="flex flex-wrap items-stretch gap-2 border-b border-border-soft">
                 <div
-                  className={styles.tabs}
+                  className="flex min-w-0 max-w-full flex-1 basis-80 overflow-x-auto [scrollbar-width:thin]"
                   role="tablist"
                   aria-label="Problems"
                 >
@@ -248,7 +255,7 @@ export default function OfficerProblems({
                         if (element) tabs.current.set(record.id, element);
                         else tabs.current.delete(record.id);
                       }}
-                      className={styles.tab}
+                      className="min-h-11 shrink-0 border-b-2 border-transparent px-3 py-2 text-muted hover:bg-hover hover:text-ink aria-selected:border-accent aria-selected:font-semibold aria-selected:text-ink"
                       role="tab"
                       id={`problem-tab-${record.id}`}
                       aria-controls={`problem-panel-${record.id}`}
@@ -264,16 +271,16 @@ export default function OfficerProblems({
                 </div>
                 <button
                   ref={addButton}
-                  className={styles.button}
+                  className={buttonClass}
                   disabled={blocked}
                   onClick={add}
                   aria-label="Add problem"
                 >
-                  +
+                  + Add
                 </button>
                 <button
                   ref={actionsButton}
-                  className={styles.button}
+                  className={buttonClass}
                   disabled={blocked}
                   aria-expanded={actionsOpen}
                   aria-controls="problem-actions"
@@ -285,7 +292,7 @@ export default function OfficerProblems({
               {actionsOpen && selected && (
                 <div
                   id="problem-actions"
-                  className={styles.actions}
+                  className="my-3 flex flex-wrap items-center gap-2 rounded-md border border-border-strong bg-surface p-3 [&>p]:m-0 [&>p]:basis-full"
                   onKeyDown={(event) => {
                     if (event.key === 'Escape') {
                       setActionsOpen(false);
@@ -295,7 +302,7 @@ export default function OfficerProblems({
                 >
                   <button
                     autoFocus
-                    className={styles.button}
+                    className={buttonClass}
                     disabled={blocked}
                     onClick={() => {
                       setActionsOpen(false);
@@ -305,21 +312,21 @@ export default function OfficerProblems({
                     Rename
                   </button>
                   <button
-                    className={styles.button}
+                    className={buttonClass}
                     disabled={blocked || records[0].id === selected.id}
                     onClick={() => move(-1)}
                   >
                     Move earlier
                   </button>
                   <button
-                    className={styles.button}
+                    className={buttonClass}
                     disabled={blocked || records.at(-1)?.id === selected.id}
                     onClick={() => move(1)}
                   >
                     Move later
                   </button>
                   <button
-                    className={styles.button}
+                    className={buttonClass}
                     disabled={blocked}
                     onClick={() => {
                       setConfirmDelete(true);
@@ -332,7 +339,7 @@ export default function OfficerProblems({
               )}
               {confirmDelete && selected && (
                 <div
-                  className={styles.actions}
+                  className="my-3 flex flex-wrap items-center gap-2 rounded-md border border-border-strong bg-surface p-3 [&>p]:m-0 [&>p]:basis-full"
                   role="group"
                   aria-label="Confirm problem deletion"
                   onKeyDown={(event) => {
@@ -348,7 +355,7 @@ export default function OfficerProblems({
                   </p>
                   <button
                     autoFocus
-                    className={styles.button}
+                    className={buttonClass}
                     disabled={blocked}
                     onClick={() => {
                       setConfirmDelete(false);
@@ -358,7 +365,7 @@ export default function OfficerProblems({
                     Cancel
                   </button>
                   <button
-                    className={styles.button}
+                    className={buttonClass}
                     disabled={blocked}
                     onClick={remove}
                   >
@@ -369,14 +376,18 @@ export default function OfficerProblems({
               {selected && (
                 <>
                   {sessionStatus === 'live' ? (
-                    <div className={styles.reveal}>
-                      <p>
+                    <div className="my-3 flex flex-wrap items-center justify-between gap-3 border-b border-border-soft py-2 pb-3">
+                      <p className="m-0">
                         Answers are{' '}
-                        {selected.problem.answersVisible ? 'visible' : 'hidden'}{' '}
+                        <span className="font-semibold">
+                          {selected.problem.answersVisible
+                            ? 'visible'
+                            : 'hidden'}
+                        </span>{' '}
                         to members for this problem.
                       </p>
                       <button
-                        className={styles.button}
+                        className={buttonClass}
                         disabled={blocked}
                         onClick={toggleAnswers}
                       >
@@ -386,8 +397,10 @@ export default function OfficerProblems({
                       </button>
                     </div>
                   ) : sessionStatus === 'ended' ? (
-                    <div className={styles.reveal}>
-                      <p>Solutions are public in ended sessions.</p>
+                    <div className="my-3 flex flex-wrap items-center justify-between gap-3 border-b border-border-soft py-2 pb-3">
+                      <p className="m-0">
+                        Solutions are public in ended sessions.
+                      </p>
                     </div>
                   ) : null}
                   <ProblemEditor
@@ -419,10 +432,14 @@ export default function OfficerProblems({
                 </>
               )}
               {editing && (
-                <p>Save problem changes before using problem actions.</p>
+                <p className="text-sm text-muted">
+                  Save problem changes before using problem actions.
+                </p>
               )}
               {solutionPending && (
-                <p>Finish saving solution changes before changing problems.</p>
+                <p className="text-sm text-muted">
+                  Finish saving solution changes before changing problems.
+                </p>
               )}
             </>
           )}

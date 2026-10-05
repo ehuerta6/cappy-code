@@ -27,19 +27,17 @@ export default function OfficerAuthGate({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="officer-shell">
+    <div className="min-h-screen bg-canvas text-ink">
       <AppHeader
-        context={
-          auth.status === 'authenticated' ? 'Officer Mode' : 'Officer Login'
-        }
+        context={auth.status === 'authenticated' ? 'Officer Mode' : undefined}
       >
         <nav aria-label="Officer navigation">
-          <Link href="/" aria-label="Member Mode">
-            Members
+          <Link href="/" aria-label="View member site">
+            View member site
           </Link>
           {auth.status === 'authenticated' && (
             <button
-              className="clear-button"
+              className="min-h-11 rounded px-2 text-sm text-muted hover:bg-hover hover:text-ink"
               disabled={signingOut}
               onClick={handleLogout}
               type="button"
@@ -49,18 +47,24 @@ export default function OfficerAuthGate({ children }: { children: ReactNode }) {
           )}
         </nav>
       </AppHeader>
-      <main className="officer-content">
+      <main
+        className={
+          auth.status === 'anonymous'
+            ? 'mx-auto flex min-h-[calc(100vh-56px)] w-[calc(100%-32px)] max-w-[1440px] items-center justify-center pb-[6vh] sm:w-[calc(100%-48px)]'
+            : 'mx-auto w-[calc(100%-32px)] max-w-[1440px] py-5 pb-12 sm:w-[calc(100%-48px)] sm:pt-6'
+        }
+      >
         {error && (
-          <p className="auth-error" role="alert">
+          <p className="text-danger" role="alert">
             {error}
           </p>
         )}
         {auth.status === 'checking' || signingOut ? (
-          <p role="status">
+          <p className="text-muted" role="status">
             {signingOut ? 'Signing out…' : 'Checking officer access…'}
           </p>
         ) : auth.status === 'unavailable' ? (
-          <p role="alert">
+          <p className="text-danger" role="alert">
             Officer login is unavailable. Please reload to try again.
           </p>
         ) : auth.status === 'anonymous' ? (

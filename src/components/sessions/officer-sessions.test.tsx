@@ -108,7 +108,7 @@ describe('Officer Sessions surface', () => {
     resolve([record]);
     expect(
       await screen.findByRole('button', {
-        name: /Arrays.*Oct 8.*1 Problem.*draft/,
+        name: /Oct 8.*Arrays.*1 Problem.*draft/,
       }),
     ).toBeTruthy();
   });
@@ -180,7 +180,7 @@ describe('Officer Sessions surface', () => {
       },
     ]);
     render(<OfficerSessions />);
-    await screen.findByRole('heading', { name: 'Past Sessions' });
+    await screen.findByRole('heading', { name: 'Past' });
     expect(screen.getByRole('heading', { name: 'Live' })).toBeTruthy();
     expect(screen.getByRole('heading', { name: 'Upcoming' })).toBeTruthy();
     expect(
@@ -196,7 +196,7 @@ describe('Officer Sessions surface', () => {
         ?.getAttribute('datetime'),
     ).toBe('2026-01-01');
     const pastRows = screen
-      .getByRole('region', { name: 'Past Sessions' })
+      .getByRole('region', { name: 'Past' })
       .querySelectorAll('button');
     expect(pastRows[0].textContent).toContain('Oct 1');
     expect(pastRows[1].textContent).toContain('Sep 1');
@@ -304,11 +304,9 @@ describe('Officer Sessions surface', () => {
       expect(screen.getByRole('status').textContent).toBe('Saved ✓'),
     );
     fireEvent.click(screen.getByRole('button', { name: 'Back to Sessions' }));
+    expect(await screen.findByRole('heading', { name: 'Past' })).toBeTruthy();
     expect(
-      await screen.findByRole('heading', { name: 'Past Sessions' }),
-    ).toBeTruthy();
-    expect(
-      screen.getByRole('button', { name: /Arrays.*Oct 8.*1 Problem.*ended/ }),
+      screen.getByRole('button', { name: /Oct 8.*Arrays.*1 Problem.*ended/ }),
     ).toBeTruthy();
   });
 

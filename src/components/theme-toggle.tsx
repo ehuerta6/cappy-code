@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { useColorTheme, type ColorTheme } from './theme-provider';
-import styles from './app-header.module.css';
 
 function systemTheme(): ColorTheme {
   return window.matchMedia('(prefers-color-scheme: dark)').matches
@@ -34,16 +33,16 @@ export default function ThemeToggle() {
 
   return (
     <button
-      className={styles.themeToggle}
+      className="theme-toggle inline-flex min-h-11 w-11 items-center justify-center gap-2 rounded border border-border-strong bg-surface px-0 text-ink hover:bg-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:w-auto sm:px-2.5"
       type="button"
       aria-label="Toggle color theme"
       aria-pressed={theme === null ? undefined : theme === 'dark'}
       onClick={toggle}
     >
-      <span className={styles.themeIcon} aria-hidden="true">
+      <span className="text-lg leading-none text-accent" aria-hidden="true">
         {theme === 'dark' ? '☾' : theme === 'light' ? '☼' : '◐'}
       </span>
-      <span>
+      <span className="hidden text-sm sm:inline">
         {theme ? `${theme === 'dark' ? 'Dark' : 'Light'} mode` : 'Theme'}
       </span>
     </button>

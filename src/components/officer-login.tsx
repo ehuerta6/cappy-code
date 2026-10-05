@@ -28,11 +28,26 @@ export default function OfficerLogin() {
   }
 
   return (
-    <section className="officer-login" aria-labelledby="officer-login-title">
-      <h1 id="officer-login-title">Officer Login</h1>
-      <form onSubmit={handleSubmit} aria-busy={pending}>
-        <label htmlFor="officer-email">Email</label>
+    <section
+      className="w-full max-w-[400px]"
+      aria-labelledby="officer-login-title"
+    >
+      <h1
+        className="m-0 text-2xl font-semibold leading-8 tracking-tight"
+        id="officer-login-title"
+      >
+        Officer login
+      </h1>
+      <form
+        className="mt-6 grid gap-2"
+        onSubmit={handleSubmit}
+        aria-busy={pending}
+      >
+        <label className="font-medium" htmlFor="officer-email">
+          Email
+        </label>
         <input
+          className="mb-2 min-h-11 w-full rounded-md border border-border-strong bg-surface px-3 py-2 text-ink disabled:cursor-default disabled:bg-raised disabled:text-muted"
           autoComplete="username"
           disabled={pending}
           id="officer-email"
@@ -40,8 +55,11 @@ export default function OfficerLogin() {
           required
           type="email"
         />
-        <label htmlFor="officer-password">Password</label>
+        <label className="font-medium" htmlFor="officer-password">
+          Password
+        </label>
         <input
+          className="mb-2 min-h-11 w-full rounded-md border border-border-strong bg-surface px-3 py-2 text-ink disabled:cursor-default disabled:bg-raised disabled:text-muted"
           autoComplete="current-password"
           disabled={pending}
           id="officer-password"
@@ -50,14 +68,22 @@ export default function OfficerLogin() {
           type="password"
         />
         {error && (
-          <p className="auth-error" role="alert">
+          <p className="text-danger" role="alert">
             {error}
           </p>
         )}
-        <button className="login-button" disabled={pending} type="submit">
+        <button
+          className="mt-2 min-h-11 w-full rounded border border-accent bg-accent px-3 py-2 font-semibold text-accent-contrast hover:bg-accent-hover disabled:cursor-default disabled:border-border-strong disabled:bg-raised disabled:text-muted"
+          disabled={pending}
+          type="submit"
+        >
           {pending ? 'Signing in…' : 'Sign in'}
         </button>
-        {pending && <p role="status">Confirming officer access…</p>}
+        {pending && (
+          <p className="text-sm text-muted" role="status">
+            Confirming officer access…
+          </p>
+        )}
       </form>
     </section>
   );

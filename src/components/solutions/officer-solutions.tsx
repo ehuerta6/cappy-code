@@ -8,7 +8,9 @@ import {
   type ProblemSolutions,
 } from '@/lib/firebase/solutions';
 import SolutionPanel, { languageNames } from './solution-panel';
-import styles from './solutions.module.css';
+
+const buttonClass =
+  'min-h-10 rounded border border-border-strong bg-surface px-3 py-2 text-ink hover:bg-hover disabled:cursor-default disabled:bg-raised disabled:text-muted';
 
 type Props = {
   sessionId: string;
@@ -72,7 +74,7 @@ function ProblemSolutionsEditor({
         <div role="alert">
           <p>Solutions could not be loaded. Check your connection and retry.</p>
           <button
-            className={styles.button}
+            className={buttonClass}
             onClick={() => {
               setError(false);
               setAttempt((value) => value + 1);
@@ -85,17 +87,17 @@ function ProblemSolutionsEditor({
         <p role="status">Loading solutions…</p>
       ) : (
         <>
-          <p className={styles.hint}>
+          <p className="text-sm leading-5 text-muted">
             Code and prepared output save after a short pause. Finish saving
             before switching Problems. In Monaco, press Ctrl+M to toggle Tab key
             navigation.
           </p>
           <div
-            className={styles.rail}
+            className="overflow-x-auto p-1 -m-1 [scrollbar-width:thin] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             tabIndex={0}
             aria-label="Three-language solution comparison"
           >
-            <div className={styles.grid}>
+            <div className="grid grid-cols-[repeat(3,minmax(min(360px,calc(100vw-40px)),1fr))] gap-4">
               {languages.map((language) => (
                 <EditableSolution
                   key={language}
@@ -174,7 +176,7 @@ function EditableSolution({
         }}
       />
       <p
-        className={styles.saveStatus}
+        className="mt-2 text-sm leading-5 text-muted"
         role="status"
         aria-label={`${languageNames[language]} save status`}
       >
@@ -193,7 +195,7 @@ function EditableSolution({
             still here.
           </p>
           <button
-            className={styles.button}
+            className={buttonClass}
             onClick={() => void save()}
             disabled={saving || disabled}
           >
