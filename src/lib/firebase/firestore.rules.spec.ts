@@ -198,7 +198,7 @@ describe('Firestore security rules', () => {
     await assertFails(getDocs(collection(db, 'sessions')));
   });
 
-  it('denies hidden and draft Solutions and permits revealed public Solutions only for fixed languages', async () => {
+  it('denies draft and live hidden Solutions and permits all ended Solutions for fixed languages', async () => {
     const db = anonymousDb();
     for (const language of ['python', 'java', 'cpp']) {
       await assertFails(
@@ -214,7 +214,7 @@ describe('Firestore security rules', () => {
           doc(db, `sessions/ended/problems/revealed/solutions/${language}`),
         ),
       );
-      await assertFails(
+      await assertSucceeds(
         getDoc(doc(db, `sessions/ended/problems/hidden/solutions/${language}`)),
       );
       await assertFails(
@@ -223,9 +223,13 @@ describe('Firestore security rules', () => {
         ),
       );
     }
-    await assertFails(
-      getDoc(doc(db, 'sessions/live/problems/revealed/solutions/rust')),
-    );
+    for (const sessionId of ['draft', 'live', 'ended']) {
+      await assertFails(
+        getDoc(
+          doc(db, `sessions/${sessionId}/problems/revealed/solutions/rust`),
+        ),
+      );
+    }
   });
 
   it('changes anonymous Solution permission immediately after Show Answers and Hide Answers writes', async () => {

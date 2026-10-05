@@ -77,9 +77,9 @@ responses. Firestore Security Rules independently enforce backend access.
 
 ## Access boundary
 
-Problem documents hold member-facing metadata and `answersVisible`. Prepared code and output exist only in the separate Solution subcollection, consistent with [Firestore's hierarchical data model](https://firebase.google.com/docs/firestore/data-model). Draft Sessions are officer-only; anonymous members can read metadata only under `live` or `ended` Sessions. Anonymous Solution reads also require the parent Problem's `answersVisible` to be true.
+Problem documents hold member-facing metadata and `answersVisible`. Prepared code and output exist only in the separate Solution subcollection, consistent with [Firestore's hierarchical data model](https://firebase.google.com/docs/firestore/data-model). Draft Sessions are officer-only; anonymous members can read metadata under `live` and `ended` Sessions.
 
-Hiding answers in the UI alone provides no protection; Firestore Rules deny anonymous reads of hidden Solution documents.
+Anonymous Solution reads for live Sessions require the parent Problem's `answersVisible` to be true. For ended Sessions, all fixed-language Solution documents are public regardless of that field. Draft Solutions remain officer-only. Hiding live answers in the UI alone provides no protection; Firestore Rules deny those reads.
 
 ## Officer Session preparation (#38)
 
@@ -122,11 +122,12 @@ serialized by this small client-side cascade.
 
 `firebase.json` points to `firestore.rules`. Authenticated Officers can read and
 write Sessions, Problems, and the fixed `python`, `java`, and `cpp` Solution
-documents. Anonymous members can read Sessions and Problems only when the parent
-Session status is `live` or `ended`. They can read a fixed Solution document only
-when that Session is public and its Problem has `answersVisible: true`. Anonymous
-writes are denied. A broad Session query does not filter drafts through Rules;
-public discovery uses separate queries constrained to `live` and `ended`.
+documents. Anonymous members can read Sessions and Problems when the parent
+Session status is `live` or `ended`. For live Sessions, they can read a fixed
+Solution document only when its Problem has `answersVisible: true`; every fixed
+Solution document is readable for ended Sessions. Anonymous writes are denied.
+A broad Session query does not filter drafts through Rules; public discovery uses
+separate queries constrained to `live` and `ended`.
 
 Deploy these rules to the intended Firebase project **before using Session CRUD**:
 
@@ -146,8 +147,7 @@ that the persisted Session is currently `draft` or `live`, respectively, before
 updating status. Go Live also requires at least one Problem. The Officer
 dashboard groups rows by persisted status: live, draft (Upcoming), and ended
 (Past Sessions). Dates sort rows within each group but do not determine status.
-Ended Sessions remain editable and public under the existing Rules; ending does
-not alter any Problem's `answersVisible` value.
+Ended Sessions remain editable and public. Ending only updates the Session status; it does not alter any Problem's `answersVisible` value. The ended status itself makes all fixed-language Solutions publicly readable.
 
 Normal unit tests mock Firebase and require no project. Rules tests use the actual
 emulator to verify officer access, public status access, answer reveal/revocation,
@@ -210,17 +210,17 @@ short debounce. Failed saves retain edits and offer retry; unsaved changes block
 Problem switching and leaving the Session workspace. Monaco's language mode is
 fixed to Python, Java, or C++ for its panel. The reusable `SolutionWorkspace`
 accepts already-authorized records for read-only rendering and does not fetch
-Solution data itself; the public view fetches these records only after Problem
-metadata reports answers visible.
+Solution data itself; the public view fetches live records only after Problem
+metadata reports answers visible. It fetches ended-session records automatically.
 
 Firestore Rules allow anonymous Session and Problem reads only for `live` and
-`ended` Sessions. Anonymous Solution reads additionally require the parent
-Problem's `answersVisible` to be true, and only `python`, `java`, and `cpp`
-Solution IDs are supported. Authenticated Officers manage all three document
-types; anonymous writes are denied. Ending a Session does not change each
-Problem's reveal state.
+`ended` Sessions. Live Solution reads require `answersVisible: true`; ended
+Sessions allow all fixed-language Solutions regardless of that value. Draft
+Solutions, unsupported language IDs, and anonymous writes remain denied.
+Authenticated Officers retain access to the fixed Solution documents. Ending a
+Session changes only its status; it does not rewrite Problem documents.
 
-## Public Member view (#41)
+## Public Member view and archive (#41, #64)
 
 `src/lib/firebase/member.ts` provides anonymous server reads for public
 discovery, a selected Session, its ordered Problem metadata, and the three fixed
@@ -229,28 +229,36 @@ Solution documents. Discovery runs separate `status == live` and
 queries. Drafts are not returned. The selected Session and Problem reads still
 go through Firestore Rules, which remain authoritative if access changes.
 
-The member pages call these read functions from Client Component effects; no
-Officer Auth gate, account UI, or write function is used. The hidden-answer
-state renders from Problem metadata without requesting Solution documents.
-Only when `answersVisible` is true does the page request the fixed language
-documents, and Firestore Rules independently deny a hidden or no-longer-public
-read. The reusable `SolutionWorkspace` renders only those returned records in
-read-only Monaco panels with their prepared output.
+The public home shows **Live now** and newest-first **Past sessions**. It shows
+“No live session right now” when the live group is empty; ended Sessions remain
+visible in the archive. Drafts are not returned.
+
+The member pages call read functions from Client Component effects; no Officer
+Auth gate, account UI, or write function is used. For live Sessions, the hidden
+AnswerGate renders without requesting Solution documents until
+`answersVisible` becomes true. For ended Sessions, all three fixed Solution
+documents are requested automatically, regardless of `answersVisible`. The
+read model maps missing documents to empty source and Output. Firestore Rules
+remain authoritative for every read. The reusable `SolutionWorkspace` renders
+returned records in read-only Monaco panels with their prepared Output.
 
 ## Realtime answer visibility
 
 `src/lib/firebase/answer-visibility.ts` subscribes to the viewed Problem's
-`answersVisible` field. The hook in `src/hooks/use-answer-visibility.ts` tracks
-one Problem at a time and unsubscribes on change or unmount. Member and Officer
-tab selections are local to each view and do not synchronize through Firestore.
+`answersVisible` field for live Sessions. The hook in
+`src/hooks/use-answer-visibility.ts` tracks one Problem at a time and
+unsubscribes on change or unmount. Ended Sessions do not need this listener;
+their Solutions are public based on the parent Session status. Member and
+Officer tab selections are local to each view and do not synchronize through
+Firestore.
 
 The officer's **Show Answers** and **Hide Answers** controls update the selected
-Problem's `answersVisible` field. Members viewing that Problem receive the change
-in realtime. The member view fetches fixed Solution documents only after the
-listener confirms `answersVisible: true`; when it reports false, the revealed
-Solution component unmounts and clears its loaded data. Firestore Rules also deny
-anonymous reads while answers are hidden. Listener and permission failures show
-generic retry states; raw Firebase errors are not rendered.
+Problem's `answersVisible` field while a Session is live. Members viewing that
+Problem receive the change in realtime. The member view fetches live Solutions
+only after the listener confirms `answersVisible: true`; when it reports false,
+the Solution component unmounts and clears its loaded data. Firestore Rules also
+deny anonymous reads while live answers are hidden. Listener and permission
+failures show generic retry states; raw Firebase errors are not rendered.
 
 Legacy `activeProblemId` fields on existing Session documents are ignored by
 readers. New Session documents do not write that field. No data migration is

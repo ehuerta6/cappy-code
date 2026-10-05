@@ -10,16 +10,19 @@ import {
   type ProblemRecord,
 } from '@/lib/firebase/problems';
 import type { ProblemCountState } from '@/lib/firebase/sessions';
+import type { SessionStatus } from '@/lib/domain';
 import ProblemEditor from './problem-editor';
 import styles from './problems.module.css';
 import OfficerSolutions from '../solutions/officer-solutions';
 
 export default function OfficerProblems({
   sessionId,
+  sessionStatus,
   onBusyChange,
   onProblemCountStateChange,
 }: {
   sessionId: string;
+  sessionStatus: SessionStatus;
   onBusyChange: (busy: boolean) => void;
   onProblemCountStateChange: (state: ProblemCountState) => void;
 }) {
@@ -365,22 +368,28 @@ export default function OfficerProblems({
               )}
               {selected && (
                 <>
-                  <div className={styles.reveal}>
-                    <p>
-                      Answers are{' '}
-                      {selected.problem.answersVisible ? 'visible' : 'hidden'}{' '}
-                      to members for this problem.
-                    </p>
-                    <button
-                      className={styles.button}
-                      disabled={blocked}
-                      onClick={toggleAnswers}
-                    >
-                      {selected.problem.answersVisible
-                        ? 'Hide Answers'
-                        : 'Show Answers'}
-                    </button>
-                  </div>
+                  {sessionStatus === 'live' ? (
+                    <div className={styles.reveal}>
+                      <p>
+                        Answers are{' '}
+                        {selected.problem.answersVisible ? 'visible' : 'hidden'}{' '}
+                        to members for this problem.
+                      </p>
+                      <button
+                        className={styles.button}
+                        disabled={blocked}
+                        onClick={toggleAnswers}
+                      >
+                        {selected.problem.answersVisible
+                          ? 'Hide Answers'
+                          : 'Show Answers'}
+                      </button>
+                    </div>
+                  ) : sessionStatus === 'ended' ? (
+                    <div className={styles.reveal}>
+                      <p>Solutions are public in ended sessions.</p>
+                    </div>
+                  ) : null}
                   <ProblemEditor
                     key={selected.id}
                     sessionId={sessionId}

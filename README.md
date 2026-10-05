@@ -2,7 +2,7 @@
 
 **A live solution showcase platform for CIC Intro sessions.**
 
-CappyCode helps Coding Interview Club (CIC) Intro officers prepare interview-style problems and solutions. Officers manage sessions from Officer Mode; members open an anonymous, read-only view and choose problems independently as prepared answers are revealed.
+CappyCode helps Coding Interview Club (CIC) Intro officers prepare interview-style problems and solutions. Officers manage sessions from Officer Mode; members open an anonymous, read-only view, choose problems independently, and revisit ended sessions as a study archive.
 
 Officers prepare Python, Java, and C++ solutions before a session. CappyCode presents those solutions side by side with prepared static output for each language. It does not generate, translate, compile, or run code.
 
@@ -12,24 +12,24 @@ Officers prepare Python, Java, and C++ solutions before a session. CappyCode pre
 2. The officer adds, edits, orders, and describes multiple problems, including examples.
 3. For each problem, the officer prepares Python, Java, and C++ source and static output.
 4. The officer starts the session, which becomes live. Members open the public session view without accounts.
-5. The officer chooses which problem to manage and uses **Show Answers** or **Hide Answers** for that problem while presenting. Members choose problems independently.
-6. Ended sessions remain available in session history.
+5. While live, the officer uses **Show Answers** or **Hide Answers** for the selected problem; members viewing it receive changes in realtime.
+6. Members can choose any problem independently. Ended sessions appear in **Past sessions** with all prepared solutions available.
 
-Sessions have `draft`, `live`, and `ended` states. Members choose problems independently in their own view. Each problem stores its own `answersVisible` state, which updates in realtime for members viewing that problem.
+Sessions have `draft`, `live`, and `ended` states. Members choose problems independently in their own view. During a live session, each problem's `answersVisible` state updates in realtime. Ended sessions expose all prepared solutions, regardless of that field's stored value.
 
 ## Modes and access
 
 - **Officer Mode** requires Firebase Authentication. The proof of concept uses one shared CIC officer account. Officers manage sessions and their problems, prepare solutions and outputs, and control the presentation.
-- **Member Mode** is anonymous. Members can read problem metadata only when the session's status and publication rules allow member access, such as an eligible `live` session or a published `ended` session. Draft sessions are officer-only. Editors are read-only in Member Mode.
+- **Member Mode** is anonymous. Members can read metadata for live and ended sessions; draft sessions are officer-only. Editors are read-only in Member Mode.
 - Monaco editors are editable in Officer Mode and read-only in Member Mode. Python, Java, and C++ are presented together; there is no source-language selection.
-- Problem descriptions and examples are member-readable metadata only when the session's status/publication rules permit it; they are not always publicly readable. Solution documents are stored separately from problem metadata.
-- Firestore Security Rules enforce answer confidentiality. Hiding answers in the interface alone is not a security boundary: member clients must not be authorized to read hidden solution documents. Public solution reads require the parent problem's `answersVisible` to be true and the session to permit member access. Rules also restrict content management to authenticated officers.
+- Problem descriptions and examples are public for live and ended sessions. Solution documents are stored separately from problem metadata.
+- Firestore Security Rules enforce answer confidentiality. Hiding answers in the interface alone is not a security boundary: member clients must not be authorized to read hidden solution documents. Live solution reads require the parent problem's `answersVisible` to be true. Ended-session solutions are public regardless of that field. Draft solutions remain officer-only. Rules also restrict content management to authenticated officers.
 
 ## Persistence and architecture
 
 Firestore is the canonical persistence layer for officer-managed content, session history, and live answer visibility. Firebase Authentication protects Officer Mode; public members do not sign in. The product has no runtime AI, LLM, translation, code execution, compiler, interpreter, or online judging system.
 
-A session stores its status. Its ordered problems store titles, descriptions, examples, and per-problem `answersVisible`; these metadata are member-readable only when the session's status/publication rules permit access. Separate protected solution documents contain prepared source text and static output for Python, Java, and C++. Firestore Security Rules use the parent problem's `answersVisible` and session access rules to govern solution reads.
+A session stores its status. Its ordered problems store titles, descriptions, examples, and per-problem `answersVisible`; these metadata are public only for live and ended sessions. Separate solution documents contain prepared source text and static output for Python, Java, and C++. Firestore Security Rules gate live solution reads on `answersVisible`, while every fixed-language solution is readable for ended sessions.
 
 ## Product principles
 
@@ -37,7 +37,7 @@ A session stores its status. Its ordered problems store titles, descriptions, ex
 2. **Presentation first** — keep problems and all three language views clear, readable, and useful on a projected screen.
 3. **Prepared content** — solutions and outputs are authored before presentation and shown as stored.
 4. **Anonymous audience** — members can follow along without accounts and cannot edit content.
-5. **Secure reveal** — answer access is enforced by Firestore Security Rules, with realtime answer visibility updates.
+5. **Secure reveal** — live answer access is enforced by Firestore Security Rules and realtime visibility updates; ended sessions are a public study archive.
 
 ## Documentation
 

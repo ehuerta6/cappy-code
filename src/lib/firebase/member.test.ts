@@ -27,7 +27,7 @@ vi.mock('firebase/firestore', () => ({
 
 import {
   getMemberSession,
-  getRevealedMemberSolutions,
+  getMemberSolutions,
   listMemberProblems,
   listMemberSessions,
 } from './member';
@@ -137,7 +137,7 @@ describe('anonymous member persistence', () => {
     });
   });
 
-  it('loads only the three fixed solution documents when requested by the revealed UI', async () => {
+  it('loads only the three fixed solution documents', async () => {
     sdk.getDocFromServer.mockImplementation(
       async ({ path }: { path: string }) =>
         snapshot(path.split('/').at(-1) ?? '', {
@@ -145,12 +145,24 @@ describe('anonymous member persistence', () => {
           output: 'prepared',
         }),
     );
-    const solutions = await getRevealedMemberSolutions('s', 'p');
+    const solutions = await getMemberSolutions('s', 'p');
     expect(solutions.python.code).toBe(
       'sessions/s/problems/p/solutions/python',
     );
     expect(solutions.java.output).toBe('prepared');
     expect(solutions.cpp.code).toBe('sessions/s/problems/p/solutions/cpp');
     expect(sdk.getDocFromServer).toHaveBeenCalledTimes(3);
+  });
+
+  it('maps missing solution documents to empty source and output', async () => {
+    sdk.getDocFromServer.mockImplementation(async () => ({
+      exists: () => false,
+      metadata: { hasPendingWrites: false },
+    }));
+    await expect(getMemberSolutions('past', 'problem')).resolves.toEqual({
+      python: { code: '', output: '' },
+      java: { code: '', output: '' },
+      cpp: { code: '', output: '' },
+    });
   });
 });

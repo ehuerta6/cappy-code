@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   getMemberSession,
-  getRevealedMemberSolutions,
+  getMemberSolutions,
   listMemberProblems,
   type MemberSessionRecord,
 } from '@/lib/firebase/member';
@@ -73,7 +73,7 @@ export default function MemberSessionPage({
   }, [reloadProblems, sessionId]);
 
   const loadRevealedSolutions = useCallback(
-    (problemId: string) => getRevealedMemberSolutions(sessionId, problemId),
+    (problemId: string) => getMemberSolutions(sessionId, problemId),
     [sessionId],
   );
 
