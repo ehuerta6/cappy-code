@@ -1,6 +1,38 @@
 import type { FirebaseOptions } from 'firebase/app';
 
+export const FIREBASE_EMULATOR_CONFIG = {
+  host: '127.0.0.1',
+  projectId: 'demo-cappycode-local',
+  firestorePort: 8080,
+  authPort: 9099,
+} as const;
+
+export function useFirebaseEmulators(): boolean {
+  const setting = process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATORS;
+  if (setting === undefined || setting === 'false') return false;
+  if (setting !== 'true') {
+    throw new Error(
+      'NEXT_PUBLIC_USE_FIREBASE_EMULATORS must be either true or false.',
+    );
+  }
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(
+      'Firebase emulators cannot be enabled in a production build.',
+    );
+  }
+  return true;
+}
+
 export function getFirebaseConfig(): FirebaseOptions {
+  if (useFirebaseEmulators()) {
+    return {
+      apiKey: 'demo-api-key',
+      authDomain: 'localhost',
+      projectId: FIREBASE_EMULATOR_CONFIG.projectId,
+      appId: 'demo-cappycode-local',
+    };
+  }
+
   const config = {
     apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
     authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,

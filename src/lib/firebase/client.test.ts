@@ -2,6 +2,21 @@ import { deleteApp, getApps, initializeApp } from 'firebase/app';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('client-only', () => ({}));
+const firestoreEmulator = vi.hoisted(() => ({
+  connect: vi.fn(),
+  databases: new WeakMap<object, { app: unknown }>(),
+}));
+vi.mock('firebase/firestore', () => ({
+  getFirestore: (app: object) => {
+    let database = firestoreEmulator.databases.get(app);
+    if (!database) {
+      database = { app };
+      firestoreEmulator.databases.set(app, database);
+    }
+    return database;
+  },
+  connectFirestoreEmulator: firestoreEmulator.connect,
+}));
 
 import { getFirebaseApp, getFirestoreDb } from './client';
 
@@ -9,6 +24,7 @@ afterEach(async () => {
   await Promise.all(getApps().map(deleteApp));
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
+  firestoreEmulator.connect.mockClear();
 });
 
 function configureBrowser() {
@@ -46,5 +62,26 @@ describe('Firebase client initialization', () => {
     initializeApp({ projectId: 'other-unit-test' }, 'other');
     expect(getFirebaseApp().name).toBe('[DEFAULT]');
     expect(getApps()).toHaveLength(2);
+  });
+
+  it('connects the application Firestore client only when emulator mode is enabled', () => {
+    configureBrowser();
+    vi.stubEnv('NEXT_PUBLIC_USE_FIREBASE_EMULATORS', 'true');
+    const database = getFirestoreDb();
+    getFirestoreDb();
+    expect(firestoreEmulator.connect).toHaveBeenCalledTimes(1);
+    expect(firestoreEmulator.connect).toHaveBeenCalledWith(
+      database,
+      '127.0.0.1',
+      8080,
+    );
+  });
+
+  it('does not connect Firestore to an emulator in production mode', () => {
+    configureBrowser();
+    vi.stubEnv('NEXT_PUBLIC_USE_FIREBASE_EMULATORS', 'false');
+    vi.stubEnv('NODE_ENV', 'production');
+    getFirestoreDb();
+    expect(firestoreEmulator.connect).not.toHaveBeenCalled();
   });
 });
