@@ -10,9 +10,12 @@ import {
 } from '@/lib/firebase/sessions';
 import { validateSessionMetadata } from '@/lib/session-metadata';
 import OfficerProblems from '../problems/officer-problems';
+import type { OfficerSaveState } from '@/components/officer-save-state';
 
 const secondaryButtonClass =
   'min-h-11 rounded border border-border-strong bg-surface px-3 py-2 text-ink hover:bg-hover disabled:cursor-default disabled:bg-raised disabled:text-muted';
+const contextualButtonClass =
+  'min-h-10 rounded px-2 py-2 text-sm text-muted underline-offset-4 hover:bg-hover hover:text-accent-hover hover:underline disabled:cursor-default disabled:text-muted';
 const primaryButtonClass =
   'min-h-11 rounded border border-accent bg-accent px-3 py-2 font-semibold text-accent-contrast hover:border-accent-hover hover:bg-accent-hover disabled:cursor-default disabled:border-border-strong disabled:bg-raised disabled:text-muted';
 const statusTone = {
@@ -30,6 +33,8 @@ export default function SessionEditor({
 }) {
   const [problemsOpen, setProblemsOpen] = useState(false);
   const [problemBusy, setProblemBusy] = useState(false);
+  const [contentSaveState, setContentSaveState] =
+    useState<OfficerSaveState | null>(null);
   const [title, setTitle] = useState(record.session.title);
   const [date, setDate] = useState(record.session.date);
   const [saved, setSaved] = useState({
@@ -89,7 +94,7 @@ export default function SessionEditor({
     if (status === 'live') {
       return (
         <button
-          className={secondaryButtonClass}
+          className="min-h-10 rounded-md border border-danger/50 px-3 py-2 text-sm text-danger hover:bg-danger-surface disabled:cursor-default disabled:border-border-soft disabled:text-muted"
           onClick={() => void transition('ended')}
           disabled={
             dirty || saving || deleting || transitionPending || problemBusy
@@ -103,16 +108,34 @@ export default function SessionEditor({
   }
 
   function saveStatus() {
+    const failed = saveError || contentSaveState?.error;
+    const isSaving = saving || dirty || contentSaveState?.pending;
     return (
-      <p className="m-0 text-sm leading-5 text-muted" role="status">
-        {saving
-          ? 'Saving…'
-          : saveError
-            ? 'Save failed'
-            : dirty
-              ? 'Unsaved changes — leave a field to save'
-              : 'Saved ✓'}
-      </p>
+      <div
+        className="flex items-center gap-2 text-sm leading-5"
+        role="status"
+        aria-live="polite"
+      >
+        {failed ? (
+          <>
+            <span className="text-danger">Save failed —</span>
+            <button
+              className="rounded px-1 text-accent underline underline-offset-4 hover:text-accent-hover"
+              onClick={() => {
+                if (saveError) void save();
+                else contentSaveState?.retry?.();
+              }}
+              type="button"
+            >
+              Retry
+            </button>
+          </>
+        ) : isSaving ? (
+          <span className="text-muted">Saving…</span>
+        ) : (
+          <span className="text-muted">Saved ✓</span>
+        )}
+      </div>
     );
   }
 
@@ -204,7 +227,7 @@ export default function SessionEditor({
         aria-label="Officer session workspace"
       >
         <button
-          className={`${secondaryButtonClass} mb-3`}
+          className={`${contextualButtonClass} mb-3`}
           disabled={problemBusy}
           onClick={() => setProblemsOpen(false)}
         >
@@ -212,20 +235,22 @@ export default function SessionEditor({
         </button>
         <div className="mb-6 flex items-start justify-between gap-4 max-sm:mb-5 max-sm:flex-col">
           <div>
-            <h1 className="m-0 text-[28px] font-semibold leading-9 tracking-tight">
-              {title}
-            </h1>
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="m-0 text-[28px] font-semibold leading-9 tracking-tight">
+                {title}
+              </h1>
+              <span
+                className={`inline-flex min-h-7 items-center rounded-md border px-2.5 py-0.5 text-sm font-semibold capitalize leading-5 ${statusTone[status]}`}
+              >
+                {status}
+              </span>
+            </div>
             <p className="mt-1 flex flex-wrap items-center gap-2 text-sm leading-5 text-muted">
               CIC Intro Session <span aria-hidden="true">•</span>{' '}
               <time dateTime={date}>{formatDate(date)}</time>
             </p>
           </div>
           <div className="flex flex-wrap items-center justify-start gap-x-3 gap-y-2">
-            <span
-              className={`inline-flex min-h-7 items-center rounded border px-2.5 py-0.5 text-sm font-semibold capitalize leading-5 ${statusTone[status]}`}
-            >
-              {status}
-            </span>
             {saveStatus()}
             {lifecycleActions()}
           </div>
@@ -240,6 +265,7 @@ export default function SessionEditor({
           sessionId={record.id}
           sessionStatus={status}
           onBusyChange={setProblemBusy}
+          onSaveStateChange={setContentSaveState}
           onProblemCountStateChange={setProblemCount}
         />
       </section>
@@ -251,7 +277,7 @@ export default function SessionEditor({
       aria-label="Session metadata"
     >
       <button
-        className={`${secondaryButtonClass} mb-3`}
+        className={`${contextualButtonClass} mb-3`}
         onClick={onClose}
         disabled={dirty || saving || deleting || transitionPending}
       >
@@ -259,20 +285,22 @@ export default function SessionEditor({
       </button>
       <div className="mb-6 flex items-start justify-between gap-4 max-sm:mb-5 max-sm:flex-col">
         <div>
-          <h1 className="m-0 text-[28px] font-semibold leading-9 tracking-tight">
-            {record.session.title}
-          </h1>
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="m-0 text-[28px] font-semibold leading-9 tracking-tight">
+              {record.session.title}
+            </h1>
+            <span
+              className={`inline-flex min-h-7 items-center rounded-md border px-2.5 py-0.5 text-sm font-semibold capitalize leading-5 ${statusTone[status]}`}
+            >
+              {status}
+            </span>
+          </div>
           <p className="mt-1 flex flex-wrap items-center gap-2 text-sm leading-5 text-muted">
             CIC Intro Session <span aria-hidden="true">•</span>{' '}
             <time dateTime={date}>{formatDate(date)}</time>
           </p>
         </div>
         <div className="flex flex-wrap items-center justify-start gap-x-3 gap-y-2">
-          <span
-            className={`inline-flex min-h-7 items-center rounded border px-2.5 py-0.5 text-sm font-semibold capitalize leading-5 ${statusTone[status]}`}
-          >
-            {status}
-          </span>
           {saveStatus()}
           {lifecycleActions()}
         </div>
@@ -318,19 +346,15 @@ export default function SessionEditor({
           required
         />
       </label>
-      <p className="text-sm text-muted">
-        Title and date save when you leave a field. Finish saving before
-        returning to Sessions.
-      </p>
       <button
-        className={secondaryButtonClass}
+        className={primaryButtonClass}
         disabled={dirty || saving || deleting || transitionPending}
         onClick={() => setProblemsOpen(true)}
       >
         Manage problems
       </button>
       <button
-        className={secondaryButtonClass}
+        className="ml-2 min-h-11 rounded px-3 py-2 text-sm text-danger hover:bg-danger-surface disabled:cursor-default disabled:text-muted"
         onClick={() => void remove()}
         disabled={saving || deleting || transitionPending || dirty}
       >

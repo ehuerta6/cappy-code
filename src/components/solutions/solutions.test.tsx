@@ -136,7 +136,9 @@ describe('solution workspace', () => {
         ) as HTMLTextAreaElement
       ).value,
     ).toBe('unsaved python');
-    expect(screen.getByText('Save failed — edits retained')).toBeTruthy();
+    expect(screen.getByRole('alert').textContent).toContain(
+      'Python changes could not be saved',
+    );
     await autosave();
     expect(persistence.save).toHaveBeenCalledTimes(1);
     await act(async () => {
@@ -145,7 +147,7 @@ describe('solution workspace', () => {
       );
     });
     expect(persistence.save).toHaveBeenCalledTimes(2);
-    expect(screen.queryByText('Save failed — edits retained')).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
   });
   it('keeps newer edits made during an outstanding write and saves them next', async () => {
     const onPending = vi.fn();
@@ -191,7 +193,7 @@ describe('solution workspace', () => {
         .disabled,
     ).toBe(true);
   });
-  it('clears a failed save when the officer restores confirmed content', async () => {
+  it('keeps a failed dirty save blocking until the officer restores confirmed content', async () => {
     const pending = vi.fn();
     await openOfficer(pending);
     vi.useFakeTimers();
@@ -200,6 +202,7 @@ describe('solution workspace', () => {
       target: { value: 'failed change' },
     });
     await autosave();
+    expect(pending).toHaveBeenLastCalledWith(true);
     fireEvent.change(screen.getByLabelText('Python Solution, editable'), {
       target: { value: 'python source' },
     });
@@ -229,7 +232,7 @@ describe('solution workspace', () => {
     await act(async () => {
       reject(new Error('offline'));
     });
-    expect(screen.queryByText('Save failed — edits retained')).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
     expect(pending).toHaveBeenLastCalledWith(false);
   });
   it('loads the selected Problem and discards an obsolete fetch result', async () => {

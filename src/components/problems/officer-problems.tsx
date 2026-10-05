@@ -13,6 +13,10 @@ import type { ProblemCountState } from '@/lib/firebase/sessions';
 import type { SessionStatus } from '@/lib/domain';
 import ProblemEditor from './problem-editor';
 import OfficerSolutions from '../solutions/officer-solutions';
+import type {
+  OfficerSaveState,
+  SaveStateReporter,
+} from '@/components/officer-save-state';
 
 const buttonClass =
   'min-h-11 rounded border border-border-strong bg-surface px-3 py-2 text-ink hover:bg-hover disabled:cursor-default disabled:bg-raised disabled:text-muted';
@@ -21,11 +25,13 @@ export default function OfficerProblems({
   sessionId,
   sessionStatus,
   onBusyChange,
+  onSaveStateChange,
   onProblemCountStateChange,
 }: {
   sessionId: string;
   sessionStatus: SessionStatus;
   onBusyChange: (busy: boolean) => void;
+  onSaveStateChange: SaveStateReporter;
   onProblemCountStateChange: (state: ProblemCountState) => void;
 }) {
   const [records, setRecords] = useState<ProblemRecord[]>([]);
@@ -37,6 +43,10 @@ export default function OfficerProblems({
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [solutionPending, setSolutionPending] = useState(false);
+  const [problemSaveState, setProblemSaveState] =
+    useState<OfficerSaveState | null>(null);
+  const [solutionSaveState, setSolutionSaveState] =
+    useState<OfficerSaveState | null>(null);
   const [actionsOpen, setActionsOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const lock = useRef(false);
@@ -49,6 +59,21 @@ export default function OfficerProblems({
   useEffect(() => {
     onBusyChange(blocked);
   }, [blocked, onBusyChange]);
+
+  useEffect(() => {
+    const failed = [problemSaveState, solutionSaveState].find(
+      (state) => state?.error,
+    );
+    if (failed) {
+      onSaveStateChange(failed);
+      return;
+    }
+    onSaveStateChange(
+      problemSaveState?.pending || solutionSaveState?.pending
+        ? { pending: true }
+        : null,
+    );
+  }, [onSaveStateChange, problemSaveState, solutionSaveState]);
 
   useEffect(() => {
     if (loading) {
@@ -276,23 +301,26 @@ export default function OfficerProblems({
                   onClick={add}
                   aria-label="Add problem"
                 >
-                  + Add
+                  + Add problem
                 </button>
-                <button
-                  ref={actionsButton}
-                  className={buttonClass}
-                  disabled={blocked}
-                  aria-expanded={actionsOpen}
-                  aria-controls="problem-actions"
-                  onClick={() => setActionsOpen((open) => !open)}
-                >
-                  Problem actions
-                </button>
+                {selected && (
+                  <button
+                    ref={actionsButton}
+                    className="min-h-10 min-w-10 rounded-md px-2 text-lg text-muted hover:bg-hover hover:text-ink disabled:cursor-default disabled:text-muted"
+                    disabled={blocked}
+                    aria-label={`Manage ${selected.problem.title}`}
+                    aria-expanded={actionsOpen}
+                    aria-controls="problem-actions"
+                    onClick={() => setActionsOpen((open) => !open)}
+                  >
+                    ···
+                  </button>
+                )}
               </div>
               {actionsOpen && selected && (
                 <div
                   id="problem-actions"
-                  className="my-3 flex flex-wrap items-center gap-2 rounded-md border border-border-strong bg-surface p-3 [&>p]:m-0 [&>p]:basis-full"
+                  className="my-3 flex flex-wrap items-center gap-2 border-y border-border-soft py-3 [&>p]:m-0 [&>p]:basis-full"
                   onKeyDown={(event) => {
                     if (event.key === 'Escape') {
                       setActionsOpen(false);
@@ -376,24 +404,39 @@ export default function OfficerProblems({
               {selected && (
                 <>
                   {sessionStatus === 'live' ? (
-                    <div className="my-3 flex flex-wrap items-center justify-between gap-3 border-b border-border-soft py-2 pb-3">
-                      <p className="m-0">
-                        Answers are{' '}
+                    <div className="my-3 flex flex-wrap items-center gap-3 border-b border-border-soft py-2 pb-3">
+                      <p className="m-0 flex items-center gap-2 text-sm">
+                        <span
+                          aria-hidden="true"
+                          className={
+                            selected.problem.answersVisible
+                              ? 'text-success'
+                              : 'text-muted'
+                          }
+                        >
+                          ●
+                        </span>
                         <span className="font-semibold">
                           {selected.problem.answersVisible
-                            ? 'visible'
-                            : 'hidden'}
-                        </span>{' '}
-                        to members for this problem.
+                            ? 'Visible to members'
+                            : 'Hidden from members'}
+                        </span>
+                        <span className="text-muted">
+                          for {selected.problem.title}
+                        </span>
                       </p>
                       <button
-                        className={buttonClass}
+                        className={
+                          selected.problem.answersVisible
+                            ? 'min-h-10 rounded-md px-3 py-2 text-sm text-muted hover:bg-hover hover:text-ink disabled:text-muted'
+                            : 'min-h-10 rounded-md border border-accent bg-accent px-3 py-2 text-sm font-semibold text-accent-contrast hover:bg-accent-hover disabled:cursor-default disabled:border-border-strong disabled:bg-raised disabled:text-muted'
+                        }
                         disabled={blocked}
                         onClick={toggleAnswers}
                       >
                         {selected.problem.answersVisible
-                          ? 'Hide Answers'
-                          : 'Show Answers'}
+                          ? 'Hide answers'
+                          : 'Show answers'}
                       </button>
                     </div>
                   ) : sessionStatus === 'ended' ? (
@@ -409,6 +452,7 @@ export default function OfficerProblems({
                     record={selected}
                     disabled={operation !== null}
                     onBusyChange={setEditing}
+                    onSaveStateChange={setProblemSaveState}
                     onSaved={(content) =>
                       setRecords((records) =>
                         records.map((record) =>
@@ -428,18 +472,9 @@ export default function OfficerProblems({
                     problemId={selected.id}
                     disabled={operation !== null}
                     onPendingChange={setSolutionPending}
+                    onSaveStateChange={setSolutionSaveState}
                   />
                 </>
-              )}
-              {editing && (
-                <p className="text-sm text-muted">
-                  Save problem changes before using problem actions.
-                </p>
-              )}
-              {solutionPending && (
-                <p className="text-sm text-muted">
-                  Finish saving solution changes before changing problems.
-                </p>
               )}
             </>
           )}

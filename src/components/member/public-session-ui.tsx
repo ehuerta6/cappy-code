@@ -255,22 +255,21 @@ function SessionContent({
       >
         ← Sessions
       </Link>
-      <div className="mb-5 flex flex-wrap items-start justify-between gap-3 sm:gap-4">
-        <div>
-          <h1 className="m-0 text-[25px] font-semibold leading-8 tracking-tight sm:text-[28px] sm:leading-9">
-            {state.session.title}
-          </h1>
-          <p className="mt-1 flex flex-wrap items-center gap-2 text-sm leading-5 text-muted">
-            <time dateTime={state.session.date}>
-              {formatDate(state.session.date)}
-            </time>
-          </p>
-        </div>
+      <div className="mb-6 flex flex-wrap items-center gap-x-3 gap-y-1">
+        <h1 className="m-0 text-[25px] font-semibold leading-8 tracking-tight sm:text-[28px] sm:leading-9">
+          {state.session.title}
+        </h1>
         <span
           className={`inline-flex min-h-7 shrink-0 items-center rounded border px-2.5 py-0.5 text-sm font-semibold capitalize leading-5 ${state.session.status === 'live' ? 'border-success/50 bg-success-surface text-success' : 'border-border-soft text-muted'}`}
         >
           {state.session.status === 'live' ? 'Live' : 'Ended'}
         </span>
+        <time
+          className="text-sm leading-5 text-muted"
+          dateTime={state.session.date}
+        >
+          {formatDate(state.session.date)}
+        </time>
       </div>
 
       {state.problems.status === 'loading' ? (
@@ -293,7 +292,7 @@ function SessionContent({
         <p className="text-muted">No problems are available in this session.</p>
       ) : (
         <>
-          <div className="mt-1 border-b border-border-soft">
+          <div className="mt-1 border-b border-border-soft pb-1">
             <ProblemTabs
               problems={problems}
               selectedId={effectiveSelectedProblemId ?? ''}
@@ -413,12 +412,12 @@ function ProblemContent({
         >
           Examples
         </h3>
-        <div className="grid overflow-hidden rounded-md border border-border-soft bg-surface sm:grid-cols-2">
+        <div className="grid sm:grid-cols-2">
           <section className="min-w-0 p-3">
             <h4 className="mb-2 mt-0 text-sm font-semibold leading-5 text-muted">
               Input
             </h4>
-            <pre className="m-0 min-h-6 overflow-auto whitespace-pre rounded bg-raised px-2.5 py-2 font-mono text-[15px] leading-[23px]">
+            <pre className="m-0 min-h-6 overflow-auto whitespace-pre-wrap rounded-md bg-raised px-3 py-2 font-mono text-[15px] leading-[23px]">
               {problem.exampleInput || 'No example input'}
             </pre>
           </section>
@@ -426,7 +425,7 @@ function ProblemContent({
             <h4 className="mb-2 mt-0 text-sm font-semibold leading-5 text-muted">
               Output
             </h4>
-            <pre className="m-0 min-h-6 overflow-auto whitespace-pre rounded bg-raised px-2.5 py-2 font-mono text-[15px] leading-[23px]">
+            <pre className="m-0 min-h-6 overflow-auto whitespace-pre-wrap rounded-md bg-raised px-3 py-2 font-mono text-[15px] leading-[23px]">
               {problem.exampleOutput || 'No example output'}
             </pre>
           </section>
