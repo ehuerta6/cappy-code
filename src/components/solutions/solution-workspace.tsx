@@ -3,6 +3,7 @@
 import { languages } from '@/lib/domain';
 import type { ProblemSolutions } from '@/lib/firebase/solutions';
 import SolutionPanel from './solution-panel';
+import { getSharedEditorHeight } from './solution-sizing';
 
 // Read-only rendering receives already-authorized data; it never fetches solutions.
 export default function SolutionWorkspace({
@@ -12,6 +13,7 @@ export default function SolutionWorkspace({
   solutions: ProblemSolutions;
   modelPath: string;
 }) {
+  const editorHeight = getSharedEditorHeight(solutions);
   return (
     <div className="animate-[reveal_200ms_ease-out_both]">
       <div
@@ -27,6 +29,7 @@ export default function SolutionWorkspace({
               language={language}
               solution={solutions[language]}
               modelPath={`${modelPath}/${language}`}
+              editorHeight={editorHeight}
             />
           ))}
         </div>

@@ -70,6 +70,7 @@ const second = {
   },
 };
 const onBusyChange = vi.fn();
+const onSaveStateChange = vi.fn();
 const onProblemCountStateChange = vi.fn();
 function start(sessionStatus: 'draft' | 'live' | 'ended' = 'draft') {
   render(
@@ -77,6 +78,7 @@ function start(sessionStatus: 'draft' | 'live' | 'ended' = 'draft') {
       sessionId="session"
       sessionStatus={sessionStatus}
       onBusyChange={onBusyChange}
+      onSaveStateChange={onSaveStateChange}
       onProblemCountStateChange={onProblemCountStateChange}
     />,
   );
@@ -120,7 +122,7 @@ async function loaded() {
   await screen.findByRole('tab', { name: 'Two Sum' });
 }
 function actions() {
-  fireEvent.click(screen.getByRole('button', { name: 'Problem actions' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Manage Two Sum' }));
 }
 describe('Officer Problem workspace', () => {
   it('distinguishes loading, failed reads with retry and empty state', async () => {
@@ -167,12 +169,12 @@ describe('Officer Problem workspace', () => {
         confirm = resolve;
       }),
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Show Answers' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show answers' }));
     expect(screen.getByText('Showing answers…')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Show Answers' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Show answers' })).toBeTruthy();
     confirm();
     expect(
-      await screen.findByRole('button', { name: 'Hide Answers' }),
+      await screen.findByRole('button', { name: 'Hide answers' }),
     ).toBeTruthy();
     expect(api.setAnswersVisible).toHaveBeenCalledExactlyOnceWith(
       'session',
@@ -181,7 +183,7 @@ describe('Officer Problem workspace', () => {
     );
     expect(api.updateSolution).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('tab', { name: 'Anagram' }));
-    expect(screen.getByRole('button', { name: 'Show Answers' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Show answers' })).toBeTruthy();
     expect(api.setAnswersVisible).toHaveBeenCalledTimes(1);
   });
   it('retains confirmed reveal state when a hide write fails', async () => {
@@ -192,12 +194,12 @@ describe('Officer Problem workspace', () => {
     api.setAnswersVisible.mockRejectedValueOnce(new Error('offline'));
     start('live');
     await screen.findByRole('tab', { name: 'Two Sum' });
-    fireEvent.click(screen.getByRole('button', { name: 'Hide Answers' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Hide answers' }));
     expect((await screen.findByRole('alert')).textContent).toContain(
       'Hiding answers failed',
     );
-    expect(screen.getByRole('button', { name: 'Hide Answers' })).toBeTruthy();
-    expect(screen.queryByRole('button', { name: 'Show Answers' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Hide answers' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Show answers' })).toBeNull();
   });
   it('shows ended solutions without answer visibility controls', async () => {
     start('ended');
@@ -205,8 +207,8 @@ describe('Officer Problem workspace', () => {
     expect(
       screen.getByText('Solutions are public in ended sessions.'),
     ).toBeTruthy();
-    expect(screen.queryByRole('button', { name: 'Show Answers' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Hide Answers' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Show answers' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Hide answers' })).toBeNull();
   });
   it('creates and selects confirmed metadata while creation is visibly pending', async () => {
     let resolve!: (record: typeof first) => void;
@@ -264,7 +266,8 @@ describe('Officer Problem workspace', () => {
     expect(description.value).toBe('New statement');
     expect(onBusyChange).toHaveBeenLastCalledWith(true);
     fireEvent.click(screen.getByRole('button', { name: 'Retry problem save' }));
-    await screen.findByText('Problem saved ✓');
+    await waitFor(() => expect(onBusyChange).toHaveBeenLastCalledWith(false));
+    expect(onSaveStateChange).toHaveBeenLastCalledWith(null);
     expect(api.updateProblem).toHaveBeenLastCalledWith('session', 'first', {
       title: 'Two Sum',
       description: 'New statement',
@@ -292,11 +295,10 @@ describe('Officer Problem workspace', () => {
           }),
         ),
       );
-      await screen.findByText('Problem saved ✓');
     }
     expect(screen.getByRole('tab', { name: 'Renamed' })).toBeTruthy();
   });
-  it('does not display saved before the backend confirms and blocks navigation', async () => {
+  it('keeps aggregate save state pending until the backend confirms and blocks navigation', async () => {
     let resolve!: () => void;
     api.updateProblem.mockReturnValue(
       new Promise<void>((done) => {
@@ -308,16 +310,19 @@ describe('Officer Problem workspace', () => {
       target: { value: 'New title' },
     });
     fireEvent.blur(screen.getByLabelText('Problem title'));
-    expect(screen.getByText('Saving problem…')).toBeTruthy();
+    expect(onSaveStateChange).toHaveBeenLastCalledWith({ pending: true });
+    expect(screen.queryByText('Problem saved ✓')).toBeNull();
     expect(
       (
         screen.getByRole('button', {
-          name: 'Problem actions',
+          name: 'Manage Two Sum',
         }) as HTMLButtonElement
       ).disabled,
     ).toBe(true);
     resolve();
-    expect(await screen.findByText('Problem saved ✓')).toBeTruthy();
+    await waitFor(() =>
+      expect(onSaveStateChange).toHaveBeenLastCalledWith(null),
+    );
   });
   it('clears a failed-save state when edits return to persisted content', async () => {
     api.updateProblem.mockRejectedValue(new Error('offline'));
@@ -328,7 +333,7 @@ describe('Officer Problem workspace', () => {
     await screen.findByRole('alert');
     fireEvent.change(title, { target: { value: 'Two Sum' } });
     expect(screen.queryByRole('alert')).toBeNull();
-    expect(screen.getByText('Problem saved ✓')).toBeTruthy();
+    expect(onSaveStateChange).toHaveBeenLastCalledWith(null);
   });
   it('uses compact actions to rename, reorder after confirmation and recover from reorder failure', async () => {
     await loaded();
@@ -376,7 +381,7 @@ describe('Officer Problem workspace', () => {
     fireEvent.keyDown(confirmation, { key: 'Escape' });
     expect(screen.queryByRole('group')).toBeNull();
     expect(document.activeElement).toBe(
-      screen.getByRole('button', { name: 'Problem actions' }),
+      screen.getByRole('button', { name: 'Manage Two Sum' }),
     );
     actions();
     fireEvent.click(screen.getByRole('button', { name: 'Delete problem' }));

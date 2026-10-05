@@ -429,7 +429,7 @@ describe('Officer Sessions surface', () => {
       ).disabled,
     ).toBe(true);
     fireEvent.click(screen.getByRole('button', { name: 'Retry problem save' }));
-    await screen.findByText('Problem saved ✓');
+    await screen.findByText('Saved ✓');
     fireEvent.click(screen.getByRole('button', { name: 'Back to session' }));
     expect(screen.getByLabelText('Session title')).toBeTruthy();
     expect(api.updateSession).not.toHaveBeenCalled();

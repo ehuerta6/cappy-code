@@ -4,6 +4,7 @@ import Editor, { type BeforeMount } from '@monaco-editor/react';
 import { useId } from 'react';
 import type { Language, Solution } from '@/lib/domain';
 import { useColorTheme } from '@/components/theme-provider';
+import { getOutputHeight } from './solution-sizing';
 
 export const languageNames: Record<Language, string> = {
   python: 'Python',
@@ -37,6 +38,7 @@ type Props = {
   language: Language;
   solution: Solution;
   modelPath: string;
+  editorHeight: number;
 } & (
   | { mode: 'member'; onChange?: never; disabled?: never }
   | {
@@ -47,25 +49,29 @@ type Props = {
 );
 
 export default function SolutionPanel(props: Props) {
-  const { language, solution, modelPath, mode } = props;
+  const { language, solution, modelPath, mode, editorHeight } = props;
   const id = useId();
   const theme = useColorTheme()?.theme;
   const dark = theme === 'dark';
   const name = languageNames[language];
+  const outputHeight = getOutputHeight(solution.output);
   return (
     <section
       className="flex min-w-0 flex-col overflow-hidden rounded-lg border border-border-soft bg-surface text-ink"
       aria-labelledby={`${id}-heading`}
     >
       <h3
-        className="m-0 flex min-h-10 items-center px-4 py-2 text-[15px] font-semibold leading-[22px]"
+        className="m-0 flex min-h-10 items-center px-3 py-2 text-[15px] font-semibold leading-[22px]"
         id={`${id}-heading`}
       >
         {name}
       </h3>
-      <div className="h-[360px] bg-monaco focus-within:outline-2 focus-within:outline-offset-[-2px] focus-within:outline-accent">
+      <div
+        className="bg-monaco transition-[height] duration-150 focus-within:outline-2 focus-within:outline-offset-[-2px] focus-within:outline-accent"
+        style={{ height: editorHeight }}
+      >
         <Editor
-          height="360px"
+          height={`${editorHeight}px`}
           language={language}
           path={modelPath}
           value={solution.code}
@@ -93,7 +99,7 @@ export default function SolutionPanel(props: Props) {
           }}
         />
       </div>
-      <div className="flex flex-1 flex-col px-4 pb-4 pt-3">
+      <div className="flex flex-1 flex-col px-3 pb-3 pt-3">
         <label
           className="mb-2 block text-[15px] font-semibold leading-[22px] text-ink"
           id={`${id}-output`}
@@ -103,10 +109,11 @@ export default function SolutionPanel(props: Props) {
         </label>
         {props.mode === 'officer' ? (
           <textarea
-            className="max-h-[230px] min-h-[92px] w-full overflow-auto whitespace-pre rounded border border-border-soft bg-raised px-2.5 py-2 font-mono text-[15px] leading-[23px] text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-default disabled:text-muted"
+            className="w-full resize-y overflow-auto whitespace-pre rounded bg-raised px-2.5 py-2 font-mono text-[15px] leading-[23px] text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-default disabled:text-muted"
             id={`${id}-field`}
             aria-label={`${name} prepared output`}
             value={solution.output}
+            style={{ height: outputHeight, maxHeight: 230 }}
             disabled={props.disabled}
             onChange={(event) =>
               props.onChange({ ...solution, output: event.target.value })
@@ -116,8 +123,9 @@ export default function SolutionPanel(props: Props) {
           />
         ) : solution.output ? (
           <pre
-            className="m-0 max-h-[230px] min-h-[92px] w-full overflow-auto whitespace-pre rounded border border-border-soft bg-raised px-2.5 py-2 font-mono text-[15px] leading-[23px] text-ink"
+            className="m-0 w-full overflow-auto whitespace-pre rounded bg-raised px-2.5 py-2 font-mono text-[15px] leading-[23px] text-ink"
             aria-labelledby={`${id}-output`}
+            style={{ height: outputHeight, maxHeight: 230 }}
           >
             {solution.output}
           </pre>

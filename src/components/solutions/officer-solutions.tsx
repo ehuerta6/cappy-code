@@ -8,6 +8,11 @@ import {
   type ProblemSolutions,
 } from '@/lib/firebase/solutions';
 import SolutionPanel, { languageNames } from './solution-panel';
+import { getSharedEditorHeight } from './solution-sizing';
+import type {
+  OfficerSaveState,
+  SaveStateReporter,
+} from '@/components/officer-save-state';
 
 const buttonClass =
   'min-h-10 rounded border border-border-strong bg-surface px-3 py-2 text-ink hover:bg-hover disabled:cursor-default disabled:bg-raised disabled:text-muted';
@@ -16,6 +21,7 @@ type Props = {
   sessionId: string;
   problemId: string;
   onPendingChange?: (pending: boolean) => void;
+  onSaveStateChange?: SaveStateReporter;
   disabled?: boolean;
 };
 
@@ -33,32 +39,80 @@ function ProblemSolutionsEditor({
   sessionId,
   problemId,
   onPendingChange,
+  onSaveStateChange,
   disabled,
 }: Props) {
   const [solutions, setSolutions] = useState<ProblemSolutions | null>(null);
+  const [currentCode, setCurrentCode] = useState<Record<
+    Language,
+    string
+  > | null>(null);
   const [error, setError] = useState(false);
   const [attempt, setAttempt] = useState(0);
-  const [pending, setPending] = useState<Record<Language, boolean>>({
-    python: false,
-    java: false,
-    cpp: false,
+  const [saveStates, setSaveStates] = useState<
+    Record<Language, OfficerSaveState | null>
+  >({
+    python: null,
+    java: null,
+    cpp: null,
   });
-  const reportPending = useCallback((language: Language, value: boolean) => {
-    setPending((previous) =>
-      previous[language] === value
-        ? previous
-        : { ...previous, [language]: value },
-    );
-  }, []);
-  const hasPendingChanges = languages.some((language) => pending[language]);
+  const reportSaveState = useCallback(
+    (language: Language, state: OfficerSaveState | null) => {
+      setSaveStates((previous) =>
+        previous[language] === state
+          ? previous
+          : { ...previous, [language]: state },
+      );
+    },
+    [],
+  );
+  const hasPendingChanges = languages.some(
+    (language) => saveStates[language]?.pending,
+  );
+  const editorHeight = solutions
+    ? getSharedEditorHeight({
+        ...solutions,
+        python: {
+          ...solutions.python,
+          code: currentCode?.python ?? solutions.python.code,
+        },
+        java: {
+          ...solutions.java,
+          code: currentCode?.java ?? solutions.java.code,
+        },
+        cpp: {
+          ...solutions.cpp,
+          code: currentCode?.cpp ?? solutions.cpp.code,
+        },
+      })
+    : 0;
   useEffect(() => {
     onPendingChange?.(hasPendingChanges);
   }, [hasPendingChanges, onPendingChange]);
   useEffect(() => {
+    const failed = languages.find((language) => saveStates[language]?.error);
+    if (failed) {
+      onSaveStateChange?.({
+        pending: false,
+        error: saveStates[failed]?.error,
+        retry: saveStates[failed]?.retry,
+      });
+      return;
+    }
+    onSaveStateChange?.(hasPendingChanges ? { pending: true } : null);
+  }, [hasPendingChanges, onSaveStateChange, saveStates]);
+  useEffect(() => {
     let active = true;
     getSolutionsForProblem(sessionId, problemId)
       .then((loaded) => {
-        if (active) setSolutions(loaded);
+        if (active) {
+          setSolutions(loaded);
+          setCurrentCode({
+            python: loaded.python.code,
+            java: loaded.java.code,
+            cpp: loaded.cpp.code,
+          });
+        }
       })
       .catch(() => {
         if (active) setError(true);
@@ -88,16 +142,14 @@ function ProblemSolutionsEditor({
       ) : (
         <>
           <p className="text-sm leading-5 text-muted">
-            Code and prepared output save after a short pause. Finish saving
-            before switching Problems. In Monaco, press Ctrl+M to toggle Tab key
-            navigation.
+            Python, Java, and C++ solutions for this Problem.
           </p>
           <div
             className="overflow-x-auto p-1 -m-1 [scrollbar-width:thin] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             tabIndex={0}
             aria-label="Three-language solution comparison"
           >
-            <div className="grid grid-cols-[repeat(3,minmax(min(360px,calc(100vw-40px)),1fr))] gap-4">
+            <div className="grid grid-cols-[repeat(3,minmax(min(360px,calc(100vw-40px)),1fr))] items-stretch gap-4">
               {languages.map((language) => (
                 <EditableSolution
                   key={language}
@@ -105,8 +157,21 @@ function ProblemSolutionsEditor({
                   problemId={problemId}
                   language={language}
                   initial={solutions[language]}
+                  editorHeight={editorHeight}
                   disabled={disabled}
-                  onPendingChange={reportPending}
+                  onSaveStateChange={reportSaveState}
+                  onCodeChange={(code) =>
+                    setCurrentCode((previous) =>
+                      previous?.[language] === code
+                        ? previous
+                        : {
+                            python: previous?.python ?? solutions.python.code,
+                            java: previous?.java ?? solutions.java.code,
+                            cpp: previous?.cpp ?? solutions.cpp.code,
+                            [language]: code,
+                          },
+                    )
+                  }
                 />
               ))}
             </div>
@@ -122,15 +187,22 @@ function EditableSolution({
   problemId,
   language,
   initial,
+  editorHeight,
   disabled,
-  onPendingChange,
+  onSaveStateChange,
+  onCodeChange,
 }: {
   sessionId: string;
   problemId: string;
   language: Language;
   initial: Solution;
+  editorHeight: number;
   disabled?: boolean;
-  onPendingChange: (language: Language, pending: boolean) => void;
+  onSaveStateChange: (
+    language: Language,
+    state: OfficerSaveState | null,
+  ) => void;
+  onCodeChange: (code: string) => void;
 }) {
   const [draft, setDraft] = useState(initial);
   const [saved, setSaved] = useState(initial);
@@ -138,9 +210,6 @@ function EditableSolution({
   const [error, setError] = useState(false);
   const busy = useRef(false);
   const dirty = draft.code !== saved.code || draft.output !== saved.output;
-  useEffect(() => {
-    onPendingChange(language, dirty || saving);
-  }, [language, dirty, saving, onPendingChange]);
   const save = useCallback(async () => {
     if (!dirty || busy.current) return;
     busy.current = true;
@@ -157,6 +226,20 @@ function EditableSolution({
     }
   }, [dirty, sessionId, problemId, language, draft]);
   useEffect(() => {
+    onSaveStateChange(
+      language,
+      error && dirty
+        ? {
+            pending: false,
+            error: `${languageNames[language]} Solution or prepared Output could not be saved.`,
+            retry: () => void save(),
+          }
+        : dirty || saving
+          ? { pending: true }
+          : null,
+    );
+  }, [language, dirty, saving, error, onSaveStateChange, save]);
+  useEffect(() => {
     if (!dirty || saving || error) return;
     const timer = window.setTimeout(() => void save(), 700);
     return () => window.clearTimeout(timer);
@@ -167,27 +250,16 @@ function EditableSolution({
         mode="officer"
         language={language}
         solution={draft}
+        editorHeight={editorHeight}
         modelPath={`officer/${sessionId}/${problemId}/${language}`}
         disabled={disabled}
         onChange={(next) => {
           setDraft(next);
+          if (next.code !== draft.code) onCodeChange(next.code);
           if (next.code === saved.code && next.output === saved.output)
             setError(false);
         }}
       />
-      <p
-        className="mt-2 text-sm leading-5 text-muted"
-        role="status"
-        aria-label={`${languageNames[language]} save status`}
-      >
-        {saving
-          ? 'Saving…'
-          : error && dirty
-            ? 'Save failed — edits retained'
-            : dirty
-              ? 'Unsaved changes'
-              : 'Saved ✓'}
-      </p>
       {error && dirty && (
         <div role="alert">
           <p>

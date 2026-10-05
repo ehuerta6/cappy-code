@@ -7,18 +7,21 @@ import {
   type ProblemContent,
   type ProblemRecord,
 } from '@/lib/firebase/problems';
+import type { SaveStateReporter } from '@/components/officer-save-state';
 
 export default function ProblemEditor({
   sessionId,
   record,
   onSaved,
   onBusyChange,
+  onSaveStateChange,
   disabled,
 }: {
   sessionId: string;
   record: ProblemRecord;
   onSaved: (content: ProblemContent) => void;
   onBusyChange: (busy: boolean) => void;
+  onSaveStateChange: SaveStateReporter;
   disabled: boolean;
 }) {
   const [content, setContent] = useState<ProblemContent>(() =>
@@ -38,13 +41,13 @@ export default function ProblemEditor({
     const next = { ...content, [field]: value };
     setContent(next);
     setError(null);
-    onBusyChange(
-      Object.keys(next).some(
-        (key) =>
-          next[key as keyof ProblemContent] !==
-          saved[key as keyof ProblemContent],
-      ),
+    const hasUnsavedFields = Object.keys(next).some(
+      (key) =>
+        next[key as keyof ProblemContent] !==
+        saved[key as keyof ProblemContent],
     );
+    onSaveStateChange(hasUnsavedFields ? { pending: true } : null);
+    onBusyChange(hasUnsavedFields);
   }
   async function save() {
     if (!dirty || busy.current) return;
@@ -55,22 +58,34 @@ export default function ProblemEditor({
       setError(
         error instanceof Error ? error.message : 'Check problem content.',
       );
+      onSaveStateChange({
+        pending: false,
+        error: 'Problem metadata needs attention.',
+        retry: () => void save(),
+      });
       return;
     }
     busy.current = true;
     setSaving(true);
     setError(null);
     onBusyChange(true);
+    onSaveStateChange({ pending: true });
     try {
       await updateProblem(sessionId, record.id, fields);
       setContent(fields);
       setSaved(fields);
       onSaved(fields);
       onBusyChange(false);
+      onSaveStateChange(null);
     } catch {
       setError(
         'Save failed. Your edits are still here. Check your connection and retry.',
       );
+      onSaveStateChange({
+        pending: false,
+        error: 'Problem metadata could not be saved.',
+        retry: () => void save(),
+      });
     } finally {
       busy.current = false;
       setSaving(false);
@@ -82,15 +97,6 @@ export default function ProblemEditor({
       id={`problem-panel-${record.id}`}
       aria-labelledby={`problem-tab-${record.id}`}
     >
-      <p className="text-sm text-muted" role="status">
-        {saving
-          ? 'Saving problem…'
-          : error
-            ? 'Problem save failed'
-            : dirty
-              ? 'Unsaved problem changes — leave a field to save'
-              : 'Problem saved ✓'}
-      </p>
       {error && (
         <div role="alert">
           <p>{error}</p>
@@ -158,10 +164,6 @@ export default function ProblemEditor({
           </label>
         </div>
       </section>
-      <p className="text-sm text-muted">
-        Problem fields save when you leave a field. Finish saving before
-        switching problems or returning to the session.
-      </p>
     </div>
   );
 }
