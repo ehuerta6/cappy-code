@@ -54,6 +54,16 @@ export default function SessionEditor({
   const busy = useRef(false);
   const dirty = title !== saved.title || date !== saved.date;
 
+  function updateTitle(value: string) {
+    setTitle(value);
+    if (value === saved.title && date === saved.date) setSaveError(null);
+  }
+
+  function updateDate(value: string) {
+    setDate(value);
+    if (title === saved.title && value === saved.date) setSaveError(null);
+  }
+
   function lifecycleActions() {
     if (status === 'draft') {
       const countKnown = problemCount.status === 'ready';
@@ -327,7 +337,7 @@ export default function SessionEditor({
         <input
           className="min-h-11 w-full rounded border border-border-strong bg-surface px-3 py-2 text-ink"
           value={title}
-          onChange={(event) => setTitle(event.target.value)}
+          onChange={(event) => updateTitle(event.target.value)}
           disabled={saving || deleting || transitionPending}
           required
         />
@@ -338,7 +348,7 @@ export default function SessionEditor({
           className="min-h-11 w-full rounded border border-border-strong bg-surface px-3 py-2 text-ink"
           type="date"
           value={date}
-          onChange={(event) => setDate(event.target.value)}
+          onChange={(event) => updateDate(event.target.value)}
           disabled={saving || deleting || transitionPending}
           required
         />

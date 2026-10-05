@@ -387,6 +387,29 @@ describe('Officer Sessions surface', () => {
     expect(api.updateSession).toHaveBeenCalledTimes(2);
   });
 
+  it('clears a failed save when metadata returns to confirmed content', async () => {
+    api.updateSession.mockRejectedValueOnce(new Error('offline'));
+    await openEditor();
+    const title = screen.getByLabelText('Session title') as HTMLInputElement;
+    fireEvent.change(title, { target: { value: 'Unsaved Hashing' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    await screen.findByRole('alert');
+    expect(api.updateSession).toHaveBeenCalledTimes(1);
+
+    fireEvent.change(title, { target: { value: 'Arrays' } });
+
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.getByRole('status').textContent).toBe('Saved ✓');
+    expect(
+      (
+        screen.getByRole('button', {
+          name: 'Save changes',
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(true);
+    expect(api.updateSession).toHaveBeenCalledTimes(1);
+  });
+
   it('blocks invalid metadata without writing', async () => {
     await openEditor();
     fireEvent.change(screen.getByLabelText('Session title'), {
