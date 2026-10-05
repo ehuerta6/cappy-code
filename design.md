@@ -402,30 +402,29 @@ Honor reduced motion and text zoom in both themes.
 These names describe design responsibilities, not mandatory one-to-one React
 component boundaries. Do not implement them in this issue.
 
-| Vocabulary           | Responsibility                                           |
-| -------------------- | -------------------------------------------------------- |
-| `AppHeader`          | Compact brand, mode/access context, theme control        |
-| `SessionHeader`      | Session title, date, and context                         |
-| `SessionStatus`      | Labeled draft/live/ended state                           |
-| `ProblemTabs`        | Ordered Problem navigation and officer management entry  |
-| `ProblemTab`         | Problem label, selected state, contextual actions        |
-| `ProblemTabs`        | Independent local Problem selection in each view         |
-| `ProblemContent`     | Integrated Problem document hierarchy                    |
-| `ProblemDescription` | Readable statement or officer editing field              |
-| `ProblemExample`     | Labeled example Input/Output pair                        |
-| `CodeBlock`          | Compact whitespace-preserving static example surface     |
-| `AnswerGate`         | Unified hidden-answer message without Solution content   |
-| `SolutionGrid`       | Equal comparison columns or responsive horizontal rail   |
-| `SolutionPanel`      | Integrated Language header, source, and output           |
-| `LanguageHeader`     | Language name and optional restrained identity           |
-| `EditorShell`        | Monaco sizing, theme, loading, focus, and editability    |
-| `PreparedOutput`     | Labeled static output or officer output field            |
-| `OfficerToolbar`     | Visible officer context, autosave, presentation controls |
-| `SessionActions`     | Lifecycle and selected-Problem reveal actions            |
-| `SaveStatus`         | Saving / confirmed saved / actionable failure            |
-| `SessionList`        | Grouped Session library, including loading/error states  |
-| `SessionRow`         | Whole-row navigation with date, title, count, status     |
-| `EmptySessionState`  | Quiet no-Problem state and officer Add Problem action    |
+| Vocabulary           | Responsibility                                                               |
+| -------------------- | ---------------------------------------------------------------------------- |
+| `AppHeader`          | Compact brand, mode/access context, theme control                            |
+| `SessionHeader`      | Session title, date, and context                                             |
+| `SessionStatus`      | Labeled draft/live/ended state                                               |
+| `ProblemTabs`        | Ordered, local Problem navigation; officer management entry where applicable |
+| `ProblemTab`         | Problem label, selected state, contextual actions                            |
+| `ProblemContent`     | Integrated Problem document hierarchy                                        |
+| `ProblemDescription` | Readable statement or officer editing field                                  |
+| `ProblemExample`     | Labeled example Input/Output pair                                            |
+| `CodeBlock`          | Compact whitespace-preserving static example surface                         |
+| `AnswerGate`         | Unified hidden-answer message without Solution content                       |
+| `SolutionGrid`       | Equal comparison columns or responsive horizontal rail                       |
+| `SolutionPanel`      | Integrated Language header, source, and output                               |
+| `LanguageHeader`     | Language name and optional restrained identity                               |
+| `EditorShell`        | Monaco sizing, theme, loading, focus, and editability                        |
+| `PreparedOutput`     | Labeled static output or officer output field                                |
+| `OfficerToolbar`     | Visible officer context, autosave, presentation controls                     |
+| `SessionActions`     | Lifecycle and selected-Problem reveal actions                                |
+| `SaveStatus`         | Saving / confirmed saved / actionable failure                                |
+| `SessionList`        | Grouped Session library, including loading/error states                      |
+| `SessionRow`         | Whole-row navigation with date, title, count, status                         |
+| `EmptySessionState`  | Quiet no-Problem state and officer Add Problem action                        |
 
 ## 17. UX invariants / product rules
 
