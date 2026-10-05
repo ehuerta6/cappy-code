@@ -193,7 +193,7 @@ describe('solution workspace', () => {
         .disabled,
     ).toBe(true);
   });
-  it('clears a failed save when the officer restores confirmed content', async () => {
+  it('keeps a failed dirty save blocking until the officer restores confirmed content', async () => {
     const pending = vi.fn();
     await openOfficer(pending);
     vi.useFakeTimers();
@@ -202,6 +202,7 @@ describe('solution workspace', () => {
       target: { value: 'failed change' },
     });
     await autosave();
+    expect(pending).toHaveBeenLastCalledWith(true);
     fireEvent.change(screen.getByLabelText('Python Solution, editable'), {
       target: { value: 'python source' },
     });

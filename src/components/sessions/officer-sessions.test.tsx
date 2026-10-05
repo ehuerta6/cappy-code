@@ -478,6 +478,99 @@ describe('Officer Sessions surface', () => {
     expect(screen.getByLabelText('Session title')).toBeTruthy();
   });
 
+  it('keeps navigation and destructive actions blocked after a dirty Solution save fails until retry succeeds', async () => {
+    api.listProblems.mockResolvedValue([
+      {
+        id: 'problem',
+        problem: {
+          title: 'Two Sum',
+          description: 'Find a pair',
+          exampleInput: '1 2',
+          exampleOutput: '3',
+          order: 0,
+          answersVisible: false,
+        },
+      },
+      {
+        id: 'second-problem',
+        problem: {
+          title: 'Anagram',
+          description: 'Compare letters',
+          exampleInput: 'listen',
+          exampleOutput: 'true',
+          order: 1,
+          answersVisible: false,
+        },
+      },
+    ]);
+    api.updateSolution.mockRejectedValueOnce(new Error('offline'));
+    render(<OfficerSessions />);
+    fireEvent.click(await screen.findByRole('button', { name: /Arrays/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Manage problems' }));
+    await screen.findByLabelText('Python Solution, editable');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Manage Two Sum' }));
+    const deleteProblem = screen.getByRole('button', {
+      name: 'Delete problem',
+    });
+    expect((deleteProblem as HTMLButtonElement).disabled).toBe(false);
+
+    fireEvent.change(screen.getByLabelText('C++ prepared output'), {
+      target: { value: 'changed output' },
+    });
+    await waitFor(() =>
+      expect(api.updateSolution).toHaveBeenCalledWith(
+        'session-id',
+        'problem',
+        'cpp',
+        { code: '', output: 'changed output' },
+      ),
+    );
+    await screen.findByRole('alert');
+
+    expect(
+      (
+        screen.getByRole('button', {
+          name: 'Back to session',
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(true);
+    expect(
+      (screen.getByRole('button', { name: 'Go Live' }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
+    expect(
+      (screen.getByRole('tab', { name: 'Anagram' }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
+    expect((deleteProblem as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.queryByRole('button', { name: 'Delete session' })).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Retry C++ save' }));
+    await waitFor(() => expect(api.updateSolution).toHaveBeenCalledTimes(2));
+    await waitFor(() =>
+      expect(
+        (
+          screen.getByRole('button', {
+            name: 'Back to session',
+          }) as HTMLButtonElement
+        ).disabled,
+      ).toBe(false),
+    );
+    expect(
+      (screen.getByRole('button', { name: 'Go Live' }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(false);
+    expect(
+      (screen.getByRole('tab', { name: 'Anagram' }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(false);
+    expect((deleteProblem as HTMLButtonElement).disabled).toBe(false);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Back to session' }));
+    expect(screen.getByRole('button', { name: 'Delete session' })).toBeTruthy();
+  });
+
   it('requires confirmation, retains the record on delete failure and allows retry', async () => {
     const confirm = vi
       .spyOn(window, 'confirm')

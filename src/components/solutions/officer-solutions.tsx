@@ -230,7 +230,7 @@ function EditableSolution({
       language,
       error && dirty
         ? {
-            pending: false,
+            pending: true,
             error: `${languageNames[language]} Solution or prepared Output could not be saved.`,
             retry: () => void save(),
           }
