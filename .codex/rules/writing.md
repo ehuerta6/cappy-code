@@ -95,4 +95,4 @@ Prefer:
 
 Avoid vague claims such as "robust", "seamless", "powerful", or "scalable" unless the text explains what makes the claim true.
 
-Use `humanizer` or `unslop` when a writing task needs a dedicated editing pass.
+Use `unslop` when a writing task needs a dedicated technical editing pass.

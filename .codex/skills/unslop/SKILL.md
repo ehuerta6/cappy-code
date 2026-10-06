@@ -22,8 +22,6 @@ Use this for:
 - project descriptions;
 - engineering notes.
 
-Use `humanizer` when the main goal is matching a person's voice.
-
 Use `unslop` when the main goal is improving information density and technical writing quality.
 
 ## Modes
