@@ -8,25 +8,66 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 <!-- END:nextjs-agent-rules -->
 
-# CappyCode guidance
+# CappyCode
 
-- Treat GitHub Issues as the scope for implementation. Keep each branch and PR focused; do not implement later issues opportunistically.
-- Read `README.md` and relevant files in `docs/` for project source of truth. Follow `docs/GIT_CONVENTIONS.md` for branches, commits, and PRs.
-- Never develop directly on `main`. Start from the latest `main` and use a short-lived branch.
-- Run the repository checks before opening a PR: `npm run lint`, `npm run typecheck`, `npm test`, `npm run format:check`, and `npm run build`.
-- CappyCode is a live solution showcase platform for CIC Intro sessions. AI and LLMs are outside the product runtime and architecture.
-- CIC Intro officers authenticate to Officer Mode and manage sessions; anonymous members use a public, read-only view.
-- Use Firebase Authentication for Officer Mode only, with one shared CIC officer account for the proof of concept. Firestore is canonical persistence.
-- Sessions have `draft`, `live`, and `ended` states, contain multiple ordered problems, and remain available in session history.
-- Keep public problem descriptions and examples separate from protected solution documents. Officers manually prepare Python, Java, and C++ source plus static output for each language.
-- Monaco editors are editable in Officer Mode and read-only in Member Mode. Show all three languages together; there is no source language or translation flow.
-- Draft sessions and content are officer-only. Members can read live and ended session metadata. Firestore Security Rules gate live solutions on `answersVisible`; ended sessions expose all fixed-language solutions regardless of that field.
-- Members choose problems independently; live `answersVisible` updates in realtime for members viewing that problem. Ending a session does not rewrite problems; all ended-session solutions are public.
-- Provide an officer dashboard and a responsive, presentation-focused interface that stays readable when projected.
-- Do not add runtime AI, translation, code execution, compilers/interpreters, online judging, or browser `localStorage` as canonical persistence.
+CappyCode is a live solution showcase for Coding Interview Club sessions.
 
-## Code quality
+## Context
 
-- Prefer simple, direct, readable code with descriptive names. Favor maintainability over cleverness.
-- Keep functions and components focused on one responsibility. Follow existing patterns; avoid premature abstractions, wrappers, indirection, and unnecessary design patterns.
-- Prefer clear statements over clever one-liners. Let structure and naming explain the code; do not add comments that narrate it. Use comments for non-obvious reasons, invariants, external constraints, or unavoidable workarounds.
+Use the newest explicit project decision as the highest project authority.
+
+For repository work, prefer:
+
+1. the active GitHub Issue and accepted project decisions;
+2. `docs/PROJECT_SCOPE.md`, `design.md`, `docs/FIREBASE.md`, and other relevant project docs;
+3. existing code as evidence of current behavior.
+
+Existing implementation does not override an explicit product requirement. Do not invent missing requirements.
+
+## Project invariants
+
+- Members are anonymous and read-only.
+- Officers prepare Session and Problem content and control solution reveals.
+- Firestore is canonical persistence.
+- Firebase Authentication protects Officer Mode.
+- Firestore Security Rules are the authorization boundary for protected content.
+- Python, Java, and C++ are first-class supported languages.
+- Use Monaco for the primary code presentation/editing experience.
+- Keep Problem metadata separate from protected Solution content where required by the current model.
+- Do not add runtime AI, code translation, code execution, compilers/interpreters, online judging, submissions, or `localStorage` as canonical persistence unless an explicit product decision changes scope.
+- Follow `design.md` for project-specific UI direction.
+
+## Reusable configuration
+
+Use the applicable repository-scoped rule instead of duplicating generic engineering guidance:
+
+- `.codex/rules/engineering.md`
+- `.codex/rules/security.md`
+- `.codex/rules/ui.md`
+- `.codex/rules/writing.md`
+- `.codex/rules/definition-of-done.md`
+
+Use the applicable skill for procedural work:
+
+- product ambiguity → `grill-me`
+- specification → `to-spec`
+- issue breakdown → `to-issues`
+- issue implementation → `implement-issue`
+- debugging → `debug-with-evidence`
+- verification → `verify-change`
+- PR review → `review-pr`
+- Git/GitHub workflow → `github-flow`
+- multiple related Issues → `issue-batch-orchestrator`
+- Firebase → `firebase`
+- UI/UX → `impeccable`
+- handoff → `handoff`
+
+Project-specific requirements override reusable defaults.
+
+## Git
+
+Follow `docs/GIT_CONVENTIONS.md`.
+
+Never implement directly on `main`. Treat the active GitHub Issue as the implementation scope contract.
+
+Do not claim verification succeeded unless the relevant checks actually ran successfully.
