@@ -11,11 +11,11 @@ metadata:
 
 Use this skill when performing Git or GitHub workflow operations.
 
-The stable conventions live in `rules/github.md`.
+The project Git conventions live in `docs/GIT_CONVENTIONS.md`.
 
 Read that file first.
 
-Project-specific Git instructions override the global rule.
+Project-specific Git instructions override reusable defaults.
 
 ## Process
 
@@ -45,7 +45,7 @@ When using a branch, start from the latest intended base.
 
 Use the repository's commit convention.
 
-When none exists, follow `rules/github.md`.
+Follow `docs/GIT_CONVENTIONS.md`.
 
 Before committing:
 
@@ -60,7 +60,6 @@ When a PR is part of the repository workflow:
 - inspect the complete diff;
 - verify acceptance criteria;
 - run relevant checks;
-- use `templates/PULL_REQUEST.md` when applicable;
 - link the implementation issue.
 
 Only report checks that actually ran.
