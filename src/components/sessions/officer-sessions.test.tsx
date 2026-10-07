@@ -788,6 +788,128 @@ describe('Officer Sessions surface', () => {
     );
   });
 
+  it('protects dirty Problem edits on unload and saves with Cmd+S or Ctrl+S', async () => {
+    api.listProblems.mockResolvedValue([
+      {
+        id: 'problem',
+        problem: {
+          title: 'Two Sum',
+          description: 'Find a pair',
+          exampleInput: '1 2',
+          exampleOutput: '3',
+          order: 0,
+          answersVisible: false,
+        },
+      },
+    ]);
+    render(<OfficerSessions />);
+    fireEvent.click(await screen.findByRole('button', { name: /Arrays/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Manage problems' }));
+    await screen.findByLabelText('Python Solution, editable');
+
+    const initialCleanUnload = new Event('beforeunload', {
+      cancelable: true,
+    });
+    window.dispatchEvent(initialCleanUnload);
+    expect(initialCleanUnload.defaultPrevented).toBe(false);
+
+    fireEvent.change(screen.getByLabelText('Problem title'), {
+      target: { value: 'Renamed problem' },
+    });
+    const dirtyUnload = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(dirtyUnload);
+    expect(dirtyUnload.defaultPrevented).toBe(true);
+
+    fireEvent.change(screen.getByLabelText('Problem title'), {
+      target: { value: 'Two Sum' },
+    });
+    const revertedUnload = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(revertedUnload);
+    expect(revertedUnload.defaultPrevented).toBe(false);
+
+    fireEvent.change(screen.getByLabelText('Problem title'), {
+      target: { value: 'Renamed problem' },
+    });
+
+    const commandSave = new KeyboardEvent('keydown', {
+      key: 's',
+      metaKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    window.dispatchEvent(commandSave);
+    expect(commandSave.defaultPrevented).toBe(true);
+    await screen.findByText('Saved ✓');
+    const savedUnload = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(savedUnload);
+    expect(savedUnload.defaultPrevented).toBe(false);
+
+    fireEvent.change(screen.getByLabelText('Problem title'), {
+      target: { value: 'A second title' },
+    });
+
+    const controlSave = new KeyboardEvent('keydown', {
+      key: 's',
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    window.dispatchEvent(controlSave);
+    expect(controlSave.defaultPrevented).toBe(true);
+    await waitFor(() => expect(api.updateProblem).toHaveBeenCalledTimes(2));
+    await screen.findByText('Saved ✓');
+
+    const cleanUnload = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(cleanUnload);
+    expect(cleanUnload.defaultPrevented).toBe(false);
+  });
+
+  it('keeps unload protection after a failed save until a retry succeeds', async () => {
+    api.listProblems.mockResolvedValue([
+      {
+        id: 'problem',
+        problem: {
+          title: 'Two Sum',
+          description: 'Find a pair',
+          exampleInput: '1 2',
+          exampleOutput: '3',
+          order: 0,
+          answersVisible: false,
+        },
+      },
+    ]);
+    api.updateProblem.mockRejectedValueOnce(new Error('offline'));
+
+    render(<OfficerSessions />);
+    fireEvent.click(await screen.findByRole('button', { name: /Arrays/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Manage problems' }));
+    await screen.findByLabelText('Python Solution, editable');
+    fireEvent.change(screen.getByLabelText('Problem title'), {
+      target: { value: 'Renamed problem' },
+    });
+    const commandSave = new KeyboardEvent('keydown', {
+      key: 's',
+      metaKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    window.dispatchEvent(commandSave);
+    expect(commandSave.defaultPrevented).toBe(true);
+    await screen.findByText(
+      'Save failed. Your edits are still here. Check your connection and retry.',
+    );
+
+    const failedSaveUnload = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(failedSaveUnload);
+    expect(failedSaveUnload.defaultPrevented).toBe(true);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    await screen.findByText('Saved ✓');
+    const savedUnload = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(savedUnload);
+    expect(savedUnload.defaultPrevented).toBe(false);
+  });
+
   it('keeps navigation and destructive actions blocked after a dirty Solution save fails until retry succeeds', async () => {
     api.listProblems.mockResolvedValue([
       {

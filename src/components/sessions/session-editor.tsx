@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   deleteSession,
   transitionSession,
@@ -53,6 +53,41 @@ export default function SessionEditor({
   const [transitionError, setTransitionError] = useState(false);
   const busy = useRef(false);
   const dirty = title !== saved.title || date !== saved.date;
+
+  useEffect(() => {
+    if (!problemsOpen || contentSaveState?.dirty !== true) return;
+
+    function protectUnsavedChanges(event: BeforeUnloadEvent) {
+      event.preventDefault();
+      event.returnValue = '';
+    }
+
+    window.addEventListener('beforeunload', protectUnsavedChanges);
+    return () =>
+      window.removeEventListener('beforeunload', protectUnsavedChanges);
+  }, [contentSaveState?.dirty, problemsOpen]);
+
+  useEffect(() => {
+    if (!problemsOpen) return;
+
+    function handleSaveShortcut(event: KeyboardEvent) {
+      if (
+        event.key.toLowerCase() !== 's' ||
+        (!event.metaKey && !event.ctrlKey) ||
+        event.altKey
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+      if (contentSaveState?.dirty && !contentSaveState.saving) {
+        void contentSaveState.save();
+      }
+    }
+
+    window.addEventListener('keydown', handleSaveShortcut);
+    return () => window.removeEventListener('keydown', handleSaveShortcut);
+  }, [contentSaveState, problemsOpen]);
 
   function updateTitle(value: string) {
     setTitle(value);
