@@ -11,7 +11,12 @@ import {
   type Firestore,
   type WriteBatch,
 } from 'firebase/firestore';
-import { languages, type Problem } from '../domain';
+import {
+  isProblemDifficulty,
+  languages,
+  type Problem,
+  type ProblemDifficulty,
+} from '../domain';
 import { validateLeetcodeProblemUrl } from '../problem-metadata';
 import { getOfficerAuth } from './auth';
 import { getFirestoreDb } from './client';
@@ -24,14 +29,15 @@ export interface ProblemRecord {
 export type ProblemContent = Pick<
   Problem,
   'title' | 'description' | 'exampleInput' | 'exampleOutput' | 'constraints'
-> & { leetcodeUrl: string };
+> & { leetcodeUrl: string; difficulty: ProblemDifficulty | '' };
 
 type ProblemContentInput = Omit<
   ProblemContent,
-  'leetcodeUrl' | 'constraints'
+  'leetcodeUrl' | 'constraints' | 'difficulty'
 > & {
   constraints?: string;
   leetcodeUrl?: string;
+  difficulty?: ProblemDifficulty | '';
 };
 
 function officerDb() {
@@ -47,6 +53,7 @@ export function validateProblemContent(
   if (typeof content.title !== 'string' || !content.title.trim())
     throw new Error('Enter a problem title.');
   const constraints = content.constraints ?? '';
+  const difficulty = content.difficulty ?? '';
   if (
     [
       content.description,
@@ -56,6 +63,8 @@ export function validateProblemContent(
     ].some((field) => typeof field !== 'string')
   )
     throw new Error('Problem content must be text.');
+  if (difficulty !== '' && !isProblemDifficulty(difficulty))
+    throw new Error('Select a supported Problem difficulty.');
   return {
     title: content.title.trim(),
     description: content.description,
@@ -63,6 +72,7 @@ export function validateProblemContent(
     exampleOutput: content.exampleOutput,
     constraints,
     leetcodeUrl: validateLeetcodeProblemUrl(content.leetcodeUrl) ?? '',
+    difficulty,
   };
 }
 
@@ -76,6 +86,8 @@ export async function listProblems(
     if (document.metadata.hasPendingWrites)
       throw new Error('Problem changes are still awaiting confirmation.');
     const data = document.data();
+    if (data.difficulty !== undefined && !isProblemDifficulty(data.difficulty))
+      throw new Error('A stored problem has invalid fields.');
     const leetcodeUrl =
       data.leetcodeUrl === undefined
         ? undefined
@@ -104,6 +116,9 @@ export async function listProblems(
         order: data.order,
         answersVisible: data.answersVisible,
         ...(leetcodeUrl ? { leetcodeUrl } : {}),
+        ...(isProblemDifficulty(data.difficulty)
+          ? { difficulty: data.difficulty }
+          : {}),
       },
     };
   });
@@ -159,6 +174,12 @@ export async function updateProblem(
   if (content.leetcodeUrl !== undefined) {
     const leetcodeUrl = validateLeetcodeProblemUrl(content.leetcodeUrl);
     updates.leetcodeUrl = leetcodeUrl ?? deleteField();
+  }
+  if (content.difficulty !== undefined) {
+    if (content.difficulty === '') updates.difficulty = deleteField();
+    else if (isProblemDifficulty(content.difficulty))
+      updates.difficulty = content.difficulty;
+    else throw new Error('Select a supported Problem difficulty.');
   }
   if (Object.keys(updates).length === 0)
     throw new Error('Select Problem content to save.');

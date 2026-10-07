@@ -200,6 +200,27 @@ describe('anonymous member persistence', () => {
     );
   });
 
+  it('reads supported Problem difficulty values and rejects invalid stored values', async () => {
+    sdk.getDocsFromServer.mockResolvedValueOnce({
+      docs: [
+        snapshot('easy', { ...problem, difficulty: 'easy' }),
+        snapshot('medium', { ...problem, order: 1, difficulty: 'medium' }),
+        snapshot('hard', { ...problem, order: 2, difficulty: 'hard' }),
+      ],
+    });
+    expect(
+      (await listMemberProblems('session')).map(
+        ({ problem: item }) => item.difficulty,
+      ),
+    ).toEqual(['easy', 'medium', 'hard']);
+    sdk.getDocsFromServer.mockResolvedValueOnce({
+      docs: [snapshot('invalid', { ...problem, difficulty: 'extreme' })],
+    });
+    await expect(listMemberProblems('session')).rejects.toThrow(
+      'invalid fields',
+    );
+  });
+
   it('maps legacy Problems without constraints to empty text and preserves new multiline constraints', async () => {
     sdk.getDocsFromServer.mockResolvedValueOnce({
       docs: [

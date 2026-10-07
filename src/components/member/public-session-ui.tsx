@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import type { ProblemSolutions } from '@/lib/firebase/solutions';
+import type { ProblemDifficulty } from '@/lib/domain';
 import AppHeader from '@/components/app-header';
 import SolutionWorkspace from '@/components/solutions/solution-workspace';
 import { useAnswersVisible } from '@/hooks/use-answer-visibility';
@@ -24,6 +25,7 @@ export interface PublicProblem {
   order: number;
   answersVisible: boolean;
   leetcodeUrl?: string;
+  difficulty?: ProblemDifficulty;
 }
 
 export type DiscoveryState =
@@ -416,9 +418,16 @@ function ProblemContent({
       aria-labelledby={`problem-tab-${problem.id}`}
       tabIndex={0}
     >
-      <h2 className="mb-2 mt-0 text-2xl font-semibold leading-8">
-        {problem.title}
-      </h2>
+      <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+        <h2 className="m-0 text-2xl font-semibold leading-8">
+          {problem.title}
+        </h2>
+        {problem.difficulty ? (
+          <span className="rounded border border-border-strong bg-raised px-2 py-0.5 text-sm font-medium text-ink">
+            {problem.difficulty[0].toUpperCase() + problem.difficulty.slice(1)}
+          </span>
+        ) : null}
+      </div>
       {problem.leetcodeUrl ? (
         <a
           className="mb-3 inline-block text-sm text-muted underline decoration-border-strong underline-offset-4 hover:text-ink focus-visible:rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"

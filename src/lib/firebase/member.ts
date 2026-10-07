@@ -10,6 +10,7 @@ import {
   where,
 } from 'firebase/firestore';
 import {
+  isProblemDifficulty,
   languages,
   type Problem,
   type SessionStatus,
@@ -70,6 +71,7 @@ function validateProblemRecord(
     typeof data.exampleInput !== 'string' ||
     typeof data.exampleOutput !== 'string' ||
     (data.constraints !== undefined && typeof data.constraints !== 'string') ||
+    (data.difficulty !== undefined && !isProblemDifficulty(data.difficulty)) ||
     typeof data.order !== 'number' ||
     !Number.isFinite(data.order) ||
     typeof data.answersVisible !== 'boolean'
@@ -90,6 +92,9 @@ function validateProblemRecord(
       order: data.order,
       answersVisible: data.answersVisible,
       ...(leetcodeUrl ? { leetcodeUrl } : {}),
+      ...(isProblemDifficulty(data.difficulty)
+        ? { difficulty: data.difficulty }
+        : {}),
     },
   };
 }

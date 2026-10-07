@@ -98,6 +98,7 @@ const problems: PublicProblem[] = [
     order: 0,
     answersVisible: false,
     leetcodeUrl: 'https://leetcode.com/problems/two-sum/',
+    difficulty: 'medium',
   },
 ];
 const solutions: ProblemSolutions = {
@@ -188,6 +189,7 @@ describe('public member UI scaffold', () => {
       'Second problem',
     ]);
     expect(screen.getByText('First description')).toBeTruthy();
+    expect(screen.getByText('Medium')).toBeTruthy();
     expect(screen.getByText('first input')).toBeTruthy();
     expect(screen.getByText('first output')).toBeTruthy();
     expect(screen.getByRole('heading', { name: 'Constraints' })).toBeTruthy();
@@ -216,6 +218,7 @@ describe('public member UI scaffold', () => {
       screen.getByRole('tab', { name: 'Second problem' }),
     );
     expect(screen.getByText('Second description')).toBeTruthy();
+    expect(screen.queryByText('Medium')).toBeNull();
     expect(screen.queryByRole('link', { name: /View on LeetCode/ })).toBeNull();
     expect(screen.queryByText('No LeetCode link provided')).toBeNull();
     fireEvent.keyDown(screen.getByRole('tab', { name: 'Second problem' }), {
@@ -251,6 +254,7 @@ describe('public member UI scaffold', () => {
       container.textContent!.indexOf('Solutions'),
     );
     expect(screen.getByText('Answers hidden')).toBeTruthy();
+    expect(screen.getByText('Medium')).toBeTruthy();
     expect(
       screen.getByText('Waiting for the officer to reveal the solution…'),
     ).toBeTruthy();
