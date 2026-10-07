@@ -99,8 +99,22 @@ function validateSolution(value: unknown): Solution {
     typeof (value as Record<string, unknown>).code !== 'string'
   )
     throw new Error('A stored solution has invalid fields.');
-  const data = value as Record<string, string>;
-  return { code: data.code };
+  const data = value as Record<string, unknown>;
+  const fields = [
+    'timeComplexity',
+    'timeComplexityReason',
+    'spaceComplexity',
+    'spaceComplexityReason',
+  ] as const;
+  const solution: Solution = { code: data.code as string };
+  for (const field of fields) {
+    const text = data[field];
+    if (text !== undefined && typeof text !== 'string')
+      throw new Error('A stored solution has invalid fields.');
+    if (typeof text === 'string' && text.trim().length > 0)
+      solution[field] = text;
+  }
+  return solution;
 }
 
 async function listSessionsWithStatus(status: 'live' | 'ended') {

@@ -105,6 +105,29 @@ const problems = [
     answersVisible: true,
     leetcodeUrl: 'https://leetcode.com/problems/two-sum/',
     solution: 'two-sum',
+    solutionComplexities: {
+      python: {
+        timeComplexity: 'O(n)',
+        timeComplexityReason:
+          'One pass with average constant-time hash lookups.',
+        spaceComplexity: 'O(n)',
+        spaceComplexityReason: 'The map can store each value.',
+      },
+      java: {
+        timeComplexity: 'O(n)',
+        timeComplexityReason:
+          'One pass with average constant-time hash lookups.',
+        spaceComplexity: 'O(n)',
+        spaceComplexityReason: 'The map can store each value.',
+      },
+      cpp: {
+        timeComplexity: 'O(n)',
+        timeComplexityReason:
+          'One pass with average constant-time hash lookups.',
+        spaceComplexity: 'O(n)',
+        spaceComplexityReason: 'The map can store each value.',
+      },
+    },
   },
   {
     sessionId: 'live-hash-maps',
@@ -116,6 +139,20 @@ const problems = [
     exampleOutput: '6',
     answersVisible: false,
     solution: 'first-repeat',
+    solutionComplexities: {
+      python: {
+        timeComplexity: 'O(n)',
+        timeComplexityReason: 'Each value is checked at most once.',
+        spaceComplexity: 'O(n)',
+        spaceComplexityReason: 'The set may contain all values.',
+      },
+      java: {
+        timeComplexity: 'O(n)',
+        timeComplexityReason: 'Each value is checked at most once.',
+        spaceComplexity: 'O(n)',
+        spaceComplexityReason: 'The set may contain all values.',
+      },
+    },
   },
   {
     sessionId: 'live-hash-maps',
@@ -128,6 +165,26 @@ const problems = [
     answersVisible: false,
     leetcodeUrl: 'https://leetcode.com/problems/valid-anagram/',
     solution: 'valid-anagram',
+    solutionComplexities: {
+      python: {
+        timeComplexity: 'O(n)',
+        timeComplexityReason: 'Both strings are scanned once.',
+        spaceComplexity: 'O(1)',
+        spaceComplexityReason: 'The lowercase alphabet bounds the count map.',
+      },
+      java: {
+        timeComplexity: 'O(n)',
+        timeComplexityReason: 'Both strings are scanned once.',
+        spaceComplexity: 'O(1)',
+        spaceComplexityReason: 'The lowercase alphabet bounds the count array.',
+      },
+      cpp: {
+        timeComplexity: 'O(n)',
+        timeComplexityReason: 'Both strings are scanned once.',
+        spaceComplexity: 'O(1)',
+        spaceComplexityReason: 'The lowercase alphabet bounds the count array.',
+      },
+    },
   },
   {
     sessionId: 'draft-sliding-window',
@@ -1243,14 +1300,18 @@ export async function seedEmulatorData() {
     problemOrders.set(sessionId, order + 1);
     const fields = { ...value, order };
     delete fields.solution;
+    delete fields.solutionComplexities;
     return [`sessions/${sessionId}/problems/${id}`, fields];
   });
   const solutionDocuments = problems.flatMap((problem) => {
-    const { solution, sessionId, id } = problem;
+    const { solution, solutionComplexities, sessionId, id } = problem;
     const implementation = implementations[solution];
     return ['python', 'java', 'cpp'].map((language) => [
       `sessions/${sessionId}/problems/${id}/solutions/${language}`,
-      { code: implementation[language] },
+      {
+        code: implementation[language],
+        ...(solutionComplexities?.[language] ?? {}),
+      },
     ]);
   });
   const documents = [

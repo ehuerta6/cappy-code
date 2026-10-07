@@ -226,7 +226,12 @@ function EditableSolution({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(false);
   const busy = useRef(false);
-  const dirty = draft.code !== saved.code;
+  const dirty =
+    draft.code !== saved.code ||
+    draft.timeComplexity !== saved.timeComplexity ||
+    draft.timeComplexityReason !== saved.timeComplexityReason ||
+    draft.spaceComplexity !== saved.spaceComplexity ||
+    draft.spaceComplexityReason !== saved.spaceComplexityReason;
   const save = useCallback(async () => {
     if (!dirty || busy.current) return;
     const submitted = draft;
@@ -272,7 +277,14 @@ function EditableSolution({
         onChange={(next) => {
           setDraft(next);
           if (next.code !== draft.code) onCodeChange(next.code);
-          if (next.code === saved.code) setError(false);
+          if (
+            next.code === saved.code &&
+            next.timeComplexity === saved.timeComplexity &&
+            next.timeComplexityReason === saved.timeComplexityReason &&
+            next.spaceComplexity === saved.spaceComplexity &&
+            next.spaceComplexityReason === saved.spaceComplexityReason
+          )
+            setError(false);
         }}
       />
     </div>

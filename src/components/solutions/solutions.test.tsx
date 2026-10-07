@@ -118,6 +118,63 @@ describe('solution workspace', () => {
     });
     expect(onPending).toHaveBeenLastCalledWith(false);
   });
+  it('edits and explicitly saves complexity with its language Solution', async () => {
+    const saveState = vi.fn();
+    await openOfficer(vi.fn(), saveState);
+    fireEvent.change(screen.getAllByLabelText('Time Complexity')[0], {
+      target: { value: 'O(n)' },
+    });
+    fireEvent.change(screen.getAllByLabelText('Time explanation')[0], {
+      target: { value: 'One pass through the list.' },
+    });
+    fireEvent.change(screen.getAllByLabelText('Space Complexity')[0], {
+      target: { value: 'O(1)' },
+    });
+    fireEvent.change(screen.getAllByLabelText('Space explanation')[0], {
+      target: { value: 'Only a fixed number of variables are stored.' },
+    });
+    expect(persistence.save).not.toHaveBeenCalled();
+    await act(async () => saveState.mock.calls.at(-1)?.[0].save());
+    expect(persistence.save).toHaveBeenCalledExactlyOnceWith(
+      's',
+      'p',
+      'python',
+      {
+        code: 'python source',
+        timeComplexity: 'O(n)',
+        timeComplexityReason: 'One pass through the list.',
+        spaceComplexity: 'O(1)',
+        spaceComplexityReason: 'Only a fixed number of variables are stored.',
+      },
+    );
+  });
+  it('shows optional analysis outside the read-only Monaco editor', () => {
+    render(
+      <SolutionWorkspace
+        solutions={{
+          ...solutions,
+          python: {
+            ...solutions.python,
+            timeComplexity: 'O(n)',
+            timeComplexityReason: 'One pass through the list.',
+            spaceComplexity: 'O(1)',
+          },
+        }}
+        modelPath="member/s/p"
+      />,
+    );
+    expect(screen.getByText('Time: O(n)')).toBeTruthy();
+    expect(screen.getByText('One pass through the list.')).toBeTruthy();
+    expect(screen.getByText('Space: O(1)')).toBeTruthy();
+    expect(
+      (
+        screen.getByLabelText(
+          'Python Solution, read-only',
+        ) as HTMLTextAreaElement
+      ).value,
+    ).toBe('python source');
+    expect(screen.queryByText('Time: undefined')).toBeNull();
+  });
   it('retains failed edits and retries only when explicitly requested', async () => {
     const saveState = vi.fn();
     await openOfficer(vi.fn(), saveState);

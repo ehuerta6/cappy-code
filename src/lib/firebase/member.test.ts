@@ -217,6 +217,24 @@ describe('anonymous member persistence', () => {
     expect(solutions.cpp.code).toBe('sessions/s/problems/p/solutions/cpp');
     expect(sdk.getDocFromServer).toHaveBeenCalledTimes(3);
   });
+  it('reads complexity only from each authorized language Solution document', async () => {
+    sdk.getDocFromServer.mockImplementation(
+      async ({ path }: { path: string }) =>
+        snapshot(path.split('/').at(-1) ?? '', {
+          code: path,
+          ...(path.endsWith('/python')
+            ? { timeComplexity: 'O(n)', timeComplexityReason: 'One pass.' }
+            : path.endsWith('/java')
+              ? { spaceComplexity: 'O(1)' }
+              : {}),
+        }),
+    );
+    await expect(getMemberSolutions('s', 'p')).resolves.toMatchObject({
+      python: { timeComplexity: 'O(n)', timeComplexityReason: 'One pass.' },
+      java: { spaceComplexity: 'O(1)' },
+      cpp: { code: 'sessions/s/problems/p/solutions/cpp' },
+    });
+  });
 
   it('maps missing solution documents to empty source', async () => {
     sdk.getDocFromServer.mockImplementation(async () => ({
