@@ -15,7 +15,7 @@ const member = vi.hoisted(() => ({
   getMemberSolutions: vi.fn(),
   subscribeToMemberSessions: vi.fn(),
 }));
-const navigation = vi.hoisted(() => ({ replace: vi.fn() }));
+const navigation = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }));
 const listeners = vi.hoisted(() => ({
   subscribeToAnswersVisible: vi.fn(),
   answers: [] as Array<{
@@ -115,6 +115,7 @@ beforeEach(() => {
     },
   );
   navigation.replace.mockReset();
+  navigation.push.mockReset();
   listeners.subscribeToAnswersVisible.mockImplementation(
     (
       sessionId: string,
@@ -141,9 +142,10 @@ afterEach(() => {
 });
 
 async function openSession() {
-  render(<MemberSessionPage sessionId="session" />);
+  const view = render(<MemberSessionPage sessionId="session" />);
   await screen.findByText('First description');
   await waitFor(() => expect(listeners.answers).toHaveLength(1));
+  return view;
 }
 
 describe('Member answer visibility realtime', () => {
@@ -174,9 +176,11 @@ describe('Member answer visibility realtime', () => {
   });
 
   it('cleans up reveal listeners when selection changes and ignores their late callbacks', async () => {
-    await openSession();
+    const view = await openSession();
     const oldListener = listeners.answers[0];
     fireEvent.click(screen.getByRole('tab', { name: 'Second problem' }));
+    expect(navigation.push).toHaveBeenCalledWith('/sessions/session/second');
+    view.rerender(<MemberSessionPage sessionId="session" problemId="second" />);
     await waitFor(() => expect(listeners.answers).toHaveLength(2));
     expect(oldListener.unsubscribe).toHaveBeenCalledOnce();
     act(() => oldListener.onValue(true));
@@ -240,7 +244,7 @@ describe('Member answer visibility realtime', () => {
     expect(listeners.answers[0].unsubscribe).toHaveBeenCalledOnce();
   });
 
-  it('automatically exits when the Session becomes Not Live', async () => {
+  it('shows an unavailable state when a routed Session is no longer public', async () => {
     let onValue: ((records: MemberSessionRecord[]) => void) | undefined;
     member.subscribeToMemberSessions.mockImplementationOnce(
       (next: (records: MemberSessionRecord[]) => void) => {
@@ -252,11 +256,12 @@ describe('Member answer visibility realtime', () => {
     render(<MemberSessionPage sessionId="session" />);
     await screen.findByText('First description');
     act(() => onValue?.([]));
-    await waitFor(() => expect(navigation.replace).toHaveBeenCalledWith('/'));
+    expect(await screen.findByText('Session unavailable')).toBeTruthy();
+    expect(navigation.replace).not.toHaveBeenCalledWith('/');
     expect(screen.queryByText('First description')).toBeNull();
   });
 
-  it('redirects an ended-session visit to the currently live Session', async () => {
+  it('keeps an ended-session route available while another Session is live', async () => {
     member.subscribeToMemberSessions.mockImplementationOnce(
       (onValue: (records: MemberSessionRecord[]) => void) => {
         queueMicrotask(() =>
@@ -274,8 +279,9 @@ describe('Member answer visibility realtime', () => {
     );
     render(<MemberSessionPage sessionId="past" />);
     await waitFor(() =>
-      expect(navigation.replace).toHaveBeenCalledWith('/sessions/live-now'),
+      expect(navigation.replace).toHaveBeenCalledWith('/sessions/past/first'),
     );
-    expect(screen.queryByText('First description')).toBeNull();
+    expect(navigation.replace).not.toHaveBeenCalledWith('/sessions/live-now');
+    expect(screen.getByText('First description')).toBeTruthy();
   });
 });

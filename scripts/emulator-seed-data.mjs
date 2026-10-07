@@ -19,6 +19,7 @@ const sessions = [
     title: 'CIC Intro — Hash Maps & Arrays',
     date: '2026-10-05',
     status: 'live',
+    bankProblemIds: ['bank-live-frequency'],
   },
   {
     id: 'draft-sliding-window',
@@ -118,12 +119,55 @@ const sessions = [
     date: '2026-09-20',
     status: 'ended',
   },
+  {
+    id: 'draft-general-interview',
+    branch: 'general',
+    title: 'CIC General — Interview Patterns Preview',
+    date: '2026-10-14',
+    status: 'draft',
+  },
+  {
+    id: 'draft-icpc-graphs',
+    branch: 'icpc',
+    title: 'CIC ICPC — Graph Search Preview',
+    date: '2026-10-16',
+    status: 'draft',
+  },
+  {
+    id: 'ended-general-dp',
+    branch: 'general',
+    title: 'CIC General — Dynamic Programming',
+    date: '2026-09-11',
+    status: 'ended',
+  },
+  {
+    id: 'ended-general-arrays',
+    branch: 'general',
+    title: 'CIC General — Arrays and Intervals',
+    date: '2026-09-04',
+    status: 'ended',
+  },
+  {
+    id: 'ended-icpc-geometry',
+    branch: 'icpc',
+    title: 'CIC ICPC — Geometry and Greedy',
+    date: '2026-09-13',
+    status: 'ended',
+  },
+  {
+    id: 'ended-icpc-strings',
+    branch: 'icpc',
+    title: 'CIC ICPC — String Algorithms',
+    date: '2026-09-06',
+    status: 'ended',
+  },
 ];
 
 const problems = [
   {
     sessionId: 'live-hash-maps',
     id: 'two-sum',
+    category: 'interview-style',
     title: 'Two Sum',
     description:
       'Given an integer array `nums` and a target, return the **indices** of two distinct values that add up to the target.',
@@ -162,6 +206,8 @@ const problems = [
   {
     sessionId: 'live-hash-maps',
     id: 'custom-frequency-map',
+    category: 'custom',
+    bankProblemId: 'bank-live-frequency',
     title: 'Custom: First Repeated Workshop ID',
     description:
       'Return the first value that appears for a second time while scanning the list from left to right.',
@@ -189,6 +235,7 @@ const problems = [
   {
     sessionId: 'live-hash-maps',
     id: 'valid-anagram',
+    category: 'interview-style',
     title: 'Valid Anagram',
     description:
       'Determine whether the two lowercase strings contain the same characters with the same frequencies.',
@@ -545,6 +592,165 @@ const problems = [
     constraints: 'Room identifiers are non-negative integers.',
     answersVisible: true,
     solution: 'room-reachability',
+  },
+  {
+    sessionId: 'ended-general-practice',
+    id: 'campus-pair-sum',
+    title: 'Campus Pair Sum',
+    description:
+      'Return the indices of two study groups whose sizes reach the target.',
+    exampleInput: 'sizes = [3, 5, 8], target = 11',
+    exampleOutput: '[0, 2]',
+    constraints: 'Exactly one pair reaches the target.',
+    answersVisible: true,
+    category: 'interview-style',
+    difficulty: 'easy',
+    solution: 'two-sum',
+  },
+  {
+    sessionId: 'ended-icpc-practice',
+    id: 'contest-schedule-count',
+    title: 'Contest Schedule Count',
+    description: 'Count how many entries occur in each contest group.',
+    exampleInput: 'groups = ["A", "B", "A", "C", "B", "A"]',
+    exampleOutput: '{A: 3, B: 2, C: 1}',
+    constraints: 'Group labels are case-sensitive.',
+    answersVisible: true,
+    category: 'competitive-programming',
+    solution: 'count-values',
+  },
+  {
+    sessionId: 'draft-general-interview',
+    id: 'draft-general-window',
+    title: 'Minimum Window of Unique Letters',
+    description:
+      'Find the shortest substring that contains every required letter.',
+    exampleInput: 'text = "cabbaac", required = "abc"',
+    exampleOutput: '"cba"',
+    constraints: 'text contains lowercase English letters.',
+    answersVisible: false,
+    category: 'interview-style',
+    difficulty: 'hard',
+    solution: 'longest-unique-window',
+  },
+  {
+    sessionId: 'draft-icpc-graphs',
+    id: 'draft-icpc-shortest-path',
+    title: 'Shortest Campus Route',
+    description:
+      'Find the fewest doors between two rooms in an unweighted building.',
+    exampleInput: 'rooms = 5, doors = [[0,1],[1,4],[0,2],[2,3],[3,4]]',
+    exampleOutput: '2',
+    constraints: '1 ≤ rooms ≤ 100,000.',
+    answersVisible: false,
+    category: 'competitive-programming',
+    difficulty: 'medium',
+    solution: 'room-reachability',
+  },
+  {
+    sessionId: 'ended-general-dp',
+    id: 'general-climbing-stairs',
+    title: 'Count Ways to Climb',
+    description:
+      'Count the ways to reach step n using one or two steps at a time.',
+    exampleInput: 'n = 6',
+    exampleOutput: '13',
+    constraints: '1 ≤ n ≤ 45.',
+    answersVisible: true,
+    category: 'interview-style',
+    difficulty: 'easy',
+    solution: 'climbing-stairs',
+  },
+  {
+    sessionId: 'ended-general-dp',
+    id: 'general-house-robber',
+    title: 'Nonadjacent Donations',
+    description:
+      'Choose nonadjacent donations to maximize the total collected.',
+    exampleInput: 'values = [2, 7, 9, 3, 1]',
+    exampleOutput: '12',
+    constraints: '1 ≤ values.length ≤ 100,000.',
+    answersVisible: true,
+    category: 'custom',
+    difficulty: 'medium',
+    solution: 'house-robber',
+  },
+  {
+    sessionId: 'ended-general-arrays',
+    id: 'general-merge-intervals',
+    title: 'Merge Overlapping Study Blocks',
+    description: 'Merge time blocks that overlap or touch.',
+    exampleInput: 'blocks = [[1,3],[2,6],[8,10]]',
+    exampleOutput: '[[1,6],[8,10]]',
+    constraints: 'Blocks are sorted by start time.',
+    answersVisible: true,
+    category: 'interview-style',
+    difficulty: 'medium',
+    solution: 'merge-arrays',
+  },
+  {
+    sessionId: 'ended-general-arrays',
+    id: 'general-array-checksum',
+    title: 'Custom: Array Checksum',
+    description: 'Sum values that appear exactly once.',
+    exampleInput: 'values = [4, 2, 4, 7, 2, 9]',
+    exampleOutput: '16',
+    answersVisible: true,
+    category: 'custom',
+    solution: 'unique-sum',
+  },
+  {
+    sessionId: 'ended-icpc-geometry',
+    id: 'icpc-max-triangle-area',
+    title: 'Maximum Triangle Area',
+    description: 'Find the largest area made by any three points on a plane.',
+    exampleInput: 'points = [[0,0],[0,2],[2,0],[1,1]]',
+    exampleOutput: '2',
+    constraints: '3 ≤ points.length ≤ 500.',
+    answersVisible: true,
+    category: 'competitive-programming',
+    difficulty: 'hard',
+    solution: 'container-water',
+  },
+  {
+    sessionId: 'ended-icpc-geometry',
+    id: 'icpc-interval-scheduling',
+    title: 'Contest Room Scheduling',
+    description:
+      'Select the maximum number of non-overlapping contest sessions.',
+    exampleInput: 'times = [[1,2],[2,4],[1,3]]',
+    exampleOutput: '2',
+    constraints: 'Times are inclusive at their starting point.',
+    answersVisible: true,
+    category: 'competitive-programming',
+    solution: 'merge-arrays',
+  },
+  {
+    sessionId: 'ended-icpc-strings',
+    id: 'icpc-prefix-matches',
+    title: 'Count Prefix Matches',
+    description: 'Count strings that start with a given prefix.',
+    exampleInput: 'words = ["alpha","alpine","beta"], prefix = "al"',
+    exampleOutput: '2',
+    constraints: 'Words contain lowercase English letters.',
+    answersVisible: true,
+    category: 'competitive-programming',
+    difficulty: 'easy',
+    solution: 'count-values',
+  },
+  {
+    sessionId: 'ended-icpc-strings',
+    id: 'icpc-anagram-groups',
+    title: 'Group Anagram Strings',
+    description:
+      'Group words that contain the same letters with the same frequencies.',
+    exampleInput: 'words = ["eat","tea","tan","ate"]',
+    exampleOutput: '[["eat","tea","ate"],["tan"]]',
+    constraints: '1 ≤ words.length ≤ 10,000.',
+    answersVisible: true,
+    category: 'competitive-programming',
+    difficulty: 'medium',
+    solution: 'valid-anagram',
   },
 ];
 
@@ -1249,23 +1455,156 @@ void sink(vector<vector<char>>& grid, int r, int c) {
   },
 };
 
+const bankProblems = [
+  {
+    id: 'bank-live-frequency',
+    title: 'First Repeated Workshop ID',
+    description:
+      'Return the first value seen for a second time from left to right.',
+    constraints: 'The input may be empty.',
+    exampleInput: 'ids = [14, 6, 9, 6, 14]',
+    exampleOutput: '6',
+    category: 'custom',
+    difficulty: 'easy',
+    isPublic: false,
+    solution: 'first-repeat',
+    complexity: {
+      timeComplexity: 'O(n)',
+      timeComplexityReason:
+        'Each value is checked once while scanning from left to right.',
+      spaceComplexity: 'O(n)',
+      spaceComplexityReason:
+        'The seen set can hold every distinct input value.',
+    },
+  },
+  {
+    id: 'bank-custom-agenda',
+    title: 'Custom: Reverse the Workshop Agenda',
+    description: 'Return agenda items in reverse order.',
+    constraints: '1 ≤ agenda.length ≤ 10,000.',
+    exampleInput: 'agenda = ["warm-up", "practice", "review"]',
+    exampleOutput: '["review", "practice", "warm-up"]',
+    category: 'custom',
+    isPublic: true,
+    solution: 'reverse-list',
+    complexity: {
+      timeComplexity: 'O(n)',
+      timeComplexityReason: 'Each list node is visited once.',
+      spaceComplexity: 'O(1)',
+      spaceComplexityReason:
+        'The links are reversed in place with three pointers.',
+    },
+  },
+  {
+    id: 'bank-interview-prefix',
+    title: 'Longest Unique Substring',
+    description:
+      'Find the length of the longest substring with no repeated characters.',
+    constraints: '0 ≤ text.length ≤ 50,000.',
+    exampleInput: 'text = "abcabcbb"',
+    exampleOutput: '3',
+    category: 'interview-style',
+    difficulty: 'medium',
+    isPublic: true,
+    leetcodeUrl:
+      'https://leetcode.com/problems/longest-substring-without-repeating-characters/',
+    solution: 'longest-unique-window',
+    complexity: {
+      timeComplexity: 'O(n)',
+      timeComplexityReason:
+        'Each character is processed a constant number of times.',
+      spaceComplexity: 'O(n)',
+      spaceComplexityReason:
+        'The last-seen map can hold one entry per character.',
+    },
+  },
+  {
+    id: 'bank-interview-binary-search',
+    title: 'Search a Sorted List',
+    description:
+      'Return the index of a target in an ascending list, or -1 if absent.',
+    constraints: 'The input list is sorted in ascending order.',
+    exampleInput: 'values = [-1, 0, 3, 5, 9], target = 9',
+    exampleOutput: '4',
+    category: 'interview-style',
+    difficulty: 'easy',
+    isPublic: true,
+    solution: 'binary-search',
+    complexity: {
+      timeComplexity: 'O(log n)',
+      timeComplexityReason:
+        'Each comparison halves the remaining search range.',
+      spaceComplexity: 'O(1)',
+      spaceComplexityReason:
+        'The search keeps only left, right, and middle indices.',
+    },
+  },
+  {
+    id: 'bank-cp-room-route',
+    title: 'Contest Room Route',
+    description: 'Determine whether doors connect the start room to the exit.',
+    constraints: 'Room identifiers are non-negative integers.',
+    exampleInput: 'doors = [[0,1],[1,3],[2,4]], start = 0, end = 3',
+    exampleOutput: 'true',
+    category: 'competitive-programming',
+    difficulty: 'medium',
+    isPublic: true,
+    solution: 'room-reachability',
+    complexity: {
+      timeComplexity: 'O(V + E)',
+      timeComplexityReason: 'Each room and door is visited at most once.',
+      spaceComplexity: 'O(V + E)',
+      spaceComplexityReason:
+        'The adjacency lists and visited set store the graph.',
+    },
+  },
+  {
+    id: 'bank-cp-grid-count',
+    title: 'Count Grid Regions',
+    description:
+      'Count connected groups of marked cells using four-direction adjacency.',
+    constraints: 'The grid is rectangular and contains only 0 and 1.',
+    exampleInput: 'grid = [[1,1,0],[0,1,0],[1,0,1]]',
+    exampleOutput: '3',
+    category: 'competitive-programming',
+    difficulty: 'hard',
+    isPublic: true,
+    solution: 'number-of-islands',
+    complexity: {
+      timeComplexity: 'O(rows × columns)',
+      timeComplexityReason: 'Each cell is visited at most once.',
+      spaceComplexity: 'O(rows × columns)',
+      spaceComplexityReason:
+        'The recursive traversal can use stack space proportional to the grid.',
+    },
+  },
+];
+
 function assertFixture() {
   const counts = Object.groupBy(sessions, (session) => session.status);
+  const branchCounts = Object.groupBy(sessions, (session) => session.branch);
+  const endedByBranch = Object.groupBy(
+    sessions.filter((session) => session.status === 'ended'),
+    (session) => session.branch,
+  );
   const constrainedProblems = problems.filter(
     (problem) =>
       typeof problem.constraints === 'string' && problem.constraints.trim(),
   );
   if (
-    sessions.length !== 15 ||
-    problems.length !== 30 ||
     constrainedProblems.length < 10 ||
     constrainedProblems.length === problems.length ||
     counts.live?.length !== 1 ||
-    counts.draft?.length !== 2 ||
-    counts.ended?.length !== 12
+    counts.draft?.length < 3 ||
+    counts.ended?.length < 1 ||
+    ['intro', 'general', 'icpc'].some(
+      (branch) =>
+        !branchCounts[branch]?.length ||
+        (endedByBranch[branch]?.length ?? 0) < 3,
+    )
   )
     throw new Error(
-      'The local fixture must contain 1 Live, 2 Draft, and 12 Past Sessions with 30 Problems.',
+      'The local fixture must cover all branches, one live Session, multiple drafts, and at least three ended Sessions per branch.',
     );
   const sessionIds = new Set(sessions.map(({ id }) => id));
   const problemIds = new Set();
@@ -1283,6 +1622,15 @@ function assertFixture() {
     throw new Error(
       'The local fixture must cover every Problem difficulty and unset Problems.',
     );
+  const seededCategories = new Set(
+    problems.map((problem) => problem.category ?? 'custom'),
+  );
+  if (
+    ['custom', 'interview-style', 'competitive-programming'].some(
+      (category) => !seededCategories.has(category),
+    )
+  )
+    throw new Error('The local fixture must cover all Problem categories.');
   for (const problem of problems) {
     const path = `${problem.sessionId}/${problem.id}`;
     if (!sessionIds.has(problem.sessionId) || problemIds.has(path))
@@ -1324,6 +1672,43 @@ function assertFixture() {
     if (session.status === 'live' && sessionProblems.length < 3)
       throw new Error('The live Session must contain at least three Problems.');
   }
+  const liveSession = sessions.find((session) => session.status === 'live');
+  if (!liveSession || liveSession.bankProblemIds?.length !== 1)
+    throw new Error(
+      'The live Session must reference one reusable bank Problem.',
+    );
+  const bankIds = new Set(bankProblems.map(({ id }) => id));
+  if (
+    bankProblems.some(
+      ({ category, isPublic, solution, complexity }) =>
+        !['custom', 'interview-style', 'competitive-programming'].includes(
+          category,
+        ) ||
+        !implementations[solution] ||
+        [
+          'timeComplexity',
+          'timeComplexityReason',
+          'spaceComplexity',
+          'spaceComplexityReason',
+        ].some((field) => !complexity[field]?.trim()) ||
+        typeof isPublic !== 'boolean',
+    ) ||
+    ['custom', 'interview-style', 'competitive-programming'].some(
+      (category) =>
+        !bankProblems.some((problem) => problem.category === category),
+    ) ||
+    liveSession.bankProblemIds.some((id) => !bankIds.has(id))
+  )
+    throw new Error(
+      'Problem Bank fixture categories or live references are invalid.',
+    );
+  const hiddenLiveBankProblem = bankProblems.find(
+    (problem) => problem.id === liveSession.bankProblemIds?.[0],
+  );
+  if (!hiddenLiveBankProblem || hiddenLiveBankProblem.isPublic)
+    throw new Error(
+      'The live Session bank Problem must be hidden from Members.',
+    );
 }
 
 async function request(url, options = {}) {
@@ -1405,10 +1790,29 @@ export async function seedEmulatorData() {
       },
     ]);
   });
+  const bankDocuments = bankProblems.map((problem) => {
+    const fields = { ...problem };
+    delete fields.id;
+    delete fields.solution;
+    delete fields.complexity;
+    return [`problemBank/${problem.id}`, fields];
+  });
+  const bankSolutionDocuments = bankProblems.flatMap((problem) =>
+    ['python', 'java', 'cpp'].map((language) => [
+      `problemBank/${problem.id}/solutions/${language}`,
+      {
+        code: implementations[problem.solution][language],
+        ...problem.complexity,
+      },
+    ]),
+  );
   const documents = [
     ...sessionDocuments,
     ...problemDocuments,
     ...solutionDocuments,
+    ...bankDocuments,
+    ...bankSolutionDocuments,
+    ['sessionControl/liveSession', { sessionId: 'live-hash-maps' }],
   ];
 
   const environment = await initializeTestEnvironment({
@@ -1431,7 +1835,7 @@ export async function seedEmulatorData() {
   }
 
   console.log(
-    `Seeded ${problems.length} Problems across ${sessions.length} Sessions in ${projectId}.`,
+    `Seeded ${problems.length} Session Problems and ${bankProblems.length} reusable Problem Bank entries across ${sessions.length} Sessions in ${projectId}.`,
   );
   console.log(`Local emulator Officer is ready: ${officerEmail}.`);
   console.log(`Auth emulator UID: ${account.localId}`);

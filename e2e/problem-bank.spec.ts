@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { expect, test } from '@playwright/test';
 
-const bankTitle = 'Reusable Bank Snapshot Problem';
+const bankTitle = 'Contest Room Route';
 const sessionTitle = 'Problem Bank Snapshot Session';
 const originalStatement = 'Original statement remains in the Session snapshot.';
 
@@ -31,12 +31,8 @@ test('Officer edits and reuses a bank Problem as an independent Session snapshot
     await officer.getByRole('button', { name: 'Back to Sessions' }).click();
 
     await officer.getByRole('link', { name: 'Problem Bank' }).click();
-    await officer.getByRole('button', { name: '+ New Problem' }).click();
-    await officer.getByLabel('Problem title').fill(bankTitle);
-    await officer
-      .getByLabel('Problem type')
-      .selectOption('competitive-programming');
-    await officer.getByLabel('Difficulty').selectOption('hard');
+    await officer.getByRole('button', { name: bankTitle }).click();
+    await expect(officer.getByLabel('Problem title')).toHaveValue(bankTitle);
     await officer
       .getByLabel('Description (Markdown supported)')
       .fill(originalStatement);
@@ -82,7 +78,11 @@ test('Officer edits and reuses a bank Problem as an independent Session snapshot
     await officer
       .getByRole('button', { name: 'Add from Problem Bank' })
       .click();
-    await officer.getByRole('button', { name: 'Add to Session' }).click();
+    await officer
+      .getByRole('listitem')
+      .filter({ hasText: bankTitle })
+      .getByRole('button', { name: 'Add to Session' })
+      .click();
     await expect(officer.getByLabel('Problem title')).toHaveValue(bankTitle);
     await expect(officer.getByLabel('Problem category')).toHaveValue(
       'competitive-programming',
@@ -92,6 +92,8 @@ test('Officer edits and reuses a bank Problem as an independent Session snapshot
     await expect(officer.getByRole('button', { name: bankTitle })).toHaveCount(
       1,
     );
+    await officer.getByRole('button', { name: bankTitle }).click();
+    await expect(officer.getByLabel('Problem title')).toHaveValue(bankTitle);
     await officer
       .getByLabel('Description (Markdown supported)')
       .fill('Updated in the bank after reuse.');
@@ -138,7 +140,8 @@ test('Officer edits and reuses a bank Problem as an independent Session snapshot
     await member.goto('/problem-bank');
     await expect(member.getByRole('link', { name: bankTitle })).toHaveCount(0);
     await member.goto('/');
-    await expect(member).toHaveURL(/\/sessions\//);
+    await member.getByRole('link', { name: sessionTitle }).click();
+    await expect(member).toHaveURL(/\/sessions\/.*\/.*$/);
     await expect(member.getByText('Answers hidden')).toBeVisible();
     for (const token of [
       'bank python solution',

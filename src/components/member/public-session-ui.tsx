@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import type { ProblemSolutions } from '@/lib/firebase/solutions';
 import type { ProblemDifficulty } from '@/lib/domain';
@@ -195,10 +196,11 @@ function SessionGroup({
 export type SessionState =
   | { status: 'loading' }
   | { status: 'error'; onRetry: () => void }
-  | { status: 'unavailable' }
+  | { status: 'unavailable'; kind?: 'session' | 'problem' }
   | {
       status: 'ready';
       session: PublicSessionSummary;
+      selectedProblemId?: string | null;
       problems:
         | { status: 'loading' }
         | { status: 'error'; onRetry: () => void }
@@ -229,9 +231,15 @@ export function PublicSessionView({ state }: { state: SessionState }) {
             className="m-0 text-[28px] font-semibold leading-9 tracking-tight"
             id="unavailable-title"
           >
-            Session unavailable
+            {state.kind !== 'problem'
+              ? 'Session unavailable'
+              : 'Problem unavailable'}
           </h1>
-          <p>This session is unavailable or cannot be viewed.</p>
+          <p>
+            {state.kind !== 'problem'
+              ? 'This session is unavailable or cannot be viewed.'
+              : 'This problem is not available in this session.'}
+          </p>
           <Link
             className="text-accent underline-offset-4 hover:text-accent-hover hover:underline"
             href="/"
@@ -265,6 +273,7 @@ function SessionContent({
 }: {
   state: Extract<SessionState, { status: 'ready' }>;
 }) {
+  const router = useRouter();
   const problems = useMemo(
     () =>
       state.problems.status === 'ready'
@@ -274,27 +283,35 @@ function SessionContent({
         : [],
     [state.problems],
   );
-  const [selectedProblemId, setSelectedProblemId] = useState<string | null>(
-    null,
-  );
-  const effectiveSelectedProblemId = problems.some(
-    (problem) => problem.id === selectedProblemId,
-  )
-    ? selectedProblemId
-    : (problems[0]?.id ?? null);
+  const requestedProblemId = state.selectedProblemId ?? null;
+  const effectiveSelectedProblemId =
+    requestedProblemId ?? problems[0]?.id ?? null;
   const selectedProblem = problems.find(
     (problem) => problem.id === effectiveSelectedProblemId,
   );
 
   useEffect(() => {
-    if (state.problems.status !== 'ready') return;
-    if (!problems.some((problem) => problem.id === selectedProblemId)) {
-      setSelectedProblemId(problems[0]?.id ?? null);
+    if (
+      state.problems.status === 'ready' &&
+      requestedProblemId === null &&
+      problems[0]
+    ) {
+      router.replace(
+        `/sessions/${encodeURIComponent(state.session.id)}/${encodeURIComponent(problems[0].id)}`,
+      );
     }
-  }, [problems, selectedProblemId, state.problems.status]);
+  }, [
+    problems,
+    requestedProblemId,
+    router,
+    state.problems.status,
+    state.session.id,
+  ]);
 
   function selectProblem(problemId: string) {
-    setSelectedProblemId(problemId);
+    router.push(
+      `/sessions/${encodeURIComponent(state.session.id)}/${encodeURIComponent(problemId)}`,
+    );
   }
 
   return (
@@ -343,6 +360,14 @@ function SessionContent({
             Retry problems
           </button>
         </div>
+      ) : requestedProblemId !== null && !selectedProblem ? (
+        <section role="alert" aria-labelledby="problem-unavailable-title">
+          <h2 id="problem-unavailable-title">Problem unavailable</h2>
+          <p>This problem is not part of this session.</p>
+          <Link href={`/sessions/${encodeURIComponent(state.session.id)}`}>
+            ← Session problems
+          </Link>
+        </section>
       ) : problems.length === 0 ? (
         <p className="text-muted">No problems are available in this session.</p>
       ) : (

@@ -20,6 +20,9 @@ import {
 const presentation = vi.hoisted(() => ({
   answersVisible: false,
 }));
+const navigation = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }));
+
+vi.mock('next/navigation', () => ({ useRouter: () => navigation }));
 
 vi.mock('@/hooks/use-answer-visibility', async (original) => ({
   ...(await original<typeof import('@/hooks/use-answer-visibility')>()),
@@ -57,6 +60,8 @@ vi.mock('@monaco-editor/react', () => ({
 
 beforeEach(() => {
   presentation.answersVisible = false;
+  navigation.push.mockClear();
+  navigation.replace.mockClear();
   window.localStorage.clear();
   document.documentElement.removeAttribute('data-theme');
   vi.stubGlobal('matchMedia', () => ({
@@ -229,9 +234,11 @@ describe('public member UI scaffold', () => {
     expect(retry).toHaveBeenCalledOnce();
   });
 
-  it('opens a permitted session and navigates ordered problem tabs locally', () => {
+  it('opens a permitted session and routes ordered problem tabs', () => {
     const load = vi.fn().mockResolvedValue(solutions);
-    const { container } = render(<PublicSessionView state={viewState(load)} />);
+    const { container, rerender } = render(
+      <PublicSessionView state={viewState(load)} />,
+    );
     expect(
       screen.getByRole('heading', { name: 'Intro practice' }),
     ).toBeTruthy();
@@ -289,26 +296,48 @@ describe('public member UI scaffold', () => {
     expect(document.activeElement).toBe(
       screen.getByRole('tab', { name: 'Second problem' }),
     );
-    expect(screen.getByText('Second description')).toBeTruthy();
-    expect(screen.queryByText('Medium')).toBeNull();
-    expect(screen.queryByRole('link', { name: /View on LeetCode/ })).toBeNull();
-    expect(screen.queryByText('No LeetCode link provided')).toBeNull();
+    expect(navigation.push).toHaveBeenCalledWith(
+      '/sessions/live-session/later',
+    );
+    rerender(
+      <PublicSessionView
+        state={{ ...viewState(load), selectedProblemId: 'later' }}
+      />,
+    );
     fireEvent.keyDown(screen.getByRole('tab', { name: 'Second problem' }), {
       key: 'ArrowLeft',
     });
+    expect(navigation.push).toHaveBeenLastCalledWith(
+      '/sessions/live-session/first',
+    );
     expect(document.activeElement).toBe(
       screen.getByRole('tab', { name: 'First problem' }),
+    );
+    rerender(
+      <PublicSessionView
+        state={{ ...viewState(load), selectedProblemId: 'first' }}
+      />,
     );
     fireEvent.keyDown(screen.getByRole('tab', { name: 'First problem' }), {
       key: 'End',
     });
+    expect(navigation.push).toHaveBeenLastCalledWith(
+      '/sessions/live-session/later',
+    );
     expect(document.activeElement).toBe(
       screen.getByRole('tab', { name: 'Second problem' }),
+    );
+    rerender(
+      <PublicSessionView
+        state={{ ...viewState(load), selectedProblemId: 'later' }}
+      />,
     );
     fireEvent.keyDown(screen.getByRole('tab', { name: 'Second problem' }), {
       key: 'Home',
     });
-    expect(screen.getByText('First description')).toBeTruthy();
+    expect(navigation.push).toHaveBeenLastCalledWith(
+      '/sessions/live-session/first',
+    );
     expect(screen.queryByRole('checkbox')).toBeNull();
     expect(load).not.toHaveBeenCalled();
     expect(

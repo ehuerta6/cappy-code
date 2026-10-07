@@ -122,7 +122,9 @@ test('Officer prepares and presents a Session through its public lifecycle', asy
 
     await officer.getByRole('button', { name: 'Go Live' }).click();
     await expect(officer.getByText('live', { exact: true })).toBeVisible();
-    await expect(member).toHaveURL(/\/sessions\//);
+    await member.goto('/');
+    await member.getByRole('link', { name: sessionTitle }).click();
+    await expect(member).toHaveURL(/\/sessions\/.*\/.*$/);
     await expect(
       member.getByRole('heading', { name: problemTitle }),
     ).toBeVisible();
@@ -144,7 +146,7 @@ test('Officer prepares and presents a Session through its public lifecycle', asy
       member.getByText('Waiting for the officer to reveal the solution…'),
     ).toBeVisible();
     await expect(member.getByText(/answer-secret/)).toHaveCount(0);
-    const sessionId = new URL(member.url()).pathname.split('/').at(-1);
+    const sessionId = new URL(member.url()).pathname.split('/').at(-2);
     expect(sessionId).toBeTruthy();
     const liveSessionUrl = member.url();
     await member.goto('/problem-bank');
@@ -200,6 +202,10 @@ test('Officer prepares and presents a Session through its public lifecycle', asy
     await expect(member.getByText(/answer-secret/)).toHaveCount(0);
 
     await officer.getByRole('button', { name: 'Not Live' }).click();
+    await expect(
+      member.getByRole('heading', { name: 'Session unavailable' }),
+    ).toBeVisible();
+    await member.getByRole('link', { name: 'CappyCode home' }).click();
     await expect(member).toHaveURL(`${baseURL}/`);
     await expect(
       member
@@ -213,7 +219,9 @@ test('Officer prepares and presents a Session through its public lifecycle', asy
     await member.goto('/');
 
     await officer.getByRole('button', { name: 'Go Live' }).click();
-    await expect(member).toHaveURL(/\/sessions\//);
+    await member.goto('/');
+    await member.getByRole('link', { name: sessionTitle }).click();
+    await expect(member).toHaveURL(/\/sessions\/.*\/.*$/);
     await expect(
       member.getByRole('heading', { name: problemTitle }),
     ).toBeVisible();
