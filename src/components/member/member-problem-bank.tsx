@@ -161,10 +161,14 @@ export function MemberBankProblemPage({ problemId }: { problemId: string }) {
         aria-labelledby="bank-problem-heading"
       >
         {state.status === 'loading' ? (
-          <p role="status">Loading Problem…</p>
+          <p id="bank-problem-heading" role="status">
+            Loading Problem…
+          </p>
         ) : state.status === 'unavailable' ? (
           <div role="alert">
-            <h1 className="text-[28px]">Problem unavailable</h1>
+            <h1 className="text-[28px]" id="bank-problem-heading">
+              Problem unavailable
+            </h1>
             <p>
               This Problem is unavailable or is being used by the live Session.
             </p>
@@ -226,7 +230,9 @@ export function MemberBankProblemPage({ problemId }: { problemId: string }) {
                 >
                   Constraints
                 </h2>
-                <ProblemMarkdown>{state.problem.constraints}</ProblemMarkdown>
+                <p className="m-0 max-w-[80ch] whitespace-pre-wrap break-words text-base leading-[26px]">
+                  {state.problem.constraints}
+                </p>
               </section>
             )}
             <section className="mt-6" aria-label="Shared example">
