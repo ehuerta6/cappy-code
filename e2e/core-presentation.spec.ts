@@ -115,6 +115,9 @@ test('Officer prepares and presents a Session through its public lifecycle', asy
       member.getByText('Use a map to find the matching pair.'),
     ).toBeVisible();
     await expect(
+      member.getByText('2 ≤ values.length ≤ 100,000', { exact: true }),
+    ).toBeVisible();
+    await expect(
       member.getByText('values = [4, 8, 12], target = 12'),
     ).toBeVisible();
     await expect(member.getByText('[0, 1]', { exact: true })).toBeVisible();
@@ -159,6 +162,9 @@ test('Officer prepares and presents a Session through its public lifecycle', asy
     await expect(member.getByText('Python time analysis.')).toBeVisible();
     await expect(member.getByText('Java time analysis.')).toBeVisible();
     await expect(member.getByText('C++ time analysis.')).toBeVisible();
+    await expect(member.getByText('Python space analysis.')).toBeVisible();
+    await expect(member.getByText('Java space analysis.')).toBeVisible();
+    await expect(member.getByText('C++ space analysis.')).toBeVisible();
     await officer.getByRole('button', { name: 'Hide answers' }).click();
     await expect(
       member.getByText('Waiting for the officer to reveal the solution…'),
