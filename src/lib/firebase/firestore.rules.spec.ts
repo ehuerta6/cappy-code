@@ -9,6 +9,7 @@ import {
 import {
   collection,
   deleteDoc,
+  deleteField,
   doc,
   getDoc,
   getDocs,
@@ -18,7 +19,7 @@ import {
   where,
   writeBatch,
 } from 'firebase/firestore';
-import { afterAll, beforeAll, beforeEach, describe, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 const projectId = 'demo-cappycode-rules';
 let environment: RulesTestEnvironment;
@@ -118,6 +119,44 @@ function anonymousAuthDb() {
 }
 
 describe('Firestore security rules', () => {
+  it('requires a supported branch on new Sessions and rejects invalid branch updates', async () => {
+    const db = officerDb();
+    await assertFails(
+      setDoc(doc(db, 'sessions/new-legacy'), {
+        title: 'New session',
+        status: 'draft',
+      }),
+    );
+    for (const branch of ['intro', 'general', 'icpc']) {
+      await assertSucceeds(
+        setDoc(doc(db, `sessions/new-${branch}`), {
+          branch,
+          title: 'New session',
+          status: 'draft',
+        }),
+      );
+    }
+    await assertFails(
+      setDoc(doc(db, 'sessions/invalid'), {
+        branch: 'advanced',
+        title: 'Invalid session',
+        status: 'draft',
+      }),
+    );
+    const legacy = doc(db, 'sessions/draft');
+    await assertSucceeds(
+      updateDoc(legacy, { title: 'Legacy metadata update' }),
+    );
+    expect((await getDoc(legacy)).data()).not.toHaveProperty('branch');
+    await assertFails(updateDoc(legacy, { branch: 'advanced' }));
+    await assertSucceeds(updateDoc(legacy, { branch: 'general' }));
+
+    const modern = doc(db, 'sessions/new-intro');
+    await assertSucceeds(updateDoc(modern, { branch: 'icpc' }));
+    await assertFails(updateDoc(modern, { branch: 'advanced' }));
+    await assertFails(updateDoc(modern, { branch: deleteField() }));
+  });
+
   it('allows an authenticated officer to read and write draft sessions, problems, and fixed solutions', async () => {
     const db = officerDb();
     await assertSucceeds(getDoc(doc(db, 'sessions/draft')));

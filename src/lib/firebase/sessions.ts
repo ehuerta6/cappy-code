@@ -82,6 +82,7 @@ export async function listSessions(): Promise<SessionRecord[]> {
         );
       }
       const metadata = validateSessionMetadata({
+        branch: data.branch,
         title: data.title,
         date: data.date,
       });

@@ -1,12 +1,27 @@
-import type { Session } from './domain';
+import { sessionBranches, type Session, type SessionBranch } from './domain';
 
-export type SessionMetadata = Pick<Session, 'title' | 'date'>;
+export type SessionMetadata = Pick<Session, 'branch' | 'title' | 'date'>;
+export type SessionMetadataInput = Pick<Session, 'title' | 'date'> & {
+  branch?: unknown;
+};
+
+export function validateSessionBranch(value: unknown): SessionBranch {
+  if (value === undefined) return 'intro';
+  if (
+    typeof value !== 'string' ||
+    !sessionBranches.includes(value as SessionBranch)
+  ) {
+    throw new Error('Choose Intro, General, or ICPC for this session.');
+  }
+  return value as SessionBranch;
+}
 
 export function validateSessionMetadata(
-  metadata: SessionMetadata,
+  metadata: SessionMetadataInput,
 ): SessionMetadata {
   const title = metadata.title.trim();
   if (!title) throw new Error('Enter a session title.');
+  const branch = validateSessionBranch(metadata.branch);
 
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(metadata.date);
   if (!match) throw new Error('Enter a date in YYYY-MM-DD format.');
@@ -19,7 +34,7 @@ export function validateSessionMetadata(
   if (year < 1 || month < 1 || month > 12 || day < 1 || day > days[month - 1]) {
     throw new Error('Enter a valid calendar date.');
   }
-  return { title, date: metadata.date };
+  return { branch, title, date: metadata.date };
 }
 
 export function todayCalendarDate(): string {

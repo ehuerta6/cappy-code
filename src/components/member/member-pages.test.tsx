@@ -53,6 +53,7 @@ import type { MemberSessionRecord } from '@/lib/firebase/member';
 const session = {
   id: 'intro',
   session: {
+    branch: 'intro' as const,
     title: 'Intro practice',
     date: '2026-10-04',
     status: 'live' as const,
@@ -150,7 +151,9 @@ describe('public member page integration', () => {
     );
     render(<MemberHome />);
 
-    expect(await screen.findByText('No live session right now.')).toBeTruthy();
+    expect(
+      await screen.findAllByText('No live session right now.'),
+    ).toHaveLength(3);
     expect(
       screen.getByRole('link', { name: /Intro practice/ }).getAttribute('href'),
     ).toBe('/sessions/past-session');
@@ -165,8 +168,10 @@ describe('public member page integration', () => {
     );
     render(<MemberHome />);
 
-    expect(await screen.findByText('No live session right now.')).toBeTruthy();
-    expect(screen.getByText('No past sessions yet.')).toBeTruthy();
+    expect(
+      await screen.findAllByText('No live session right now.'),
+    ).toHaveLength(3);
+    expect(await screen.findAllByText('No past sessions yet.')).toHaveLength(3);
   });
 
   it('loads ended-session Solutions regardless of answersVisible', async () => {

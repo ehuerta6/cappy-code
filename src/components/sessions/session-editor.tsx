@@ -11,6 +11,11 @@ import {
 import { validateSessionMetadata } from '@/lib/session-metadata';
 import OfficerProblems from '../problems/officer-problems';
 import type { OfficerSaveState } from '@/components/officer-save-state';
+import {
+  sessionBranchLabels,
+  sessionBranches,
+  type SessionBranch,
+} from '@/lib/domain';
 
 const contextualButtonClass =
   'min-h-10 rounded px-2 py-2 text-sm text-muted underline-offset-4 hover:bg-hover hover:text-accent-hover hover:underline disabled:cursor-default disabled:text-muted';
@@ -35,7 +40,9 @@ export default function SessionEditor({
     useState<OfficerSaveState | null>(null);
   const [title, setTitle] = useState(record.session.title);
   const [date, setDate] = useState(record.session.date);
+  const [branch, setBranch] = useState(record.session.branch);
   const [saved, setSaved] = useState({
+    branch: record.session.branch,
     title: record.session.title,
     date: record.session.date,
   });
@@ -55,16 +62,23 @@ export default function SessionEditor({
   >(null);
   const [transitionError, setTransitionError] = useState<string | null>(null);
   const busy = useRef(false);
-  const dirty = title !== saved.title || date !== saved.date;
+  const dirty =
+    branch !== saved.branch || title !== saved.title || date !== saved.date;
 
   function updateTitle(value: string) {
     setTitle(value);
-    if (value === saved.title && date === saved.date) setSaveError(null);
+    if (branch === saved.branch && value === saved.title && date === saved.date)
+      setSaveError(null);
   }
 
   function updateDate(value: string) {
     setDate(value);
-    if (title === saved.title && value === saved.date) setSaveError(null);
+    if (
+      branch === saved.branch &&
+      title === saved.title &&
+      value === saved.date
+    )
+      setSaveError(null);
   }
 
   function lifecycleActions() {
@@ -193,14 +207,19 @@ export default function SessionEditor({
     if (!dirty || busy.current) return;
     let metadata;
     try {
-      metadata = validateSessionMetadata({ title, date });
+      metadata = validateSessionMetadata({ branch, title, date });
     } catch (error) {
       setSaveError(
         error instanceof Error ? error.message : 'Check the title and date.',
       );
       return;
     }
-    if (metadata.title === saved.title && metadata.date === saved.date) {
+    if (
+      metadata.branch === saved.branch &&
+      metadata.title === saved.title &&
+      metadata.date === saved.date
+    ) {
+      setBranch(metadata.branch);
       setTitle(metadata.title);
       setDate(metadata.date);
       setSaveError(null);
@@ -211,6 +230,7 @@ export default function SessionEditor({
     setSaveError(null);
     try {
       await updateSession(record.id, metadata);
+      setBranch(metadata.branch);
       setTitle(metadata.title);
       setSaved(metadata);
     } catch {
@@ -271,7 +291,8 @@ export default function SessionEditor({
               </span>
             </div>
             <p className="mt-1 flex flex-wrap items-center gap-2 text-sm leading-5 text-muted">
-              CIC Intro Session <span aria-hidden="true">•</span>{' '}
+              CIC {sessionBranchLabels[branch]} Session{' '}
+              <span aria-hidden="true">•</span>{' '}
               <time dateTime={date}>{formatDate(date)}</time>
             </p>
           </div>
@@ -320,7 +341,8 @@ export default function SessionEditor({
             </span>
           </div>
           <p className="mt-1 flex flex-wrap items-center gap-2 text-sm leading-5 text-muted">
-            CIC Intro Session <span aria-hidden="true">•</span>{' '}
+            CIC {sessionBranchLabels[branch]} Session{' '}
+            <span aria-hidden="true">•</span>{' '}
             <time dateTime={date}>{formatDate(date)}</time>
           </p>
         </div>
@@ -351,6 +373,31 @@ export default function SessionEditor({
           {transitionError}
         </p>
       )}
+      <label className="my-5 flex max-w-3xl flex-col gap-2">
+        Session branch
+        <select
+          className="min-h-11 w-full rounded border border-border-strong bg-surface px-3 py-2 text-ink"
+          aria-label="Session branch"
+          value={branch}
+          onChange={(event) => {
+            setBranch(event.target.value as SessionBranch);
+            if (
+              title === saved.title &&
+              date === saved.date &&
+              event.target.value === saved.branch
+            ) {
+              setSaveError(null);
+            }
+          }}
+          disabled={saving || deleting || transitionPending}
+        >
+          {sessionBranches.map((option) => (
+            <option key={option} value={option}>
+              {sessionBranchLabels[option]}
+            </option>
+          ))}
+        </select>
+      </label>
       <label className="my-5 flex max-w-3xl flex-col gap-2">
         Session title
         <input

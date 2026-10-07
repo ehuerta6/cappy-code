@@ -4,6 +4,7 @@ import {
   fireEvent,
   render,
   screen,
+  within,
   waitFor,
 } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -73,6 +74,7 @@ afterEach(() => {
 
 const liveSession: PublicSessionSummary = {
   id: 'live-session',
+  branch: 'intro',
   title: 'Intro practice',
   date: '2026-10-04',
   status: 'live',
@@ -149,8 +151,19 @@ describe('public member UI scaffold', () => {
     expect(
       screen.getByRole('link', { name: /Past practice/ }).getAttribute('href'),
     ).toBe('/sessions/past');
-    expect(screen.getByRole('heading', { name: 'Live' })).toBeTruthy();
-    expect(screen.getByRole('heading', { name: 'Past' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Intro' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'General' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'ICPC' })).toBeTruthy();
+    expect(
+      within(
+        screen.getByRole('region', { name: 'Intro session history' }),
+      ).getByRole('heading', { name: 'Live' }),
+    ).toBeTruthy();
+    expect(
+      within(
+        screen.getByRole('region', { name: 'Intro session history' }),
+      ).getByRole('heading', { name: 'Past' }),
+    ).toBeTruthy();
     expect(screen.queryByText('Private draft')).toBeNull();
     expect(screen.getByRole('link', { name: 'Officer login' })).toBeTruthy();
     expect(
@@ -160,6 +173,46 @@ describe('public member UI scaffold', () => {
     expect(screen.queryByLabelText(/Password|Email/)).toBeNull();
   });
 
+  it('groups public Sessions by branch, keeps Past newest-first, and bounds each branch history independently', () => {
+    const sessions: PublicSessionSummary[] = [
+      { ...liveSession, status: 'ended', id: 'intro-old', date: '2026-09-01' },
+      { ...liveSession, status: 'ended', id: 'intro-new', date: '2026-10-01' },
+      {
+        ...liveSession,
+        branch: 'general',
+        status: 'ended',
+        id: 'general-past',
+      },
+      { ...liveSession, branch: 'icpc', status: 'ended', id: 'icpc-past' },
+    ];
+    const { container } = render(
+      <PublicSessionDiscovery state={{ status: 'ready', sessions }} />,
+    );
+    const intro = screen.getByRole('region', { name: 'Intro session history' });
+    expect(
+      Array.from(within(intro).getAllByRole('link')).map((link) =>
+        link.getAttribute('href'),
+      ),
+    ).toEqual(['/sessions/intro-new', '/sessions/intro-old']);
+    expect(
+      container.querySelector('a[href="/sessions/general-past"]'),
+    ).toBeTruthy();
+    expect(
+      container.querySelector('a[href="/sessions/icpc-past"]'),
+    ).toBeTruthy();
+    const regions = screen.getAllByRole('region', { name: /session history$/ });
+    expect(regions).toHaveLength(3);
+    for (const region of regions) {
+      expect(region.getAttribute('tabindex')).toBe('0');
+      expect(region.className).toContain('md:overflow-y-auto');
+      expect(region.className).toContain('md:max-h-');
+      expect(region.className).toContain('md:overscroll-contain');
+    }
+    expect(container.querySelector('main')?.className).not.toContain(
+      'overflow-y-auto',
+    );
+  });
+
   it('shows loading, empty, and retryable discovery states', () => {
     const retry = vi.fn();
     const { rerender } = render(
@@ -167,8 +220,8 @@ describe('public member UI scaffold', () => {
     );
     expect(screen.getByRole('status').textContent).toBe('Loading sessions…');
     rerender(<PublicSessionDiscovery state={{ status: 'empty' }} />);
-    expect(screen.getByText('No live session right now.')).toBeTruthy();
-    expect(screen.getByText('No past sessions yet.')).toBeTruthy();
+    expect(screen.getAllByText('No live session right now.')).toHaveLength(3);
+    expect(screen.getAllByText('No past sessions yet.')).toHaveLength(3);
     rerender(
       <PublicSessionDiscovery state={{ status: 'error', onRetry: retry }} />,
     );
