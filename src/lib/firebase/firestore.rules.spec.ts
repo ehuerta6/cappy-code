@@ -9,6 +9,7 @@ import {
 import {
   collection,
   deleteDoc,
+  deleteField,
   doc,
   getDoc,
   getDocs,
@@ -18,7 +19,7 @@ import {
   where,
   writeBatch,
 } from 'firebase/firestore';
-import { afterAll, beforeAll, beforeEach, describe, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 const projectId = 'demo-cappycode-rules';
 let environment: RulesTestEnvironment;
@@ -142,12 +143,18 @@ describe('Firestore security rules', () => {
         status: 'draft',
       }),
     );
-    await assertFails(
-      updateDoc(doc(db, 'sessions/draft'), { branch: 'advanced' }),
-    );
+    const legacy = doc(db, 'sessions/draft');
     await assertSucceeds(
-      updateDoc(doc(db, 'sessions/draft'), { branch: 'general' }),
+      updateDoc(legacy, { title: 'Legacy metadata update' }),
     );
+    expect((await getDoc(legacy)).data()).not.toHaveProperty('branch');
+    await assertFails(updateDoc(legacy, { branch: 'advanced' }));
+    await assertSucceeds(updateDoc(legacy, { branch: 'general' }));
+
+    const modern = doc(db, 'sessions/new-intro');
+    await assertSucceeds(updateDoc(modern, { branch: 'icpc' }));
+    await assertFails(updateDoc(modern, { branch: 'advanced' }));
+    await assertFails(updateDoc(modern, { branch: deleteField() }));
   });
 
   it('allows an authenticated officer to read and write draft sessions, problems, and fixed solutions', async () => {
