@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const api = vi.hoisted(() => ({
@@ -7,12 +7,15 @@ const api = vi.hoisted(() => ({
   getMemberSession: vi.fn(),
   listMemberProblems: vi.fn(),
   getMemberSolutions: vi.fn(),
+  subscribeToMemberSessions: vi.fn(),
 }));
+const navigation = vi.hoisted(() => ({ replace: vi.fn() }));
 const realtime = vi.hoisted(() => ({
   answersVisible: false,
 }));
 
 vi.mock('@/lib/firebase/member', () => api);
+vi.mock('next/navigation', () => ({ useRouter: () => navigation }));
 vi.mock('@/hooks/use-answer-visibility', async (original) => ({
   ...(await original<typeof import('@/hooks/use-answer-visibility')>()),
   useAnswersVisible: () => ({
@@ -45,6 +48,7 @@ vi.mock('@monaco-editor/react', () => ({
 
 import MemberHome from './member-home';
 import MemberSessionPage from './member-session-page';
+import type { MemberSessionRecord } from '@/lib/firebase/member';
 
 const session = {
   id: 'intro',
@@ -82,6 +86,13 @@ beforeEach(() => {
   api.getMemberSession.mockResolvedValue(session);
   api.listMemberProblems.mockResolvedValue([problem]);
   api.getMemberSolutions.mockResolvedValue(solutions);
+  api.subscribeToMemberSessions.mockImplementation(
+    (onValue: (records: MemberSessionRecord[]) => void) => {
+      queueMicrotask(() => onValue([session]));
+      return vi.fn();
+    },
+  );
+  navigation.replace.mockReset();
 });
 afterEach(() => {
   cleanup();
@@ -89,10 +100,11 @@ afterEach(() => {
 });
 
 describe('public member page integration', () => {
-  it('shows discovered public Sessions with links to their read-only pages', async () => {
+  it('automatically opens the live Session for Members', async () => {
     render(<MemberHome />);
-    const link = await screen.findByRole('link', { name: /Intro practice/ });
-    expect(link.getAttribute('href')).toBe('/sessions/intro');
+    await waitFor(() =>
+      expect(navigation.replace).toHaveBeenCalledWith('/sessions/intro'),
+    );
     expect(
       screen.queryByRole('button', { name: /create|delete|edit/i }),
     ).toBeNull();
@@ -123,12 +135,19 @@ describe('public member page integration', () => {
   });
 
   it('keeps the public archive useful with no live session and lists past sessions', async () => {
-    api.listMemberSessions.mockResolvedValueOnce([
-      {
-        id: 'past-session',
-        session: { ...session.session, status: 'ended' },
+    api.subscribeToMemberSessions.mockImplementationOnce(
+      (onValue: (records: MemberSessionRecord[]) => void) => {
+        queueMicrotask(() =>
+          onValue([
+            {
+              id: 'past-session',
+              session: { ...session.session, status: 'ended' },
+            },
+          ]),
+        );
+        return vi.fn();
       },
-    ]);
+    );
     render(<MemberHome />);
 
     expect(await screen.findByText('No live session right now.')).toBeTruthy();
@@ -138,7 +157,12 @@ describe('public member page integration', () => {
   });
 
   it('shows explicit empty states when there are no live or past sessions', async () => {
-    api.listMemberSessions.mockResolvedValueOnce([]);
+    api.subscribeToMemberSessions.mockImplementationOnce(
+      (onValue: (records: MemberSessionRecord[]) => void) => {
+        queueMicrotask(() => onValue([]));
+        return vi.fn();
+      },
+    );
     render(<MemberHome />);
 
     expect(await screen.findByText('No live session right now.')).toBeTruthy();
@@ -146,10 +170,16 @@ describe('public member page integration', () => {
   });
 
   it('loads ended-session Solutions regardless of answersVisible', async () => {
-    api.getMemberSession.mockResolvedValueOnce({
-      ...session,
-      session: { ...session.session, status: 'ended' },
-    });
+    api.subscribeToMemberSessions.mockImplementationOnce(
+      (onValue: (records: MemberSessionRecord[]) => void) => {
+        queueMicrotask(() =>
+          onValue([
+            { ...session, session: { ...session.session, status: 'ended' } },
+          ]),
+        );
+        return vi.fn();
+      },
+    );
     api.listMemberProblems.mockResolvedValueOnce([
       { ...problem, problem: { ...problem.problem, answersVisible: false } },
     ]);

@@ -161,6 +161,7 @@ function formatDate(date: string) {
 
 export type SessionState =
   | { status: 'loading' }
+  | { status: 'error'; onRetry: () => void }
   | { status: 'unavailable' }
   | {
       status: 'ready';
@@ -203,6 +204,20 @@ export function PublicSessionView({ state }: { state: SessionState }) {
           >
             ← Sessions
           </Link>
+        </section>
+      ) : state.status === 'error' ? (
+        <section
+          className="mx-auto w-[calc(100%-32px)] max-w-[1440px] py-6 sm:w-[calc(100%-48px)]"
+          role="alert"
+        >
+          <p>Session updates could not be synchronized.</p>
+          <button
+            className="min-h-11 rounded border border-border-strong bg-surface px-3 py-2 text-ink hover:bg-hover"
+            type="button"
+            onClick={state.onRetry}
+          >
+            Retry session updates
+          </button>
         </section>
       ) : (
         <SessionContent key={state.session.id} state={state} />
@@ -250,12 +265,14 @@ function SessionContent({
 
   return (
     <section className="mx-auto w-[calc(100%-32px)] max-w-[1440px] py-5 pb-12 leading-relaxed sm:w-[calc(100%-48px)] sm:pt-6">
-      <Link
-        className="mb-3 inline-flex min-h-10 items-center text-sm text-muted underline-offset-4 hover:text-accent-hover hover:underline"
-        href="/"
-      >
-        ← Sessions
-      </Link>
+      {state.session.status === 'ended' && (
+        <Link
+          className="mb-3 inline-flex min-h-10 items-center text-sm text-muted underline-offset-4 hover:text-accent-hover hover:underline"
+          href="/"
+        >
+          ← Sessions
+        </Link>
+      )}
       <div className="mb-6 flex flex-wrap items-center gap-x-3 gap-y-1">
         <h1 className="m-0 text-[25px] font-semibold leading-8 tracking-tight sm:text-[28px] sm:leading-9">
           {state.session.title}
