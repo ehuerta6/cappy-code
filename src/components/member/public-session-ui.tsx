@@ -434,10 +434,10 @@ function ProblemContent({
           </section>
           <section className="min-w-0 border-t border-border-soft p-3 sm:border-l sm:border-t-0">
             <h4 className="mb-2 mt-0 text-sm font-semibold leading-5 text-muted">
-              Output
+              Expected output
             </h4>
             <pre className="m-0 min-h-6 overflow-auto whitespace-pre-wrap rounded-md bg-raised px-3 py-2 font-mono text-[15px] leading-[23px]">
-              {problem.exampleOutput || 'No example output'}
+              {problem.exampleOutput || 'No expected output'}
             </pre>
           </section>
         </div>

@@ -4,7 +4,7 @@
 
 CappyCode is **a live solution showcase platform for CIC Intro sessions**. CIC officers prepare interview-style problems and their solutions ahead of time, then present them to members during a session. Members join through an anonymous, read-only public view.
 
-CappyCode is not an IDE, code translator, transpiler, AI product, online judge, or code-execution tool. All presented source and output are prepared and stored by an officer; the runtime displays that content without generating or executing it.
+CappyCode is not an IDE, code translator, transpiler, AI product, online judge, or code-execution tool. Officers prepare Problem examples and source code; the runtime displays that content without generating or executing it.
 
 ## Users and access
 
@@ -20,7 +20,7 @@ Members are anonymous viewers. They do not create accounts or authenticate. Memb
 
 Firestore is the canonical persistence layer. It stores session content, session history, prepared solutions, and each problem's answer visibility. Firebase Authentication protects Officer Mode; public membership does not depend on authentication.
 
-Keep problem metadata separate from solution documents. Metadata includes the problem title, description, examples, order, and `answersVisible`. These fields are member-readable for live and ended sessions; a draft's metadata remains officer-only. Live solutions are protected until revealed, while ended-session solutions are public. Solution documents include manually prepared Python, Java, and C++ source and prepared static output for each language. Separation lets Firestore Security Rules enforce answer access independently of what the UI renders.
+Keep problem metadata separate from solution documents. Metadata includes the problem title, description, shared example input and expected output, order, and `answersVisible`. These fields are member-readable for live and ended sessions; a draft's metadata remains officer-only. Live solutions are protected until revealed, while ended-session solutions are public. Solution documents include manually prepared Python, Java, and C++ source. Separation lets Firestore Security Rules enforce answer access independently of what the UI renders.
 
 Firestore Security Rules are the actual hidden-answer permission boundary. A hidden answer must not be readable by an anonymous member client. Live Solution-document reads require the parent Problem's `answersVisible` to be true. Ended-session Solution reads do not depend on `answersVisible`; draft Solutions remain officer-only. Rules also restrict session and problem management to authenticated officers. UI state such as **Hide Answers** is not a substitute for these rules.
 
@@ -38,7 +38,7 @@ The public home shows Live now and Past sessions, including an explicit no-live 
 
 ## Editors and presentation UI
 
-Show Python, Java, and C++ solutions together. There is no source-language selector and no translation flow. Monaco editors are editable in Officer Mode for preparing solutions, and read-only in Member Mode. Display each language's prepared static output alongside its source where appropriate.
+Show the Problem's shared example input and expected output once before the three Python, Java, and C++ solutions. There is no source-language selector and no translation flow. Monaco editors are editable in Officer Mode for preparing solutions, and read-only in Member Mode.
 
 The interface is presentation-focused: responsive, readable at a distance, and clear on the projected screen used during a CIC Intro session. Preserve a layout that keeps the problem and the three language panels easy to compare.
 

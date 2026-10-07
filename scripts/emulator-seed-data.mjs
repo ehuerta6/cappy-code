@@ -161,7 +161,7 @@ const problems = [
     title: 'Custom: Pairwise Growth Challenge',
     description: 'Add the products of every distinct pair in the list.',
     exampleInput: 'values = [1, 2, 3]',
-    exampleOutput: '',
+    exampleOutput: '11',
     answersVisible: false,
     solution: 'pairwise-growth',
   },
@@ -425,7 +425,6 @@ const problems = [
 
 const implementations = {
   'two-sum': {
-    output: '[0, 1]',
     python: `def two_sum(nums, target):
     seen = {}
     for index, value in enumerate(nums):
@@ -454,7 +453,6 @@ const implementations = {
 }`,
   },
   'first-repeat': {
-    output: '6',
     python: `def first_repeat(values):
     seen = set()
     for value in values:
@@ -478,7 +476,6 @@ const implementations = {
 }`,
   },
   'valid-anagram': {
-    output: 'true',
     python: `def is_anagram(left, right):
     if len(left) != len(right):
         return False
@@ -505,7 +502,6 @@ const implementations = {
 }`,
   },
   'stock-profit': {
-    output: '5',
     python: `def max_profit(prices):
     lowest = float("inf")
     best = 0
@@ -532,7 +528,6 @@ const implementations = {
 }`,
   },
   'longest-unique-window': {
-    output: '3',
     python: `def longest_unique(text):
     last_seen = {}
     left = best = 0
@@ -564,7 +559,6 @@ const implementations = {
 }`,
   },
   'pairwise-growth': {
-    output: '11',
     python: `def pairwise_growth(values):
     total = 0
     for left in range(len(values)):
@@ -587,7 +581,6 @@ const implementations = {
 }`,
   },
   'count-values': {
-    output: '{A: 3, B: 2, C: 1}',
     python: `def count_values(values):
     counts = {}
     for value in values:
@@ -606,7 +599,6 @@ const implementations = {
 }`,
   },
   'valid-parentheses': {
-    output: 'true',
     python: `def is_valid(text):
     pairs = {")": "(", "]": "[", "}": "{"}
     stack = []
@@ -637,7 +629,6 @@ const implementations = {
 }`,
   },
   'contains-duplicate': {
-    output: 'true',
     python: `def contains_duplicate(nums):
     return len(nums) != len(set(nums))`,
     java: `boolean containsDuplicate(int[] nums) {
@@ -652,7 +643,6 @@ const implementations = {
 }`,
   },
   'product-except-self': {
-    output: '[24, 12, 8, 6]',
     python: `def product_except_self(nums):
     result = [1] * len(nums)
     prefix = 1
@@ -682,7 +672,6 @@ const implementations = {
 }`,
   },
   'unique-sum': {
-    output: '16',
     python: `def unique_sum(values):
     counts = {}
     for value in values:
@@ -703,7 +692,6 @@ const implementations = {
 }`,
   },
   'container-water': {
-    output: '49',
     python: `def max_area(height):
     left, right = 0, len(height) - 1
     best = 0
@@ -732,7 +720,6 @@ const implementations = {
 }`,
   },
   'merge-arrays': {
-    output: '[1, 2, 4, 4, 8, 9]',
     python: `def merge_sorted(left, right):
     result = []
     i = j = 0
@@ -762,7 +749,6 @@ const implementations = {
 }`,
   },
   'max-window-sum': {
-    output: '68',
     python: `def max_window_sum(values, width=3):
     current = sum(values[:width])
     best = current
@@ -791,7 +777,6 @@ const implementations = {
 }`,
   },
   'balanced-delimiters': {
-    output: 'true',
     python: `def balanced_delimiters(text):
     pairs = {")": "(", "]": "[", "}": "{"}
     stack = []
@@ -827,7 +812,6 @@ const implementations = {
 }`,
   },
   'binary-search': {
-    output: '4',
     python: `def binary_search(nums, target):
     left, right = 0, len(nums) - 1
     while left <= right:
@@ -859,7 +843,6 @@ const implementations = {
 }`,
   },
   'search-insert': {
-    output: '2',
     python: `def search_insert(nums, target):
     left, right = 0, len(nums)
     while left < right:
@@ -887,7 +870,6 @@ const implementations = {
 }`,
   },
   'merge-two-lists': {
-    output: '[1, 1, 2, 3, 4, 4]',
     python: `def merge_two_lists(left, right):
     sentinel = ListNode()
     tail = sentinel
@@ -921,7 +903,6 @@ const implementations = {
 }`,
   },
   'reverse-list': {
-    output: '["review", "practice", "warm-up"]',
     python: `def reverse_list(head):
     previous = None
     current = head
@@ -952,7 +933,6 @@ const implementations = {
 }`,
   },
   'max-depth-tree': {
-    output: '3',
     python: `def max_depth(root):
     if root is None:
         return 0
@@ -967,7 +947,6 @@ const implementations = {
 }`,
   },
   'count-tree-levels': {
-    output: '3',
     python: `def count_levels(root):
     if root is None:
         return 0
@@ -1008,7 +987,6 @@ const implementations = {
 }`,
   },
   'number-of-islands': {
-    output: '3',
     python: `def num_islands(grid):
     rows, cols = len(grid), len(grid[0])
     def visit(r, c):
@@ -1052,7 +1030,6 @@ void sink(vector<vector<char>>& grid, int r, int c) {
 }`,
   },
   'room-reachability': {
-    output: 'true',
     python: `def can_reach(doors, start, destination):
     graph = {}
     for left, right in doors:
@@ -1098,7 +1075,6 @@ void sink(vector<vector<char>>& grid, int r, int c) {
 }`,
   },
   'climbing-stairs': {
-    output: '8',
     python: `def climb_stairs(n):
     one_step, two_steps = 1, 1
     for _ in range(n - 1):
@@ -1123,7 +1099,6 @@ void sink(vector<vector<char>>& grid, int r, int c) {
 }`,
   },
   'house-robber': {
-    output: '12',
     python: `def rob(values):
     two_back = one_back = 0
     for value in values:
@@ -1177,11 +1152,12 @@ function assertFixture() {
           typeof implementation[language] !== 'string' ||
           !implementation[language].trim(),
       ) ||
-      typeof implementation.output !== 'string' ||
-      !implementation.output.trim()
+      typeof problem.exampleInput !== 'string' ||
+      typeof problem.exampleOutput !== 'string' ||
+      !problem.exampleOutput.trim()
     )
       throw new Error(
-        `Missing prepared language solution or output for ${path}.`,
+        `Missing Problem example or prepared language solution for ${path}.`,
       );
     if (
       problem.leetcodeUrl &&
@@ -1274,7 +1250,7 @@ export async function seedEmulatorData() {
     const implementation = implementations[solution];
     return ['python', 'java', 'cpp'].map((language) => [
       `sessions/${sessionId}/problems/${id}/solutions/${language}`,
-      { code: implementation[language], output: implementation.output },
+      { code: implementation[language] },
     ]);
   });
   const documents = [

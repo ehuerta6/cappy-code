@@ -43,9 +43,9 @@ import OfficerSolutions from './officer-solutions';
 import SolutionWorkspace from './solution-workspace';
 
 const solutions: ProblemSolutions = {
-  python: { code: 'python source', output: 'python output' },
-  java: { code: 'java source', output: 'java output' },
-  cpp: { code: 'cpp source', output: '' },
+  python: { code: 'python source' },
+  java: { code: 'java source' },
+  cpp: { code: 'cpp source' },
 };
 beforeEach(() => {
   vi.clearAllMocks();
@@ -80,7 +80,7 @@ async function openOfficer(
 }
 
 describe('solution workspace', () => {
-  it('renders all three read-only languages and static output without fetching or execution controls', () => {
+  it('renders all three read-only source panels without output or execution controls', () => {
     render(<SolutionWorkspace solutions={solutions} modelPath="member/s/p" />);
     for (const [language, name] of [
       ['python', 'Python'],
@@ -94,12 +94,12 @@ describe('solution workspace', () => {
       expect(editor.dataset.language).toBe(language);
       expect(editor.dataset.path).toBe(`member/s/p/${language}`);
     }
-    expect(screen.getByText('python output').tagName).toBe('PRE');
-    expect(screen.getByText('No prepared output')).toBeTruthy();
+    expect(screen.queryByText('python output')).toBeNull();
+    expect(screen.queryByText('Output')).toBeNull();
     expect(screen.queryByRole('button')).toBeNull();
     expect(persistence.load).not.toHaveBeenCalled();
   });
-  it('keeps source and prepared Output local until the reported save action runs', async () => {
+  it('keeps source local until the reported save action runs', async () => {
     const onPending = vi.fn();
     const saveState = vi.fn();
     await openOfficer(onPending, saveState);
@@ -108,16 +108,13 @@ describe('solution workspace', () => {
     ) as HTMLTextAreaElement;
     expect(editor.readOnly).toBe(false);
     fireEvent.change(editor, { target: { value: 'new java' } });
-    fireEvent.change(screen.getByLabelText('Java prepared output'), {
-      target: { value: 'new output' },
-    });
+    expect(screen.queryByLabelText('Java prepared output')).toBeNull();
     expect(onPending).toHaveBeenLastCalledWith(true);
     expect(persistence.save).not.toHaveBeenCalled();
     expect(saveState.mock.calls.at(-1)?.[0]).toMatchObject({ dirty: true });
     await act(async () => saveState.mock.calls.at(-1)?.[0].save());
     expect(persistence.save).toHaveBeenCalledExactlyOnceWith('s', 'p', 'java', {
       code: 'new java',
-      output: 'new output',
     });
     expect(onPending).toHaveBeenLastCalledWith(false);
   });
@@ -140,7 +137,7 @@ describe('solution workspace', () => {
       ).value,
     ).toBe('unsaved python');
     expect(saveState.mock.calls.at(-1)?.[0].error).toContain(
-      'Python Solution or prepared Output could not be saved',
+      'Python Solution could not be saved',
     );
     expect(persistence.save).toHaveBeenCalledTimes(1);
     await act(async () => saveState.mock.calls.at(-1)?.[0].save());
@@ -195,20 +192,16 @@ describe('solution workspace', () => {
     await act(async () => saveState.mock.calls.at(-1)?.[0].save());
     expect(persistence.save).toHaveBeenLastCalledWith('s', 'p', 'cpp', {
       code: 'second',
-      output: '',
     });
     expect(onPending).toHaveBeenLastCalledWith(false);
   });
-  it('locks code and output during a parent operation', async () => {
+  it('locks code during a parent operation', async () => {
     render(<OfficerSolutions sessionId="s" problemId="p" disabled />);
     const editor = (await screen.findByLabelText(
       'Python Solution, temporarily read-only',
     )) as HTMLTextAreaElement;
     expect(editor.readOnly).toBe(true);
-    expect(
-      (screen.getByLabelText('Python prepared output') as HTMLTextAreaElement)
-        .disabled,
-    ).toBe(true);
+    expect(screen.queryByLabelText('Python prepared output')).toBeNull();
   });
   it('keeps a failed dirty save blocking until the officer restores confirmed content', async () => {
     const pending = vi.fn();
@@ -267,7 +260,7 @@ describe('solution workspace', () => {
     view.rerender(<OfficerSolutions sessionId="s" problemId="second" />);
     await screen.findByLabelText('Python Solution, editable');
     await act(async () => {
-      first({ ...solutions, python: { code: 'stale', output: '' } });
+      first({ ...solutions, python: { code: 'stale' } });
     });
     expect(
       (

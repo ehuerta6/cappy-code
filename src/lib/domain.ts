@@ -27,5 +27,4 @@ export interface Problem {
 
 export interface Solution {
   code: string;
-  output: string;
 }

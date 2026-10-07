@@ -75,9 +75,9 @@ beforeEach(() => {
   api.listProblems.mockResolvedValue([]);
   api.updateProblem.mockResolvedValue(undefined);
   api.getSolutionsForProblem.mockResolvedValue({
-    python: { code: '', output: '' },
-    java: { code: '', output: '' },
-    cpp: { code: '', output: '' },
+    python: { code: '' },
+    java: { code: '' },
+    cpp: { code: '' },
   });
   api.updateSolution.mockResolvedValue(undefined);
   api.createSession.mockResolvedValue('new-session');
@@ -693,7 +693,7 @@ describe('Officer Sessions surface', () => {
     expect(api.updateSession).not.toHaveBeenCalled();
   });
 
-  it('keeps the Session workspace open until the selected Problem solution saves', async () => {
+  it('keeps the Session workspace open until the selected Problem source saves', async () => {
     api.listProblems.mockResolvedValue([
       {
         id: 'problem',
@@ -712,8 +712,8 @@ describe('Officer Sessions surface', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Manage problems' }));
     await screen.findByLabelText('Python Solution, editable');
     const backButton = screen.getByRole('button', { name: 'Back to session' });
-    fireEvent.change(screen.getByLabelText('C++ prepared output'), {
-      target: { value: 'static output' },
+    fireEvent.change(screen.getByLabelText('C++ Solution, editable'), {
+      target: { value: 'static source' },
     });
     expect((backButton as HTMLButtonElement).disabled).toBe(true);
     expect(api.updateSolution).not.toHaveBeenCalled();
@@ -726,8 +726,7 @@ describe('Officer Sessions surface', () => {
         'problem',
         'cpp',
         {
-          code: '',
-          output: 'static output',
+          code: 'static source',
         },
       ),
     );
@@ -772,16 +771,14 @@ describe('Officer Sessions surface', () => {
     fireEvent.change(screen.getByLabelText('Python Solution, editable'), {
       target: { value: 'new python' },
     });
-    fireEvent.change(screen.getByLabelText('Java prepared output'), {
-      target: { value: 'new java output' },
+    fireEvent.change(screen.getByLabelText('Java Solution, editable'), {
+      target: { value: 'new java source' },
     });
     expect(api.updateProblem).not.toHaveBeenCalled();
     expect(api.updateSolution).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
-    await screen.findByText(
-      /Java Solution or prepared Output could not be saved/,
-    );
+    await screen.findByText(/Java Solution could not be saved/);
     expect(api.updateProblem).toHaveBeenCalledOnce();
     expect(api.updateProblem).toHaveBeenCalledWith('session-id', 'problem', {
       title: 'Renamed problem',
@@ -804,7 +801,7 @@ describe('Officer Sessions surface', () => {
       'session-id',
       'problem',
       'java',
-      { code: '', output: 'new java output' },
+      { code: 'new java source' },
     ]);
     expect(api.updateProblem).toHaveBeenCalledOnce();
     await waitFor(() =>
@@ -855,8 +852,8 @@ describe('Officer Sessions surface', () => {
     });
     expect((deleteProblem as HTMLButtonElement).disabled).toBe(false);
 
-    fireEvent.change(screen.getByLabelText('C++ prepared output'), {
-      target: { value: 'changed output' },
+    fireEvent.change(screen.getByLabelText('C++ Solution, editable'), {
+      target: { value: 'changed source' },
     });
     expect(api.updateSolution).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
@@ -865,7 +862,7 @@ describe('Officer Sessions surface', () => {
         'session-id',
         'problem',
         'cpp',
-        { code: '', output: 'changed output' },
+        { code: 'changed source' },
       ),
     );
     await screen.findByRole('alert');

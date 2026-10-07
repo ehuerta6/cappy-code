@@ -89,7 +89,6 @@ beforeEach(async () => {
         writes.push(
           setDoc(doc(database, `${parentPath}/solutions/${language}`), {
             code: `${language} source`,
-            output: `${language} output`,
           }),
         );
       }
@@ -143,7 +142,7 @@ describe('Firestore security rules', () => {
         `sessions/draft/problems/revealed/solutions/${language}`,
       );
       await assertSucceeds(getDoc(solution));
-      await assertSucceeds(setDoc(solution, { code: 'updated', output: '' }));
+      await assertSucceeds(setDoc(solution, { code: 'updated' }));
     }
     await assertFails(
       getDoc(doc(db, 'sessions/draft/problems/revealed/solutions/rust')),
@@ -185,7 +184,7 @@ describe('Firestore security rules', () => {
       );
       await assertFails(updateDoc(problem, { title: 'forbidden' }));
       await assertFails(deleteDoc(problem));
-      await assertFails(setDoc(solution, { code: 'forbidden', output: '' }));
+      await assertFails(setDoc(solution, { code: 'forbidden' }));
       await assertFails(updateDoc(solution, { code: 'forbidden' }));
       await assertFails(deleteDoc(solution));
     }

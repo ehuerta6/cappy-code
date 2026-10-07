@@ -226,7 +226,7 @@ function EditableSolution({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(false);
   const busy = useRef(false);
-  const dirty = draft.code !== saved.code || draft.output !== saved.output;
+  const dirty = draft.code !== saved.code;
   const save = useCallback(async () => {
     if (!dirty || busy.current) return;
     const submitted = draft;
@@ -253,7 +253,7 @@ function EditableSolution({
             saving,
             error:
               error && isDirty
-                ? `${languageNames[language]} Solution or prepared Output could not be saved.`
+                ? `${languageNames[language]} Solution could not be saved.`
                 : undefined,
             save,
           }
@@ -272,8 +272,7 @@ function EditableSolution({
         onChange={(next) => {
           setDraft(next);
           if (next.code !== draft.code) onCodeChange(next.code);
-          if (next.code === saved.code && next.output === saved.output)
-            setError(false);
+          if (next.code === saved.code) setError(false);
         }}
       />
     </div>
