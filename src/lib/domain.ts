@@ -20,6 +20,7 @@ export interface Problem {
   description: string;
   exampleInput: string;
   exampleOutput: string;
+  constraints: string;
   order: number;
   answersVisible: boolean;
   leetcodeUrl?: string;

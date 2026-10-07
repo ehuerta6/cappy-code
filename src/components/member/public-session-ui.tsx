@@ -20,6 +20,7 @@ export interface PublicProblem {
   description: string;
   exampleInput: string;
   exampleOutput: string;
+  constraints: string;
   order: number;
   answersVisible: boolean;
   leetcodeUrl?: string;
@@ -459,6 +460,19 @@ function ProblemContent({
           </section>
         </div>
       </section>
+      {problem.constraints ? (
+        <section className="my-5 mb-7" aria-labelledby="constraints-heading">
+          <h3
+            className="mb-2 mt-0 text-base font-semibold leading-6"
+            id="constraints-heading"
+          >
+            Constraints
+          </h3>
+          <p className="m-0 max-w-[80ch] whitespace-pre-wrap text-base leading-[26px]">
+            {problem.constraints}
+          </p>
+        </section>
+      ) : null}
       <section
         className="mt-7 border-t border-border-soft pt-6"
         aria-labelledby="solutions-heading"

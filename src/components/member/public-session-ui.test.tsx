@@ -84,6 +84,7 @@ const problems: PublicProblem[] = [
     description: 'Second description',
     exampleInput: 'second input',
     exampleOutput: 'second output',
+    constraints: '',
     order: 1,
     answersVisible: false,
   },
@@ -93,6 +94,7 @@ const problems: PublicProblem[] = [
     description: 'First description',
     exampleInput: 'first input',
     exampleOutput: 'first output',
+    constraints: '1 ≤ nums.length ≤ 10⁴\n-10⁹ ≤ nums[i] ≤ 10⁹',
     order: 0,
     answersVisible: false,
     leetcodeUrl: 'https://leetcode.com/problems/two-sum/',
@@ -175,7 +177,7 @@ describe('public member UI scaffold', () => {
 
   it('opens a permitted session and navigates ordered problem tabs locally', () => {
     const load = vi.fn().mockResolvedValue(solutions);
-    render(<PublicSessionView state={viewState(load)} />);
+    const { container } = render(<PublicSessionView state={viewState(load)} />);
     expect(
       screen.getByRole('heading', { name: 'Intro practice' }),
     ).toBeTruthy();
@@ -188,6 +190,14 @@ describe('public member UI scaffold', () => {
     expect(screen.getByText('First description')).toBeTruthy();
     expect(screen.getByText('first input')).toBeTruthy();
     expect(screen.getByText('first output')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Constraints' })).toBeTruthy();
+    expect(screen.getByText(/1 ≤ nums.length/)).toBeTruthy();
+    expect(container.textContent!.indexOf('Constraints')).toBeGreaterThan(
+      container.textContent!.indexOf('Expected output'),
+    );
+    expect(container.textContent!.indexOf('Constraints')).toBeLessThan(
+      container.textContent!.indexOf('Solutions'),
+    );
     expect(screen.getAllByText('Expected output')).toHaveLength(1);
     expect(screen.queryByText('hello')).toBeNull();
     expect(screen.queryByText('java output')).toBeNull();

@@ -127,6 +127,16 @@ export default function ProblemEditor({
         />
       </label>
       <label className="my-5 flex max-w-3xl flex-col gap-2">
+        Constraints
+        <textarea
+          className="min-h-[76px] w-full resize-y rounded border border-border-strong bg-surface px-3 py-2 leading-6 text-ink disabled:cursor-default disabled:bg-raised disabled:text-muted"
+          rows={3}
+          value={content.constraints}
+          onChange={(event) => edit('constraints', event.target.value)}
+          disabled={saving || disabled}
+        />
+      </label>
+      <label className="my-5 flex max-w-3xl flex-col gap-2">
         LeetCode link (optional)
         <input
           className="min-h-11 w-full min-w-0 rounded border border-border-strong bg-surface px-3 py-2 text-ink disabled:cursor-default disabled:bg-raised disabled:text-muted"

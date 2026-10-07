@@ -252,6 +252,7 @@ describe('Officer Sessions surface', () => {
                 description: 'Given an array of integers, find two values.',
                 exampleInput: '',
                 exampleOutput: '',
+                constraints: '',
                 order: 0,
                 answersVisible: false,
                 leetcodeUrl: 'https://leetcode.com/problems/two-sum/',
@@ -264,6 +265,7 @@ describe('Officer Sessions surface', () => {
                 description: 'Write a function that finds a shared prefix.',
                 exampleInput: '',
                 exampleOutput: '',
+                constraints: '1 ≤ n ≤ 100',
                 order: 1,
                 answersVisible: false,
               },
@@ -277,6 +279,7 @@ describe('Officer Sessions surface', () => {
                 description: 'Determine whether two strings are anagrams.',
                 exampleInput: '',
                 exampleOutput: '',
+                constraints: '',
                 order: 0,
                 answersVisible: false,
                 leetcodeUrl: 'https://leetcode.com/problems/valid-anagram/',
@@ -301,6 +304,7 @@ describe('Officer Sessions surface', () => {
         'Given an array of integers, find two values.',
       ),
     ).toBeTruthy();
+    expect(within(newerHistory).getByText('1 ≤ n ≤ 100')).toBeTruthy();
     expect(
       within(newerHistory)
         .getByRole('link', {

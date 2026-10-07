@@ -45,6 +45,7 @@ const problem = {
   description: 'Find the pair.',
   exampleInput: '2 4',
   exampleOutput: '6',
+  constraints: 'Values are distinct.',
   order: 0,
   answersVisible: false,
 };
@@ -197,6 +198,24 @@ describe('anonymous member persistence', () => {
     await expect(listMemberProblems('session')).rejects.toThrow(
       'valid HTTPS LeetCode Problem URL',
     );
+  });
+
+  it('maps legacy Problems without constraints to empty text and preserves new multiline constraints', async () => {
+    sdk.getDocsFromServer.mockResolvedValueOnce({
+      docs: [
+        snapshot('legacy', { ...problem, constraints: undefined }),
+        snapshot('new', {
+          ...problem,
+          order: 1,
+          constraints: '1 ≤ n ≤ 100\nValues are distinct.',
+        }),
+      ],
+    });
+    const records = await listMemberProblems('session');
+    expect(records.map(({ problem: item }) => item.constraints)).toEqual([
+      '',
+      '1 ≤ n ≤ 100\nValues are distinct.',
+    ]);
   });
 
   it('loads only the three fixed solution documents', async () => {

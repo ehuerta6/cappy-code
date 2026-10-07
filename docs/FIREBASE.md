@@ -177,12 +177,12 @@ responses. Firestore Security Rules independently enforce backend access.
 
 `src/lib/domain.ts` defines document fields, with IDs held in document paths rather than duplicated inside records:
 
-| Path                                                             | Type       | Fields                                                                                                     |
-| ---------------------------------------------------------------- | ---------- | ---------------------------------------------------------------------------------------------------------- |
-| `sessions/{sessionId}`                                           | `Session`  | `title`, `date`, `status`, `createdAt`, `updatedAt`                                                        |
-| `sessions/{sessionId}/problems/{problemId}`                      | `Problem`  | `title`, `description`, `exampleInput`, `exampleOutput`, `order`, `answersVisible`, optional `leetcodeUrl` |
-| `sessionControl/liveSession`                                     | control    | `sessionId` (active Session ID, or `null` when no Session is live)                                         |
-| `sessions/{sessionId}/problems/{problemId}/solutions/{language}` | `Solution` | `code`                                                                                                     |
+| Path                                                             | Type       | Fields                                                                                                                    |
+| ---------------------------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `sessions/{sessionId}`                                           | `Session`  | `title`, `date`, `status`, `createdAt`, `updatedAt`                                                                       |
+| `sessions/{sessionId}/problems/{problemId}`                      | `Problem`  | `title`, `description`, `exampleInput`, `exampleOutput`, `constraints`, `order`, `answersVisible`, optional `leetcodeUrl` |
+| `sessionControl/liveSession`                                     | control    | `sessionId` (active Session ID, or `null` when no Session is live)                                                        |
+| `sessions/{sessionId}/problems/{problemId}/solutions/{language}` | `Solution` | `code`                                                                                                                    |
 
 - `Language` is exactly `python | java | cpp`; each language identifies its own Solution document.
 - `SessionStatus` is `draft | live | ended`.
@@ -289,20 +289,23 @@ fixed Solution IDs, and anonymous write denial.
 `updateProblem`, `reorderProblems`, and `deleteProblem`. Every operation checks
 the current non-anonymous Officer Auth session before accessing Firestore.
 Creation reads the current order from the server and writes only `Untitled Problem`,
-empty description/examples, the next order, and `answersVisible: false`. The
-optional `leetcodeUrl` is omitted for custom Problems and on older documents;
-readers accept its absence without a migration. Officers can enter a link in the
+empty description/examples/constraints, the next order, and
+`answersVisible: false`. The optional `leetcodeUrl` is omitted for custom
+Problems and on older documents; readers accept its absence without a migration.
+The plain multiline `constraints` field is backward-compatible: readers treat a
+missing value as empty, with no migration required. Officers can enter a link in the
 Problem editor, where a blank value clears the field and a nonblank value must
 be an HTTPS URL on `leetcode.com` or `www.leetcode.com` at `/problems/{slug}`.
 The link saves with the Problem's explicit **Save changes** workflow. Members
 see **View on LeetCode** only when a link exists. The Officer Sessions dashboard
 loads an ordered Problem summary under each Past Session, using existing
-Problem documents to show titles, descriptions, and links (or the Officer-only
+Problem documents to show titles, descriptions, constraints, and links (or the Officer-only
 **No LeetCode link provided** label). Draft and live Sessions do not load this
 history, and no separate history records are stored.
 No Solution documents or Solution fields are created in Problem metadata.
 Server reads validate the existing `Problem` model and reject pending writes.
-Content updates write only title, description, example input and example output;
+Content updates write only title, description, example input, expected output,
+and constraints;
 reordering checks the current complete ID list and writes dense orders in one batch.
 Problem deletion commits the three known Solution deletes and metadata delete
 in one atomic batch, without reading protected source or output.
@@ -325,7 +328,8 @@ while a child write/edit is pending. Creation uses the backend-confirmed record
 directly rather than retrying a successful write after a failed refresh.
 Operation errors offer a list reload, including when a remote list change prevents
 reordering. Firestore is authoritative; no localStorage or member/public fetching
-is added. There is no constraints field in the persisted model.
+is added. Members see constraints with the description and shared examples before
+Solutions, regardless of answer reveal state. Existing Problems need no migration.
 
 Unit tests mock Firebase, cover CRUD, ordering, fixed cleanup/cascade, authentication,
 selection, reveal persistence, save failures and loading/error/empty states, and
