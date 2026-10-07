@@ -68,8 +68,11 @@ export default function OfficerProblems({
       setRecords((currentRecords) =>
         currentRecords.map((record) => {
           if (record.id !== selectedId) return record;
-          const problem: Problem = { ...record.problem, ...content };
+          const { difficulty, ...savedContent } = content;
+          const problem: Problem = { ...record.problem, ...savedContent };
           if (!content.leetcodeUrl) delete problem.leetcodeUrl;
+          if (difficulty) problem.difficulty = difficulty;
+          else delete problem.difficulty;
           return { ...record, problem };
         }),
       );

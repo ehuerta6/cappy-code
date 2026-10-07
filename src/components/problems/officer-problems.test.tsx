@@ -299,6 +299,22 @@ describe('Officer Problem workspace', () => {
     expect(api.updateProblem).toHaveBeenCalledTimes(2);
     expect(screen.getByRole('tab', { name: 'Renamed' })).toBeTruthy();
   });
+  it('keeps difficulty changes local until the shared Save changes action', async () => {
+    await loaded();
+    const difficulty = screen.getByLabelText('Difficulty') as HTMLSelectElement;
+    expect(difficulty.value).toBe('');
+    fireEvent.change(difficulty, { target: { value: 'medium' } });
+    expect(difficulty.value).toBe('medium');
+    expect(api.updateProblem).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    await waitFor(() =>
+      expect(api.updateProblem).toHaveBeenCalledExactlyOnceWith(
+        'session',
+        'first',
+        { difficulty: 'medium' },
+      ),
+    );
+  });
   it('rejects an invalid LeetCode URL before saving and preserves the entered value', async () => {
     await loaded();
     const input = screen.getByLabelText(

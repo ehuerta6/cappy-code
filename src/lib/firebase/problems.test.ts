@@ -122,6 +122,23 @@ describe('officer problem persistence', () => {
       { constraints: '1 ≤ n ≤ 100\nValues are distinct.' },
     );
   });
+  it.each(['easy', 'medium', 'hard'] as const)(
+    'writes supported %s difficulty as Problem metadata',
+    async (difficulty) => {
+      await updateProblem('session', 'problem', { difficulty });
+      expect(sdk.updateDoc).toHaveBeenCalledExactlyOnceWith(
+        { path: 'sessions/session/problems/problem' },
+        { difficulty },
+      );
+    },
+  );
+  it('unsets difficulty when the Officer selects Not set', async () => {
+    await updateProblem('session', 'problem', { difficulty: '' });
+    expect(sdk.updateDoc).toHaveBeenCalledExactlyOnceWith(
+      { path: 'sessions/session/problems/problem' },
+      { difficulty: 'DELETE_FIELD' },
+    );
+  });
   it('accepts a blank LeetCode field and removes any saved URL', async () => {
     await updateProblem('session', 'problem', { leetcodeUrl: '   ' });
     expect(sdk.updateDoc).toHaveBeenCalledExactlyOnceWith(
@@ -210,9 +227,27 @@ describe('officer problem persistence', () => {
     const records = await listProblems('session');
     expect(records[0].problem).not.toHaveProperty('leetcodeUrl');
     expect(records[0].problem.constraints).toBe('');
+    expect(records[0].problem).not.toHaveProperty('difficulty');
     expect(records[1].problem.leetcodeUrl).toBe(
       'https://leetcode.com/problems/two-sum/',
     );
+  });
+  it('loads valid difficulty values and rejects an invalid persisted value', async () => {
+    sdk.getDocsFromServer.mockResolvedValue({
+      docs: [
+        document('easy', 0, { ...problem, difficulty: 'easy' }),
+        document('hard', 1, { ...problem, order: 1, difficulty: 'hard' }),
+      ],
+    });
+    expect(
+      (await listProblems('session')).map(
+        ({ problem: item }) => item.difficulty,
+      ),
+    ).toEqual(['easy', 'hard']);
+    sdk.getDocsFromServer.mockResolvedValue({
+      docs: [document('bad', 0, { ...problem, difficulty: 'extreme' })],
+    });
+    await expect(listProblems('session')).rejects.toThrow('invalid fields');
   });
   it('loads multiline constraints when present and defaults only missing values to empty text', async () => {
     sdk.getDocsFromServer.mockResolvedValue({
@@ -305,6 +340,9 @@ describe('officer problem persistence', () => {
     await expect(
       updateProblem('s', 'p', { ...content, title: ' ' }),
     ).rejects.toThrow('Enter a problem title');
+    await expect(
+      updateProblem('s', 'p', { difficulty: 'extreme' as never }),
+    ).rejects.toThrow('supported Problem difficulty');
     expect(sdk.updateDoc).not.toHaveBeenCalled();
   });
   it('propagates read, write and batch failures', async () => {

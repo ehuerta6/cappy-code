@@ -105,6 +105,7 @@ const problems = [
     constraints:
       '2 ≤ nums.length ≤ 10⁴\n-10⁹ ≤ nums[i] ≤ 10⁹\n-10⁹ ≤ target ≤ 10⁹\nExactly one valid answer exists; do not use the same element twice.',
     answersVisible: true,
+    difficulty: 'medium',
     leetcodeUrl: 'https://leetcode.com/problems/two-sum/',
     solution: 'two-sum',
     solutionComplexities: {
@@ -167,6 +168,7 @@ const problems = [
     exampleInput: 's = "anagram", t = "nagaram"',
     exampleOutput: 'true',
     answersVisible: false,
+    difficulty: 'easy',
     leetcodeUrl: 'https://leetcode.com/problems/valid-anagram/',
     solution: 'valid-anagram',
     solutionComplexities: {
@@ -289,6 +291,7 @@ const problems = [
     constraints:
       '2 ≤ nums.length ≤ 10⁵\nProducts fit in a signed 32-bit integer.',
     answersVisible: false,
+    difficulty: 'hard',
     leetcodeUrl: 'https://leetcode.com/problems/product-of-array-except-self/',
     solution: 'product-except-self',
   },
@@ -313,6 +316,7 @@ const problems = [
     exampleOutput: '49',
     constraints: '2 ≤ height.length ≤ 10⁵\n0 ≤ height[i] ≤ 10⁴',
     answersVisible: false,
+    difficulty: 'medium',
     leetcodeUrl: 'https://leetcode.com/problems/container-with-most-water/',
     solution: 'container-water',
   },
@@ -1217,6 +1221,19 @@ function assertFixture() {
   const sessionIds = new Set(sessions.map(({ id }) => id));
   const problemIds = new Set();
   const supportedLanguages = ['python', 'java', 'cpp'];
+  const supportedDifficulties = ['easy', 'medium', 'hard'];
+  const seededDifficulties = new Set(
+    problems.map((problem) => problem.difficulty).filter(Boolean),
+  );
+  if (
+    supportedDifficulties.some(
+      (difficulty) => !seededDifficulties.has(difficulty),
+    ) ||
+    problems.every((problem) => problem.difficulty !== undefined)
+  )
+    throw new Error(
+      'The local fixture must cover every Problem difficulty and unset Problems.',
+    );
   for (const problem of problems) {
     const path = `${problem.sessionId}/${problem.id}`;
     if (!sessionIds.has(problem.sessionId) || problemIds.has(path))
@@ -1234,6 +1251,8 @@ function assertFixture() {
       typeof problem.exampleOutput !== 'string' ||
       (problem.constraints !== undefined &&
         typeof problem.constraints !== 'string') ||
+      (problem.difficulty !== undefined &&
+        !supportedDifficulties.includes(problem.difficulty)) ||
       !problem.exampleOutput.trim()
     )
       throw new Error(

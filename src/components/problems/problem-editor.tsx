@@ -116,6 +116,20 @@ export default function ProblemEditor({
           required
         />
       </label>
+      <label className="my-5 flex max-w-xs flex-col gap-2">
+        Difficulty
+        <select
+          className="min-h-11 w-full rounded border border-border-strong bg-surface px-3 py-2 text-ink disabled:cursor-default disabled:bg-raised disabled:text-muted"
+          value={content.difficulty}
+          onChange={(event) => edit('difficulty', event.target.value)}
+          disabled={saving || disabled}
+        >
+          <option value="">Not set</option>
+          <option value="easy">Easy</option>
+          <option value="medium">Medium</option>
+          <option value="hard">Hard</option>
+        </select>
+      </label>
       <label className="my-5 flex max-w-3xl flex-col gap-2">
         Description
         <textarea
