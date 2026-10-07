@@ -260,14 +260,17 @@ Problem to avoid confusing officer access with member visibility.
 | Session / selected Problem | Visible actions and status                                                     |
 | -------------------------- | ------------------------------------------------------------------------------ |
 | Draft                      | Draft · Saved ✓ · **Go Live**                                                  |
-| Live / answers hidden      | ● Live · Saved ✓ · **Show Answers** · End Session                              |
-| Live / answers revealed    | ● Live · Saved ✓ · Hide Answers · End Session                                  |
+| Live / answers hidden      | ● Live · Saved ✓ · **Show Answers** · Not Live · End Session                   |
+| Live / answers revealed    | ● Live · Saved ✓ · Hide Answers · Not Live · End Session                       |
 | Ended                      | Ended; preserve reveal indicators and a return to Sessions; no live action bar |
 
 Show Answers is directly accessible, never in overflow. Hide Answers becomes a
-secondary outlined/text control after reveal. End Session uses a secondary action
-with clear confirmation. Go Live is disabled when there are no Problems, with
-“Add a Problem before going live” nearby. While an action is pending, use an
+secondary outlined/text control after reveal. Not Live returns the Session to
+Draft without changing prepared content or reveal state. End Session uses a
+secondary action with confirmation that it moves to Past and makes all prepared
+Python, Java, and C++ Solutions public regardless of answer visibility. Go Live
+is disabled when there are no Problems, with “Add a Problem before going live”
+nearby. While an action is pending, use an
 explicit label such as “Starting…”; reflect confirmed shared state and show errors
 with recovery instead of implying a failed action succeeded.
 

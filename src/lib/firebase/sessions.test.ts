@@ -11,13 +11,18 @@ const sdk = vi.hoisted(() => ({
   db: {},
   addDoc: vi.fn(),
   getCountFromServer: vi.fn(),
+  getDocFromServer: vi.fn(),
   getDocsFromServer: vi.fn(),
   runTransaction: vi.fn(),
   transactionGet: vi.fn(),
   transactionUpdate: vi.fn(),
+  transactionSet: vi.fn(),
   transactionStatus: 'draft' as string,
+  transactionLiveSessionId: null as string | null,
+  transactionLiveSessionExists: false,
   updateDoc: vi.fn(),
   batchDelete: vi.fn(),
+  batchUpdate: vi.fn(),
   batchCommit: vi.fn(),
 }));
 vi.mock('client-only', () => ({}));
@@ -28,14 +33,25 @@ vi.mock('./auth', () => ({ getOfficerAuth: vi.fn(() => sdk.user) }));
 vi.mock('firebase/firestore', async (importOriginal) => ({
   ...(await importOriginal<typeof import('firebase/firestore')>()),
   collection: vi.fn((_db, path) => ({ path })),
+  query: vi.fn((reference, ...constraints) => ({
+    ...reference,
+    isQuery: true,
+    constraints,
+  })),
+  where: vi.fn((...args) => args),
   doc: vi.fn((_db, path) => ({ path })),
   serverTimestamp: () => 'SERVER_TIMESTAMP',
   addDoc: sdk.addDoc,
   getDocsFromServer: sdk.getDocsFromServer,
+  getDocFromServer: sdk.getDocFromServer,
   getCountFromServer: sdk.getCountFromServer,
   runTransaction: sdk.runTransaction,
   updateDoc: sdk.updateDoc,
-  writeBatch: () => ({ delete: sdk.batchDelete, commit: sdk.batchCommit }),
+  writeBatch: () => ({
+    delete: sdk.batchDelete,
+    update: sdk.batchUpdate,
+    commit: sdk.batchCommit,
+  }),
 }));
 import { getOfficerAuth } from './auth';
 import {
@@ -65,18 +81,43 @@ beforeEach(() => {
   sdk.updateDoc.mockResolvedValue(undefined);
   sdk.batchCommit.mockResolvedValue(undefined);
   sdk.transactionStatus = 'draft';
-  sdk.transactionGet.mockImplementation(async () => ({
-    exists: () => true,
-    data: () => ({ ...session, status: sdk.transactionStatus }),
+  sdk.transactionLiveSessionId = null;
+  sdk.transactionLiveSessionExists = false;
+  sdk.getDocFromServer.mockImplementation(async (reference) => ({
+    exists: () =>
+      reference.path === 'sessionControl/liveSession'
+        ? sdk.transactionLiveSessionExists
+        : true,
+    data: () =>
+      reference.path === 'sessionControl/liveSession'
+        ? { sessionId: sdk.transactionLiveSessionId }
+        : { status: sdk.transactionStatus },
   }));
+  sdk.transactionGet.mockImplementation(async (reference) => {
+    if (reference.path === 'sessionControl/liveSession')
+      return {
+        exists: () => sdk.transactionLiveSessionExists,
+        data: () => ({ sessionId: sdk.transactionLiveSessionId }),
+      };
+    return {
+      exists: () => true,
+      data: () => ({ ...session, status: sdk.transactionStatus }),
+    };
+  });
   sdk.runTransaction.mockImplementation(async (_db, callback) =>
-    callback({ get: sdk.transactionGet, update: sdk.transactionUpdate }),
+    callback({
+      get: sdk.transactionGet,
+      update: sdk.transactionUpdate,
+      set: sdk.transactionSet,
+    }),
   );
   sdk.getCountFromServer.mockResolvedValue({ data: () => ({ count: 1 }) });
   sdk.getDocsFromServer.mockImplementation(async (reference) =>
-    reference.path === 'sessions'
-      ? { docs: [document()] }
-      : { docs: [], empty: false },
+    reference.path === 'sessions' && reference.constraints
+      ? { docs: [] }
+      : reference.path === 'sessions'
+        ? { docs: [document()] }
+        : { docs: [], empty: false },
   );
 });
 
@@ -174,11 +215,44 @@ describe('officer session persistence', () => {
       { path: 'sessions/session-id' },
       { status: 'live', updatedAt: 'SERVER_TIMESTAMP' },
     );
+    expect(sdk.transactionSet).toHaveBeenCalledWith(
+      { path: 'sessionControl/liveSession' },
+      { sessionId: 'session-id' },
+    );
     expect(sdk.updateDoc).not.toHaveBeenCalled();
+  });
+
+  it('blocks Go Live when legacy-lock initialization finds another live Session', async () => {
+    sdk.getDocsFromServer.mockResolvedValueOnce({
+      docs: [document('problem')],
+    });
+    sdk.getDocsFromServer.mockResolvedValueOnce({
+      docs: [document('already-live', { ...session, status: 'live' })],
+    });
+    await expect(transitionSession('session-id', 'live')).rejects.toThrow(
+      'Another Session is already live',
+    );
+    expect(sdk.transactionSet).not.toHaveBeenCalled();
+    expect(sdk.transactionUpdate).not.toHaveBeenCalled();
+  });
+
+  it('blocks Go Live when the live-session pointer is already claimed', async () => {
+    sdk.transactionLiveSessionExists = true;
+    sdk.transactionLiveSessionId = 'already-live';
+    sdk.getDocsFromServer.mockResolvedValueOnce({
+      docs: [document('problem')],
+    });
+    await expect(transitionSession('session-id', 'live')).rejects.toThrow(
+      'Another Session is already live',
+    );
+    expect(sdk.transactionSet).not.toHaveBeenCalled();
+    expect(sdk.transactionUpdate).not.toHaveBeenCalled();
   });
 
   it('ends only a live Session and changes no Problem answer visibility', async () => {
     sdk.transactionStatus = 'live';
+    sdk.transactionLiveSessionExists = true;
+    sdk.transactionLiveSessionId = 'session-id';
     await transitionSession('session-id', 'ended');
     expect(sdk.getDocsFromServer).not.toHaveBeenCalled();
     expect(sdk.transactionUpdate).toHaveBeenCalledWith(
@@ -188,6 +262,40 @@ describe('officer session persistence', () => {
     expect(sdk.transactionUpdate.mock.calls[0][1]).not.toHaveProperty(
       'answersVisible',
     );
+    expect(sdk.transactionSet).toHaveBeenCalledWith(
+      { path: 'sessionControl/liveSession' },
+      { sessionId: null },
+    );
+  });
+
+  it('returns a live Session to draft without touching prepared content or reveal state', async () => {
+    sdk.transactionStatus = 'live';
+    sdk.transactionLiveSessionExists = true;
+    sdk.transactionLiveSessionId = 'session-id';
+    await transitionSession('session-id', 'draft');
+    expect(sdk.transactionUpdate).toHaveBeenCalledWith(
+      { path: 'sessions/session-id' },
+      { status: 'draft', updatedAt: 'SERVER_TIMESTAMP' },
+    );
+    expect(sdk.transactionSet).toHaveBeenCalledWith(
+      { path: 'sessionControl/liveSession' },
+      { sessionId: null },
+    );
+    expect(sdk.transactionUpdate.mock.calls[0][1]).not.toHaveProperty(
+      'answersVisible',
+    );
+  });
+
+  it('cleans up a legacy live Session without clearing another Session’s live claim', async () => {
+    sdk.transactionStatus = 'live';
+    sdk.transactionLiveSessionExists = true;
+    sdk.transactionLiveSessionId = 'current-live';
+    await transitionSession('legacy-live', 'draft');
+    expect(sdk.transactionUpdate).toHaveBeenCalledWith(
+      { path: 'sessions/legacy-live' },
+      { status: 'draft', updatedAt: 'SERVER_TIMESTAMP' },
+    );
+    expect(sdk.transactionSet).not.toHaveBeenCalled();
   });
 
   it('rejects empty Go Live attempts and invalid state transitions before commit', async () => {
@@ -206,7 +314,6 @@ describe('officer session persistence', () => {
   it.each([
     ['draft', 'draft'],
     ['draft', 'ended'],
-    ['live', 'draft'],
     ['live', 'live'],
     ['ended', 'draft'],
     ['ended', 'live'],
@@ -214,7 +321,7 @@ describe('officer session persistence', () => {
   ])('rejects unsupported transition %s → %s', async (current, next) => {
     sdk.transactionStatus = current;
     await expect(
-      transitionSession('session-id', next as 'live' | 'ended'),
+      transitionSession('session-id', next as 'live' | 'draft' | 'ended'),
     ).rejects.toThrow();
     expect(sdk.transactionUpdate).not.toHaveBeenCalled();
   });
@@ -239,6 +346,22 @@ describe('officer session persistence', () => {
     ]);
     expect(sdk.batchCommit).toHaveBeenCalledTimes(1);
     expect(sdk.updateDoc).not.toHaveBeenCalled();
+  });
+
+  it('atomically releases the live claim when deleting a live Session', async () => {
+    sdk.transactionStatus = 'live';
+    sdk.transactionLiveSessionExists = true;
+    sdk.transactionLiveSessionId = 'session-id';
+    sdk.getDocsFromServer.mockResolvedValue({ docs: [] });
+    await deleteSession('session-id');
+    expect(sdk.batchUpdate).toHaveBeenCalledWith(
+      { path: 'sessionControl/liveSession' },
+      { sessionId: null },
+    );
+    expect(sdk.batchDelete).toHaveBeenCalledWith({
+      path: 'sessions/session-id',
+    });
+    expect(sdk.batchCommit).toHaveBeenCalledOnce();
   });
 
   it('deletes an empty session in one batch and rejects oversized cascades before writing', async () => {

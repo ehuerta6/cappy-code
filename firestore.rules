@@ -23,9 +23,43 @@ service cloud.firestore {
       ).data.answersVisible == true;
     }
 
+    function liveSessionPath() {
+      return /databases/$(database)/documents/sessionControl/liveSession;
+    }
+
+    function liveSessionAfterIs(sessionId) {
+      return existsAfter(liveSessionPath())
+        && getAfter(liveSessionPath()).data.sessionId == sessionId;
+    }
+
+    function liveSessionClearedAfter(sessionId) {
+      return !existsAfter(liveSessionPath())
+        || getAfter(liveSessionPath()).data.sessionId != sessionId;
+    }
+
+    function sessionInactiveAfter(sessionId) {
+      return !existsAfter(
+          /databases/$(database)/documents/sessions/$(sessionId)
+        )
+        || getAfter(
+          /databases/$(database)/documents/sessions/$(sessionId)
+        ).data.status != 'live';
+    }
+
     match /sessions/{sessionId} {
       allow read: if isOfficer() || resource.data.status in ['live', 'ended'];
-      allow write: if isOfficer();
+      allow create: if isOfficer() && request.resource.data.status == 'draft';
+      allow update: if isOfficer()
+        && (request.resource.data.status == resource.data.status
+          || (resource.data.status == 'draft'
+            && request.resource.data.status == 'live'
+            && liveSessionAfterIs(sessionId))
+          || (resource.data.status == 'live'
+            && request.resource.data.status in ['draft', 'ended']
+            && liveSessionClearedAfter(sessionId)));
+      allow delete: if isOfficer()
+        && (resource.data.status != 'live'
+          || liveSessionClearedAfter(sessionId));
 
       match /problems/{problemId} {
         allow read: if isOfficer() || sessionIsPublic(sessionId);
@@ -40,6 +74,26 @@ service cloud.firestore {
           allow write: if isOfficer() && language in ['python', 'java', 'cpp'];
         }
       }
+    }
+
+    match /sessionControl/liveSession {
+      allow read: if isOfficer();
+      allow create: if isOfficer()
+        && request.resource.data.keys().hasOnly(['sessionId'])
+        && request.resource.data.sessionId != null
+        && getAfter(/databases/$(database)/documents/sessions/$(request.resource.data.sessionId)).data.status == 'live';
+      allow update: if isOfficer()
+        && request.resource.data.keys().hasOnly(['sessionId'])
+        && (request.resource.data.sessionId == null
+          ? (resource.data.sessionId == null
+            || sessionInactiveAfter(resource.data.sessionId))
+          : getAfter(/databases/$(database)/documents/sessions/$(request.resource.data.sessionId)).data.status == 'live'
+            && (resource.data.sessionId == null
+              || resource.data.sessionId == request.resource.data.sessionId
+              || sessionInactiveAfter(resource.data.sessionId)));
+      allow delete: if isOfficer()
+        && (resource.data.sessionId == null
+          || sessionInactiveAfter(resource.data.sessionId));
     }
   }
 }

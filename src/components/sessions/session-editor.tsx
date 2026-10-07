@@ -50,7 +50,10 @@ export default function SessionEditor({
       : { status: 'ready', count: record.problemCount },
   );
   const [transitionPending, setTransitionPending] = useState(false);
-  const [transitionError, setTransitionError] = useState(false);
+  const [transitionTarget, setTransitionTarget] = useState<
+    'live' | 'draft' | 'ended' | null
+  >(null);
+  const [transitionError, setTransitionError] = useState<string | null>(null);
   const busy = useRef(false);
   const dirty = title !== saved.title || date !== saved.date;
 
@@ -83,7 +86,7 @@ export default function SessionEditor({
               problemBusy
             }
           >
-            {transitionPending ? 'Starting…' : 'Go Live'}
+            {transitionTarget === 'live' ? 'Starting…' : 'Go Live'}
           </button>
           {problemCount.status === 'loading' ? (
             <span className="text-sm text-muted">Checking Problems…</span>
@@ -101,15 +104,26 @@ export default function SessionEditor({
     }
     if (status === 'live') {
       return (
-        <button
-          className="min-h-10 rounded-md border border-danger/50 px-3 py-2 text-sm text-danger hover:bg-danger-surface disabled:cursor-default disabled:border-border-soft disabled:text-muted"
-          onClick={() => void transition('ended')}
-          disabled={
-            dirty || saving || deleting || transitionPending || problemBusy
-          }
-        >
-          {transitionPending ? 'Ending…' : 'End Session'}
-        </button>
+        <>
+          <button
+            className={contextualButtonClass}
+            onClick={() => void transition('draft')}
+            disabled={
+              dirty || saving || deleting || transitionPending || problemBusy
+            }
+          >
+            {transitionTarget === 'draft' ? 'Updating…' : 'Not Live'}
+          </button>
+          <button
+            className="min-h-10 rounded-md border border-danger/50 px-3 py-2 text-sm text-danger hover:bg-danger-surface disabled:cursor-default disabled:border-border-soft disabled:text-muted"
+            onClick={() => void transition('ended')}
+            disabled={
+              dirty || saving || deleting || transitionPending || problemBusy
+            }
+          >
+            {transitionTarget === 'ended' ? 'Ending…' : 'End Session'}
+          </button>
+        </>
       );
     }
     return null;
@@ -137,7 +151,7 @@ export default function SessionEditor({
     );
   }
 
-  async function transition(nextStatus: 'live' | 'ended') {
+  async function transition(nextStatus: 'live' | 'draft' | 'ended') {
     if (
       busy.current ||
       dirty ||
@@ -149,22 +163,29 @@ export default function SessionEditor({
     if (
       nextStatus === 'ended' &&
       !window.confirm(
-        `End “${title}”? Members can still access this session according to its publication and answer visibility settings.`,
+        `End “${title}”? It will move to Past, and all prepared Python, Java, and C++ Solutions will become public regardless of each Problem's answer visibility.`,
       )
     ) {
       return;
     }
     busy.current = true;
     setTransitionPending(true);
-    setTransitionError(false);
+    setTransitionTarget(nextStatus);
+    setTransitionError(null);
     try {
       await transitionSession(record.id, nextStatus);
       setStatus(nextStatus);
-    } catch {
-      setTransitionError(true);
+    } catch (error) {
+      setTransitionError(
+        error instanceof Error &&
+          error.message.startsWith('Another Session is already live.')
+          ? error.message
+          : 'Session status could not be changed. Check your connection and try again.',
+      );
     } finally {
       busy.current = false;
       setTransitionPending(false);
+      setTransitionTarget(null);
     }
   }
 
@@ -261,8 +282,7 @@ export default function SessionEditor({
         </div>
         {transitionError && (
           <p className="text-danger" role="alert">
-            Session status could not be changed. Check your connection and try
-            again.
+            {transitionError}
           </p>
         )}
         <OfficerProblems
@@ -328,8 +348,7 @@ export default function SessionEditor({
       )}
       {transitionError && (
         <p className="text-danger" role="alert">
-          Session status could not be changed. Check your connection and try
-          again.
+          {transitionError}
         </p>
       )}
       <label className="my-5 flex max-w-3xl flex-col gap-2">

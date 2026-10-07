@@ -16,6 +16,7 @@ import {
   setDoc,
   updateDoc,
   where,
+  writeBatch,
 } from 'firebase/firestore';
 import { afterAll, beforeAll, beforeEach, describe, it } from 'vitest';
 
@@ -70,6 +71,11 @@ beforeEach(async () => {
           }),
         ];
       },
+    );
+    writes.push(
+      setDoc(doc(database, 'sessionControl/liveSession'), {
+        sessionId: 'live',
+      }),
     );
     const solutionPaths = [
       'sessions/draft/problems/revealed',
@@ -196,6 +202,65 @@ describe('Firestore security rules', () => {
       ),
     );
     await assertFails(getDocs(collection(db, 'sessions')));
+  });
+
+  it('requires an atomic live-session pointer and allows only one live Session', async () => {
+    const db = officerDb();
+    await assertFails(updateDoc(doc(db, 'sessions/draft'), { status: 'live' }));
+
+    const staleWrite = writeBatch(db);
+    staleWrite.update(doc(db, 'sessions/draft'), { status: 'live' });
+    staleWrite.update(doc(db, 'sessionControl/liveSession'), {
+      sessionId: 'draft',
+    });
+    await assertFails(staleWrite.commit());
+
+    const transition = writeBatch(db);
+    transition.update(doc(db, 'sessions/live'), { status: 'draft' });
+    transition.update(doc(db, 'sessions/draft'), { status: 'live' });
+    transition.update(doc(db, 'sessionControl/liveSession'), {
+      sessionId: 'draft',
+    });
+    await assertSucceeds(transition.commit());
+    await assertSucceeds(getDoc(doc(db, 'sessions/draft')));
+  });
+
+  it('allows Not Live only with the pointer cleared and preserves prepared Problem data', async () => {
+    const db = officerDb();
+    await assertFails(updateDoc(doc(db, 'sessions/live'), { status: 'draft' }));
+
+    const transition = writeBatch(db);
+    transition.update(doc(db, 'sessions/live'), { status: 'draft' });
+    transition.update(doc(db, 'sessionControl/liveSession'), {
+      sessionId: null,
+    });
+    await assertSucceeds(transition.commit());
+    const problem = await getDoc(doc(db, 'sessions/live/problems/hidden'));
+    if (!problem.exists())
+      throw new Error('Expected prepared Problem to remain.');
+    if (problem.data().answersVisible !== false)
+      throw new Error('Expected answer visibility to remain hidden.');
+    await assertSucceeds(
+      getDoc(doc(db, 'sessions/live/problems/hidden/solutions/python')),
+    );
+  });
+
+  it('does not allow ended Sessions to return to draft or live', async () => {
+    const db = officerDb();
+    await assertFails(
+      updateDoc(doc(db, 'sessions/ended'), { status: 'draft' }),
+    );
+    await assertFails(updateDoc(doc(db, 'sessions/ended'), { status: 'live' }));
+  });
+
+  it('allows deleting a live Session only when its live claim is released atomically', async () => {
+    const db = officerDb();
+    await assertFails(deleteDoc(doc(db, 'sessions/live')));
+
+    const deletion = writeBatch(db);
+    deletion.update(doc(db, 'sessionControl/liveSession'), { sessionId: null });
+    deletion.delete(doc(db, 'sessions/live'));
+    await assertSucceeds(deletion.commit());
   });
 
   it('denies draft and live hidden Solutions and permits all ended Solutions for fixed languages', async () => {

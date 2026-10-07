@@ -182,6 +182,7 @@ responses. Firestore Security Rules independently enforce backend access.
 | `sessions/{sessionId}`                                           | `Session`  | `title`, `date`, `status`, `createdAt`, `updatedAt`                                                        |
 | `sessions/{sessionId}/problems/{problemId}`                      | `Problem`  | `title`, `description`, `exampleInput`, `exampleOutput`, `order`, `answersVisible`, optional `leetcodeUrl` |
 | `sessions/{sessionId}/problems/{problemId}/solutions/{language}` | `Solution` | `code`, `output`                                                                                           |
+| `sessionControl/liveSession`                                     | control    | `sessionId` (active Session ID, or `null` when no Session is live)                                         |
 
 - `Language` is exactly `python | java | cpp`; each language identifies its own Solution document.
 - `SessionStatus` is `draft | live | ended`.
@@ -259,12 +260,24 @@ is an operator task.
 ## Session lifecycle and history (#44)
 
 `src/lib/firebase/sessions.ts` provides `transitionSession`, which accepts only
-`live` or `ended` as requested targets and uses a Firestore transaction to verify
-that the persisted Session is currently `draft` or `live`, respectively, before
-updating status. Go Live also requires at least one Problem. The Officer
-dashboard groups rows by persisted status: live, draft (Upcoming), and ended
-(Past Sessions). Dates sort rows within each group but do not determine status.
-Ended Sessions remain editable and public. Ending only updates the Session status; it does not alter any Problem's `answersVisible` value. The ended status itself makes all fixed-language Solutions publicly readable.
+`live`, `draft`, or `ended` as requested targets and uses a Firestore transaction
+to verify the persisted transition. Only `draft → live`, `live → draft`, and
+`live → ended` are allowed; ended Sessions are terminal. Go Live also requires at
+least one Problem and atomically claims `sessionControl/liveSession`. If this
+control document is missing, the client checks for legacy live Sessions before
+the transaction. The transaction then claims the singleton document, whose
+concurrent creation/update conflicts make a competing transition retry and read
+the current claim. Firestore Rules require Session lifecycle changes and the live
+pointer to agree in the same write, preventing concurrent clients from claiming
+different live Sessions.
+Not Live clears the pointer and changes only the Session status; it preserves
+Problems, Solutions, ordering, and each Problem's `answersVisible` value. The
+Officer dashboard groups rows by persisted status: live, draft (Upcoming), and
+ended (Past Sessions). Dates sort rows within each group but do not determine
+status. Ended Sessions remain editable and public. Ending changes only the
+Session status and pointer; it does not alter any Problem's `answersVisible`
+value. The ended status itself makes all fixed-language Solutions publicly
+readable.
 
 Normal unit tests mock Firebase and require no project. Rules tests use the actual
 emulator to verify officer access, public status access, answer reveal/revocation,
