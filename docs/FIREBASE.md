@@ -30,20 +30,23 @@ npm run seed
 npm run dev
 ```
 
-The seed creates a local Officer account:
+The deterministic reset creates one Officer account in the local Auth
+Emulator:
 
-| Field    | Local value               |
-| -------- | ------------------------- |
-| Email    | `officer@cappycode.local` |
-| Password | `cappycode-local-only`    |
+| Field    | Local emulator value |
+| -------- | -------------------- |
+| Email    | `cappy@gmail.com`    |
+| Password | `cappy123`           |
 
-This account exists only in the Auth Emulator and is unrelated to the shared
-production Officer account. Members stay anonymous. The seed includes one draft
-custom Problem, a live linked Two Sum Problem with answers visible and a custom
-Problem with answers hidden, and an ended session with one linked and one custom
-Problem. Each has ordered metadata and Python, Java, and C++ source with prepared
-output. It covers LeetCode links and Problems without links for Member and Past
-history views.
+This credential is for the local Auth Emulator only. Never use it with
+production Firebase; it is unrelated to and must not modify the production
+Officer account. Members stay anonymous. The deterministic fixture contains
+one Live Session, two Draft Sessions, and ten Past Sessions dated across
+multiple weeks. It intentionally includes linked LeetCode and custom Problems,
+mixed reveal states, multiple Problems per Session, and prepared Python, Java,
+and C++ Solutions with Output for every Problem. This gives the Member archive,
+Officer Past history, reveal controls, Monaco panels, and explicit Save flows
+useful content immediately after reset.
 
 After destructive testing, restore the known state with the emulators still
 running:
@@ -53,9 +56,10 @@ npm run reset
 ```
 
 Reset clears the local Auth and Firestore emulator data before restoring the
-Officer account and seed Sessions. `npm run seed` reapplies the sample records
-without clearing other local data. Neither script targets a Firebase project
-outside the hard-coded local emulator endpoints.
+canonical local Officer and complete deterministic Session fixture.
+`npm run seed` reapplies the fixture without clearing other local data. Neither
+script targets a Firebase project outside the hard-coded
+`demo-cappycode-local` project and local emulator endpoints.
 The seed uses the existing Rules test helper to bypass Rules only while loading
 local setup data. The running application still uses the checked-in Rules for
 every app request.
