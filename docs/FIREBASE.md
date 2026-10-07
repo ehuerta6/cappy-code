@@ -77,6 +77,41 @@ Routine development and destructive testing belong on emulators; use production
 only for targeted deployment smoke checks. Do not create test Sessions in
 production.
 
+## Production deployment (#73)
+
+The Next.js production app is deployed to Vercel at
+<https://cappycode.vercel.app>. The Vercel project `cappycode` is connected to
+the GitHub repository `ehuerta6/cappy-code` (formerly
+`ehuerta6/multi-language-ide`) and uses `main` as its production branch. Changes
+merged to `main` trigger production deployments. Firebase remains the backend
+for Firestore, Authentication, and Security Rules; do not enable Firebase App
+Hosting or upgrade the Firebase project to Blaze for this deployment.
+
+Configure the following project-level Vercel variables for the **Production**
+environment, using the Web app config from the existing Firebase project
+`cappycode-f133c`:
+
+- `NEXT_PUBLIC_FIREBASE_API_KEY`
+- `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`
+- `NEXT_PUBLIC_FIREBASE_PROJECT_ID`
+- `NEXT_PUBLIC_FIREBASE_APP_ID`
+- `NEXT_PUBLIC_USE_FIREBASE_EMULATORS=false`
+
+These public client config values are compiled into browser assets. Never put
+Officer passwords, service account credentials, or other secrets in
+`NEXT_PUBLIC_` variables. Changing a Vercel environment variable requires a
+new deployment before the production build uses it. Confirm the deployed app's
+Firestore requests target `cappycode-f133c`; production requests must not use
+localhost or emulator endpoints. Deploy Firestore Security Rules separately
+with the Firebase CLI when Rules changes are in scope.
+
+For a production release, verify anonymous Member access and authenticated
+Officer workflows with the production account, including explicit Save,
+LeetCode links and history, solution reveal/hide, Session lifecycle and ended
+archive, Monaco languages, and themes. Use only approved temporary smoke data
+and remove it when finished. Do not treat emulator or preview-deployment
+results as production verification.
+
 ## Local setup
 
 1. Create or select a Firebase project in the [Firebase Console](https://console.firebase.google.com/).
