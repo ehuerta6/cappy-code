@@ -6,6 +6,7 @@ import type { ProblemSolutions } from '@/lib/firebase/solutions';
 import type { ProblemDifficulty } from '@/lib/domain';
 import AppHeader from '@/components/app-header';
 import ProblemMarkdown from '@/components/member/problem-markdown';
+import { formatCalendarDate } from '@/lib/calendar-date';
 import SolutionWorkspace from '@/components/solutions/solution-workspace';
 import { useAnswersVisible } from '@/hooks/use-answer-visibility';
 import {
@@ -169,7 +170,7 @@ function SessionGroup({
                   className="shrink-0 text-sm text-muted"
                   dateTime={session.date}
                 >
-                  {formatDate(session.date)}
+                  {formatCalendarDate(session.date)}
                 </time>
                 <span className="session-title min-w-0 break-words font-semibold">
                   {session.title}
@@ -188,15 +189,6 @@ function SessionGroup({
       )}
     </section>
   );
-}
-
-function formatDate(date: string) {
-  const [year, month, day] = date.split('-').map(Number);
-  if (!year || !month || !day) return date;
-  return new Intl.DateTimeFormat('en', {
-    dateStyle: 'medium',
-    timeZone: 'UTC',
-  }).format(new Date(Date.UTC(year, month - 1, day)));
 }
 
 export type SessionState =
@@ -329,7 +321,7 @@ function SessionContent({
           className="text-sm leading-5 text-muted"
           dateTime={state.session.date}
         >
-          {formatDate(state.session.date)}
+          {formatCalendarDate(state.session.date)}
         </time>
       </div>
 

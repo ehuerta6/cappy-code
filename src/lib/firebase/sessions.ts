@@ -10,12 +10,12 @@ import {
   query,
   runTransaction,
   serverTimestamp,
-  Timestamp,
   updateDoc,
   where,
   writeBatch,
 } from 'firebase/firestore';
 import type { Session } from '../domain';
+import { sessionSchema } from '../domain';
 import {
   validateSessionMetadata,
   type SessionMetadata,
@@ -69,23 +69,19 @@ export async function listSessions(): Promise<SessionRecord[]> {
           'Session changes are still awaiting confirmation. Retry when connected.',
         );
       }
-      const data = document.data();
-      if (
-        typeof data.title !== 'string' ||
-        typeof data.date !== 'string' ||
-        !['draft', 'live', 'ended'].includes(data.status) ||
-        !(data.createdAt instanceof Timestamp) ||
-        !(data.updatedAt instanceof Timestamp)
-      ) {
+      const parsed = sessionSchema.safeParse(document.data());
+      if (!parsed.success) {
+        const issue = parsed.error.issues[0];
+        const message = issue?.message;
+        if (issue?.path[0] === 'date' || issue?.path[0] === 'title')
+          throw new Error(message);
         throw new Error(
-          'A stored session has invalid fields. Check its Firestore document.',
+          message === 'Choose Intro, General, or ICPC for this session.'
+            ? message
+            : 'A stored session has invalid fields. Check its Firestore document.',
         );
       }
-      const metadata = validateSessionMetadata({
-        branch: data.branch,
-        title: data.title,
-        date: data.date,
-      });
+      const session = parsed.data;
       let problemCount: number | null = null;
       try {
         const problems = await getCountFromServer(
@@ -98,12 +94,7 @@ export async function listSessions(): Promise<SessionRecord[]> {
       return {
         id: document.id,
         problemCount,
-        session: {
-          ...metadata,
-          status: data.status,
-          createdAt: data.createdAt,
-          updatedAt: data.updatedAt,
-        },
+        session,
       };
     }),
   );

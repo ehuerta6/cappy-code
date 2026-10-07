@@ -18,7 +18,8 @@ const sdk = vi.hoisted(() => ({
 vi.mock('client-only', () => ({}));
 vi.mock('./client', () => ({ getFirestoreDb: () => sdk.db }));
 vi.mock('./auth', () => ({ getOfficerAuth: () => sdk.user }));
-vi.mock('firebase/firestore', () => ({
+vi.mock('firebase/firestore', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('firebase/firestore')>()),
   collection: (_db: unknown, path: string) => ({ path }),
   doc: (_db: unknown, path: string) => ({ path }),
   addDoc: sdk.addDoc,

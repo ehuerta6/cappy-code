@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { Timestamp } from 'firebase/firestore';
 
 const sdk = vi.hoisted(() => ({
   db: {},
@@ -10,7 +11,8 @@ const sdk = vi.hoisted(() => ({
 
 vi.mock('client-only', () => ({}));
 vi.mock('./client', () => ({ getFirestoreDb: sdk.getFirestoreDb }));
-vi.mock('firebase/firestore', () => ({
+vi.mock('firebase/firestore', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('firebase/firestore')>()),
   collection: (_db: unknown, path: string) => ({ path }),
   doc: (_db: unknown, path: string) => ({ path }),
   query: (reference: unknown, ...constraints: unknown[]) => ({
@@ -40,6 +42,8 @@ const live = {
   title: 'Intro practice',
   date: '2026-10-04',
   status: 'live',
+  createdAt: Timestamp.fromMillis(1_000),
+  updatedAt: Timestamp.fromMillis(1_000),
 };
 const problem = {
   title: 'Arrays',
@@ -113,8 +117,24 @@ describe('anonymous member persistence', () => {
 
     expect(subscribeToMemberSessions(onValue, onError)).toBe(unsubscribe);
     expect(onValue).toHaveBeenCalledWith([
-      { id: 'live', session: { ...live } },
-      { id: 'past', session: { ...live, status: 'ended' } },
+      {
+        id: 'live',
+        session: {
+          branch: 'intro',
+          title: 'Intro practice',
+          date: '2026-10-04',
+          status: 'live',
+        },
+      },
+      {
+        id: 'past',
+        session: {
+          branch: 'intro',
+          title: 'Intro practice',
+          date: '2026-10-04',
+          status: 'ended',
+        },
+      },
     ]);
     expect(onError).not.toHaveBeenCalled();
     expect(sdk.onSnapshot.mock.calls[0][0]).toEqual({
