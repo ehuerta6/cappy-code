@@ -41,7 +41,7 @@ Emulator:
 This credential is for the local Auth Emulator only. Never use it with
 production Firebase; it is unrelated to and must not modify the production
 Officer account. Members stay anonymous. The deterministic fixture contains
-one Live Session, two Draft Sessions, and ten Past Sessions dated across
+one Live Session, two Draft Sessions, and twelve Past Sessions dated across
 multiple weeks. It intentionally includes linked LeetCode and custom Problems,
 mixed reveal states, multiple Problems per Session, and prepared Python, Java,
 and C++ Solutions for every Problem. This gives the Member archive,

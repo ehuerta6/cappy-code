@@ -10,6 +10,8 @@
 
 # Test coverage
 /coverage/
+/test-results/
+/playwright-report/
 
 # Environment variables
 .env
@@ -19,6 +21,7 @@
 # Logs
 npm-debug.log*
 firebase-debug.log
+firestore-debug.log
 yarn-debug.log*
 pnpm-debug.log*
 

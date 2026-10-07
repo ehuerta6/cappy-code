@@ -1,0 +1,205 @@
+import { execFileSync } from 'node:child_process';
+import { test, expect } from '@playwright/test';
+
+const baseURL = 'http://127.0.0.1:3000';
+const sessionTitle = 'Playwright Core Lifecycle Session';
+const problemTitle = 'Playwright Hidden Answers Problem';
+const pythonSolution = 'PYTHON_E2E_SECRET = "python-answer-secret"';
+const javaSolution = 'String answer = "java-answer-secret";';
+const cppSolution = 'std::string answer = "cpp-answer-secret";';
+
+test('Officer prepares and presents a Session through its public lifecycle', async ({
+  browser,
+}) => {
+  execFileSync(process.execPath, ['scripts/reset-emulator.mjs'], {
+    cwd: process.cwd(),
+    stdio: 'inherit',
+  });
+
+  const officerContext = await browser.newContext();
+  const memberContext = await browser.newContext();
+  const officer = await officerContext.newPage();
+  const member = await memberContext.newPage();
+
+  try {
+    await officer.goto('/officer');
+    await officer.getByLabel('Email').fill('cappy@gmail.com');
+    await officer.getByLabel('Password').fill('cappy123');
+    await officer.getByRole('button', { name: 'Sign in' }).click();
+    await expect(
+      officer.getByRole('heading', { name: 'Sessions', level: 1 }),
+    ).toBeVisible();
+
+    // The shared deterministic fixture has a Live Session. Return it to draft
+    // so this flow can prove the globally unique live pointer from a clean state.
+    await officer
+      .getByRole('button', { name: /CIC Intro — Hash Maps & Arrays/ })
+      .click();
+    await officer.getByRole('button', { name: 'Not Live' }).click();
+    await expect(officer.getByText('draft', { exact: true })).toBeVisible();
+    await officer.getByRole('button', { name: 'Back to Sessions' }).click();
+
+    await officer.getByLabel('Branch for new session').selectOption('general');
+    await officer.getByRole('button', { name: '+ New session' }).click();
+    await officer.getByLabel('Session title').fill(sessionTitle);
+    await officer.getByLabel('Session date').fill('2026-10-20');
+    await officer.getByLabel('Session branch').selectOption('general');
+    await officer.getByRole('button', { name: 'Save changes' }).click();
+    await expect(officer.getByText('Saved ✓')).toBeVisible();
+    await officer.getByRole('button', { name: 'Manage problems' }).click();
+    await officer.getByRole('button', { name: 'Add problem' }).click();
+
+    await officer.getByLabel('Problem title').fill(problemTitle);
+    await officer.getByLabel('Difficulty').selectOption('medium');
+    await officer
+      .getByLabel('Description')
+      .fill('Use a **map** to find the matching pair.');
+    await officer.getByLabel('Constraints').fill('2 ≤ values.length ≤ 100,000');
+    await officer
+      .getByLabel('LeetCode link (optional)')
+      .fill('https://leetcode.com/problems/two-sum/');
+    await officer
+      .getByLabel('Example input')
+      .fill('values = [4, 8, 12], target = 12');
+    await officer.getByLabel('Expected output').fill('[0, 1]');
+
+    const solutionCode = [pythonSolution, javaSolution, cppSolution];
+    for (let index = 0; index < solutionCode.length; index += 1) {
+      const editor = officer
+        .getByRole('region', {
+          name: ['Python', 'Java', 'C++'][index],
+        })
+        .locator('.monaco-editor');
+      await expect(editor).toBeVisible();
+      await editor.click();
+      await officer.keyboard.press('ControlOrMeta+A');
+      await officer.keyboard.insertText(solutionCode[index]);
+    }
+
+    for (const [index, time, space] of [
+      [0, 'O(n)', 'O(n)'],
+      [1, 'O(n log n)', 'O(n)'],
+      [2, 'O(n)', 'O(1)'],
+    ] as const) {
+      await officer.getByLabel('Time Complexity').nth(index).fill(time);
+      await officer
+        .getByLabel('Time explanation')
+        .nth(index)
+        .fill(`${['Python', 'Java', 'C++'][index]} time analysis.`);
+      await officer.getByLabel('Space Complexity').nth(index).fill(space);
+      await officer
+        .getByLabel('Space explanation')
+        .nth(index)
+        .fill(`${['Python', 'Java', 'C++'][index]} space analysis.`);
+    }
+    await officer.getByRole('button', { name: 'Save changes' }).click();
+    await expect(officer.getByText('Saved ✓')).toBeVisible();
+
+    await member.goto('/');
+    await expect(
+      member.getByRole('heading', { name: 'Sessions' }),
+    ).toBeVisible();
+    await expect(
+      member
+        .getByRole('region', { name: 'General session history' })
+        .getByText('No live session right now.'),
+    ).toBeVisible();
+
+    await officer.getByRole('button', { name: 'Go Live' }).click();
+    await expect(officer.getByText('live', { exact: true })).toBeVisible();
+    await expect(member).toHaveURL(/\/sessions\//);
+    await expect(
+      member.getByRole('heading', { name: problemTitle }),
+    ).toBeVisible();
+    await expect(
+      member.getByText('Use a map to find the matching pair.'),
+    ).toBeVisible();
+    await expect(
+      member.getByText('values = [4, 8, 12], target = 12'),
+    ).toBeVisible();
+    await expect(member.getByText('[0, 1]', { exact: true })).toBeVisible();
+    await expect(member.getByText('Medium', { exact: true })).toBeVisible();
+    await expect(
+      member.getByRole('link', { name: /LeetCode/ }),
+    ).toHaveAttribute('href', 'https://leetcode.com/problems/two-sum/');
+    await expect(
+      member.getByText('Waiting for the officer to reveal the solution…'),
+    ).toBeVisible();
+    await expect(member.getByText(/answer-secret/)).toHaveCount(0);
+    const sessionId = new URL(member.url()).pathname.split('/').at(-1);
+    expect(sessionId).toBeTruthy();
+
+    const problemListResponse = await fetch(
+      `http://127.0.0.1:8080/v1/projects/demo-cappycode-local/databases/(default)/documents/sessions/${sessionId}/problems`,
+    );
+    const problemList = (await problemListResponse.json()) as {
+      documents?: Array<{ name: string }>;
+    };
+    const problemId = problemList.documents?.[0]?.name.split('/').at(-1);
+    expect(problemId).toBeTruthy();
+    const protectedRead = await fetch(
+      `http://127.0.0.1:8080/v1/projects/demo-cappycode-local/databases/(default)/documents/sessions/${sessionId}/problems/${problemId}/solutions/python`,
+    );
+    const protectedBody = await protectedRead.text();
+    expect(protectedRead.status).toBe(403);
+    expect(protectedBody).not.toContain('python-answer-secret');
+
+    await officer.getByRole('button', { name: 'Show answers' }).click();
+    await expect(member.getByText('python-answer-secret')).toBeVisible();
+    await expect(member.getByText('java-answer-secret')).toBeVisible();
+    await expect(member.getByText('cpp-answer-secret')).toBeVisible();
+    await expect(member.getByText('Time: O(n)', { exact: true })).toHaveCount(
+      2,
+    );
+    await expect(member.getByText('Space: O(n)', { exact: true })).toHaveCount(
+      2,
+    );
+    await expect(member.getByText('Time: O(n log n)')).toBeVisible();
+    await expect(member.getByText('Space: O(1)')).toBeVisible();
+    await expect(member.getByText('Python time analysis.')).toBeVisible();
+    await expect(member.getByText('Java time analysis.')).toBeVisible();
+    await expect(member.getByText('C++ time analysis.')).toBeVisible();
+    await officer.getByRole('button', { name: 'Hide answers' }).click();
+    await expect(
+      member.getByText('Waiting for the officer to reveal the solution…'),
+    ).toBeVisible();
+    await expect(member.getByText(/answer-secret/)).toHaveCount(0);
+
+    await officer.getByRole('button', { name: 'Not Live' }).click();
+    await expect(member).toHaveURL(`${baseURL}/`);
+    await expect(
+      member
+        .getByRole('region', { name: 'General session history' })
+        .getByText('No live session right now.'),
+    ).toBeVisible();
+
+    await officer.getByRole('button', { name: 'Go Live' }).click();
+    await expect(member).toHaveURL(/\/sessions\//);
+    await expect(
+      member.getByRole('heading', { name: problemTitle }),
+    ).toBeVisible();
+    officer.once('dialog', (dialog) => dialog.accept());
+    await officer.getByRole('button', { name: 'End Session' }).click();
+    await expect(member.getByText('Ended', { exact: true })).toBeVisible();
+    await expect(member.getByText('python-answer-secret')).toBeVisible();
+
+    const endedURL = member.url();
+    await member.reload();
+    await expect(member.getByText('Ended', { exact: true })).toBeVisible();
+    await expect(member.getByText('cpp-answer-secret')).toBeVisible();
+    await member.goto('/');
+    await expect(
+      member
+        .getByRole('region', { name: 'General session history' })
+        .getByRole('heading', { name: 'Past' }),
+    ).toBeVisible();
+    await expect(
+      member.getByRole('link', { name: sessionTitle }),
+    ).toBeVisible();
+    await member.goto(endedURL);
+    await expect(member.getByText('Ended', { exact: true })).toBeVisible();
+  } finally {
+    await officerContext.close();
+    await memberContext.close();
+  }
+});

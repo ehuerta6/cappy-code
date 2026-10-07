@@ -524,6 +524,28 @@ const problems = [
     leetcodeUrl: 'https://leetcode.com/problems/house-robber/',
     solution: 'house-robber',
   },
+  {
+    sessionId: 'ended-general-practice',
+    id: 'campus-islands',
+    title: 'Campus Map Components',
+    description: 'Count connected groups of available campus rooms.',
+    exampleInput: 'map = [[1, 1, 0], [0, 1, 0], [1, 0, 1]]',
+    exampleOutput: '3',
+    constraints: 'Rows and columns are between 1 and 100.',
+    answersVisible: true,
+    solution: 'number-of-islands',
+  },
+  {
+    sessionId: 'ended-icpc-practice',
+    id: 'contest-room-route',
+    title: 'Contest Room Route',
+    description: 'Check whether connected rooms include a route to the exit.',
+    exampleInput: 'doors = [[0, 1], [1, 3], [2, 4]], start = 0, end = 3',
+    exampleOutput: 'true',
+    constraints: 'Room identifiers are non-negative integers.',
+    answersVisible: true,
+    solution: 'room-reachability',
+  },
 ];
 
 const implementations = {
@@ -1234,16 +1256,16 @@ function assertFixture() {
       typeof problem.constraints === 'string' && problem.constraints.trim(),
   );
   if (
-    sessions.length !== 13 ||
-    problems.length !== 28 ||
+    sessions.length !== 15 ||
+    problems.length !== 30 ||
     constrainedProblems.length < 10 ||
     constrainedProblems.length === problems.length ||
     counts.live?.length !== 1 ||
     counts.draft?.length !== 2 ||
-    counts.ended?.length !== 10
+    counts.ended?.length !== 12
   )
     throw new Error(
-      'The local fixture must contain 1 Live, 2 Draft, and 10 Past Sessions with 28 Problems.',
+      'The local fixture must contain 1 Live, 2 Draft, and 12 Past Sessions with 30 Problems.',
     );
   const sessionIds = new Set(sessions.map(({ id }) => id));
   const problemIds = new Set();
