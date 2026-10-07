@@ -51,12 +51,39 @@ service cloud.firestore {
         && data.branch in ['intro', 'general', 'icpc'];
     }
 
+    function hasSupportedProblemCategory(data) {
+      return data.keys().hasAny(['category'])
+        && data.category in ['custom', 'interview-style', 'competitive-programming'];
+    }
+
+    function bankProblemUsedLiveAfter(problemId) {
+      return existsAfter(liveSessionPath())
+        ? bankProblemUsedLiveWithPointer(problemId)
+        : false;
+    }
+
+    function bankProblemUsedLiveWithPointer(problemId) {
+      let liveSessionId = getAfter(liveSessionPath()).data.sessionId;
+      return liveSessionId != null
+        && getAfter(
+          /databases/$(database)/documents/sessions/$(liveSessionId)
+        ).data.status == 'live'
+        && getAfter(
+          /databases/$(database)/documents/sessions/$(liveSessionId)
+        ).data.bankProblemIds is list
+        && getAfter(
+          /databases/$(database)/documents/sessions/$(liveSessionId)
+        ).data.bankProblemIds.hasAny([problemId]);
+    }
+
     match /sessions/{sessionId} {
       allow read: if isOfficer() || resource.data.status in ['live', 'ended'];
       allow create: if isOfficer()
         && request.resource.data.status == 'draft'
         && hasSupportedBranch(request.resource.data);
       allow update: if isOfficer()
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['bankProblemIds'])
+          || resource.data.status != 'live')
         && ((!resource.data.keys().hasAny(['branch'])
             && !request.resource.data.keys().hasAny(['branch']))
           || hasSupportedBranch(request.resource.data))
@@ -73,7 +100,14 @@ service cloud.firestore {
 
       match /problems/{problemId} {
         allow read: if isOfficer() || sessionIsPublic(sessionId);
-        allow write: if isOfficer();
+        allow create: if isOfficer()
+          && get(/databases/$(database)/documents/sessions/$(sessionId)).data.status != 'live';
+        allow update: if isOfficer()
+          && (get(/databases/$(database)/documents/sessions/$(sessionId)).data.status != 'live'
+            || request.resource.data.get('bankProblemId', null)
+              == resource.data.get('bankProblemId', null));
+        allow delete: if isOfficer()
+          && get(/databases/$(database)/documents/sessions/$(sessionId)).data.status != 'live';
 
         match /solutions/{language} {
           allow read: if (isOfficer() && language in ['python', 'java', 'cpp']) ||
@@ -104,6 +138,26 @@ service cloud.firestore {
       allow delete: if isOfficer()
         && (resource.data.sessionId == null
           || sessionInactiveAfter(resource.data.sessionId));
+    }
+
+    match /problemBank/{problemId} {
+      allow get, list: if isOfficer() || resource.data.isPublic == true;
+      allow create: if isOfficer()
+        && hasSupportedProblemCategory(request.resource.data)
+        && request.resource.data.isPublic == true
+        && !bankProblemUsedLiveAfter(problemId);
+      allow update: if isOfficer()
+        && hasSupportedProblemCategory(request.resource.data)
+        && (!bankProblemUsedLiveAfter(problemId)
+          || request.resource.data.isPublic == false);
+      allow delete: if isOfficer();
+
+      match /solutions/{language} {
+        allow read: if isOfficer()
+          || (language in ['python', 'java', 'cpp']
+            && get(/databases/$(database)/documents/problemBank/$(problemId)).data.isPublic == true);
+        allow write: if isOfficer() && language in ['python', 'java', 'cpp'];
+      }
     }
   }
 }

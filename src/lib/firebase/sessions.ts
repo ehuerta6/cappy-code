@@ -2,6 +2,7 @@ import 'client-only';
 
 import {
   addDoc,
+  deleteField,
   collection,
   doc,
   getCountFromServer,
@@ -22,7 +23,7 @@ import {
 } from '../session-metadata';
 import { getOfficerAuth } from './auth';
 import { getFirestoreDb } from './client';
-import { sessionPath } from './paths';
+import { bankProblemPath, sessionPath } from './paths';
 import { appendProblemDeletion } from './problems';
 
 export interface SessionRecord {
@@ -52,6 +53,7 @@ export async function createSession(
   const reference = await addDoc(collection(db, 'sessions'), {
     ...fields,
     status: 'draft',
+    bankProblemIds: [],
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
@@ -179,10 +181,43 @@ export async function transitionSession(
       );
     }
     const releasesLiveClaim = nextStatus !== 'live' && liveSessionId === id;
+    const bankProblemIds: string[] = Array.isArray(
+      snapshot.data().bankProblemIds,
+    )
+      ? [
+          ...new Set<string>(
+            snapshot
+              .data()
+              .bankProblemIds.filter(
+                (bankId: unknown): bankId is string =>
+                  typeof bankId === 'string',
+              ),
+          ),
+        ]
+      : [];
+    const bankSnapshots = await Promise.all(
+      (nextStatus === 'live'
+        ? bankProblemIds
+        : releasesLiveClaim
+          ? bankProblemIds
+          : []
+      ).map((bankId) => transaction.get(doc(db, bankProblemPath(bankId)))),
+    );
     if (nextStatus === 'live' || releasesLiveClaim) {
       transaction.set(liveSessionReference, {
         sessionId: nextStatus === 'live' ? id : null,
       });
+    }
+    if (nextStatus === 'live' || releasesLiveClaim) {
+      for (const bankSnapshot of bankSnapshots) {
+        if (!bankSnapshot.exists()) continue;
+        transaction.update(
+          bankSnapshot.ref,
+          nextStatus === 'live'
+            ? { isPublic: false, hiddenByLiveSessionId: id }
+            : { isPublic: true, hiddenByLiveSessionId: deleteField() },
+        );
+      }
     }
     transaction.update(reference, {
       status: nextStatus,
@@ -218,14 +253,47 @@ export async function deleteSession(id: string): Promise<void> {
     session.data().status === 'live' &&
     liveSession.exists() &&
     liveSession.data().sessionId === id;
+  const bankProblemIds: string[] =
+    session.exists() && Array.isArray(session.data().bankProblemIds)
+      ? [
+          ...new Set<string>(
+            session
+              .data()
+              .bankProblemIds.filter(
+                (bankId: unknown): bankId is string =>
+                  typeof bankId === 'string',
+              ),
+          ),
+        ]
+      : [];
+  const bankSnapshots = releasesLiveClaim
+    ? await Promise.all(
+        bankProblemIds.map((bankId) =>
+          getDocFromServer(doc(db, bankProblemPath(bankId))),
+        ),
+      )
+    : [];
   // Keep the entire cascade atomic within Firestore's 500-write batch limit.
-  if (problems.docs.length * 4 + 1 + Number(releasesLiveClaim) > 500)
+  if (
+    problems.docs.length * 4 +
+      1 +
+      Number(releasesLiveClaim) +
+      bankSnapshots.filter((item) => item.exists()).length >
+    500
+  )
     throw new Error('Too many problems to delete this session in one batch.');
   const batch = writeBatch(db);
   for (const problem of problems.docs)
     appendProblemDeletion(batch, db, id, problem.id);
   if (releasesLiveClaim) {
     batch.update(liveSessionReference, { sessionId: null });
+    for (const bank of bankSnapshots) {
+      if (bank.exists())
+        batch.update(bank.ref, {
+          isPublic: true,
+          hiddenByLiveSessionId: deleteField(),
+        });
+    }
   }
   batch.delete(sessionReference);
   await batch.commit();

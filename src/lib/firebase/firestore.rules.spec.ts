@@ -61,6 +61,7 @@ beforeEach(async () => {
           setDoc(doc(database, `sessions/${sessionId}`), {
             title: sessionId,
             status,
+            ...(sessionId === 'live' ? { bankProblemIds: ['used-live'] } : {}),
           }),
           setDoc(doc(database, `sessions/${sessionId}/problems/${problemId}`), {
             title: problemId,
@@ -77,7 +78,39 @@ beforeEach(async () => {
       setDoc(doc(database, 'sessionControl/liveSession'), {
         sessionId: 'live',
       }),
+      setDoc(doc(database, 'problemBank/used-live'), {
+        title: 'Used during live Session',
+        description: 'Prepared answer must stay out of the bank.',
+        constraints: '',
+        exampleInput: '1',
+        exampleOutput: '2',
+        category: 'custom',
+        isPublic: false,
+        hiddenByLiveSessionId: 'live',
+      }),
+      setDoc(doc(database, 'problemBank/public'), {
+        title: 'Public bank Problem',
+        description: 'Available to Members.',
+        constraints: '',
+        exampleInput: '3',
+        exampleOutput: '4',
+        category: 'interview-style',
+        isPublic: true,
+      }),
     );
+    for (const problemId of ['used-live', 'public']) {
+      for (const language of ['python', 'java', 'cpp']) {
+        writes.push(
+          setDoc(
+            doc(database, `problemBank/${problemId}/solutions/${language}`),
+            {
+              code: `${problemId} ${language} source`,
+              timeComplexity: 'O(n)',
+            },
+          ),
+        );
+      }
+    }
     const solutionPaths = [
       'sessions/draft/problems/revealed',
       'sessions/live/problems/hidden',
@@ -351,4 +384,113 @@ describe('Firestore security rules', () => {
     );
     await assertFails(getDoc(solution));
   });
+
+  it('allows public bank reads, including prepared Solutions, and denies anonymous writes', async () => {
+    const member = anonymousDb();
+    const officer = officerDb();
+    await assertSucceeds(
+      getDocs(
+        query(collection(member, 'problemBank'), where('isPublic', '==', true)),
+      ),
+    );
+    await assertSucceeds(getDoc(doc(member, 'problemBank/public')));
+    for (const language of ['python', 'java', 'cpp']) {
+      await assertSucceeds(
+        getDoc(doc(member, `problemBank/public/solutions/${language}`)),
+      );
+      await assertFails(
+        setDoc(doc(member, `problemBank/public/solutions/${language}`), {
+          code: 'write',
+        }),
+      );
+    }
+    await assertFails(
+      setDoc(doc(member, 'problemBank/member'), {
+        title: 'Member write',
+        category: 'custom',
+        isPublic: true,
+      }),
+    );
+    await assertSucceeds(getDoc(doc(officer, 'problemBank/used-live')));
+    await assertFails(
+      setDoc(doc(officer, 'problemBank/invalid-category'), {
+        title: 'Invalid category',
+        category: 'leetcode',
+        isPublic: true,
+      }),
+    );
+  });
+
+  it('allows a public bank entry before the first live Session exists', async () => {
+    await environment.withSecurityRulesDisabled(async (context) => {
+      await deleteDoc(doc(context.firestore(), 'sessionControl/liveSession'));
+    });
+    await assertSucceeds(
+      setDoc(doc(officerDb(), 'problemBank/first'), {
+        title: 'First reusable Problem',
+        description: 'Public before a Session is live.',
+        constraints: '',
+        exampleInput: '1',
+        exampleOutput: '1',
+        category: 'custom',
+        isPublic: true,
+      }),
+    );
+    await assertSucceeds(getDoc(doc(anonymousDb(), 'problemBank/first')));
+  });
+
+  it('keeps a live Session bank Problem unavailable even if an Officer tries to make it public', async () => {
+    const member = anonymousDb();
+    const officer = officerDb();
+    await assertFails(getDoc(doc(member, 'problemBank/used-live')));
+    await assertFails(
+      getDoc(doc(member, 'problemBank/used-live/solutions/python')),
+    );
+    await assertFails(
+      updateDoc(doc(officer, 'problemBank/used-live'), { isPublic: true }),
+    );
+    const visible = await getDocs(
+      query(collection(member, 'problemBank'), where('isPublic', '==', true)),
+    );
+    expect(visible.docs.map((item) => item.id)).toEqual(['public']);
+  });
+
+  it.each(['draft', 'ended'] as const)(
+    'restores bank visibility after a live Session becomes %s',
+    async (nextStatus) => {
+      const member = anonymousDb();
+      const officer = officerDb();
+      const transition = writeBatch(officer);
+      transition.update(doc(officer, 'sessions/live'), { status: nextStatus });
+      transition.update(doc(officer, 'sessionControl/liveSession'), {
+        sessionId: null,
+      });
+      transition.update(doc(officer, 'problemBank/used-live'), {
+        isPublic: true,
+        hiddenByLiveSessionId: deleteField(),
+      });
+      await assertSucceeds(transition.commit());
+      await assertSucceeds(getDoc(doc(member, 'problemBank/used-live')));
+      await assertSucceeds(
+        getDoc(doc(member, 'problemBank/used-live/solutions/cpp')),
+      );
+      await assertSucceeds(
+        getDocs(
+          query(
+            collection(member, 'problemBank'),
+            where('isPublic', '==', true),
+          ),
+        ),
+      );
+      if (nextStatus === 'draft') {
+        await assertFails(
+          getDoc(doc(member, 'sessions/live/problems/hidden/solutions/python')),
+        );
+      } else {
+        await assertSucceeds(
+          getDoc(doc(member, 'sessions/live/problems/hidden/solutions/python')),
+        );
+      }
+    },
+  );
 });
