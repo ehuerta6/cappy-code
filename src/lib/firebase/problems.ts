@@ -1,10 +1,11 @@
 import 'client-only';
 
 import {
-  addDoc,
   collection,
+  arrayUnion,
   deleteField,
   doc,
+  getDocFromServer,
   getDocsFromServer,
   updateDoc,
   writeBatch,
@@ -14,14 +15,22 @@ import {
 import {
   isProblemDifficulty,
   languages,
+  problemCategorySchema,
   problemSchema,
   type Problem,
+  type ProblemCategory,
   type ProblemDifficulty,
 } from '../domain';
 import { validateLeetcodeProblemUrl } from '../problem-metadata';
 import { getOfficerAuth } from './auth';
 import { getFirestoreDb } from './client';
-import { problemPath, sessionPath, solutionPath } from './paths';
+import {
+  bankProblemPath,
+  bankSolutionPath,
+  problemPath,
+  sessionPath,
+  solutionPath,
+} from './paths';
 
 export interface ProblemRecord {
   id: string;
@@ -30,15 +39,20 @@ export interface ProblemRecord {
 export type ProblemContent = Pick<
   Problem,
   'title' | 'description' | 'exampleInput' | 'exampleOutput' | 'constraints'
-> & { leetcodeUrl: string; difficulty: ProblemDifficulty | '' };
+> & {
+  leetcodeUrl: string;
+  difficulty: ProblemDifficulty | '';
+  category: ProblemCategory;
+};
 
 type ProblemContentInput = Omit<
   ProblemContent,
-  'leetcodeUrl' | 'constraints' | 'difficulty'
+  'leetcodeUrl' | 'constraints' | 'difficulty' | 'category'
 > & {
   constraints?: string;
   leetcodeUrl?: string;
   difficulty?: ProblemDifficulty | '';
+  category?: ProblemCategory;
 };
 
 function officerDb() {
@@ -55,6 +69,7 @@ export function validateProblemContent(
     throw new Error('Enter a problem title.');
   const constraints = content.constraints ?? '';
   const difficulty = content.difficulty ?? '';
+  const category = content.category ?? 'custom';
   if (
     [
       content.description,
@@ -66,6 +81,8 @@ export function validateProblemContent(
     throw new Error('Problem content must be text.');
   if (difficulty !== '' && !isProblemDifficulty(difficulty))
     throw new Error('Select a supported Problem difficulty.');
+  if (!problemCategorySchema.safeParse(category).success)
+    throw new Error('Select a supported Problem category.');
   return {
     title: content.title.trim(),
     description: content.description,
@@ -74,6 +91,7 @@ export function validateProblemContent(
     constraints,
     leetcodeUrl: validateLeetcodeProblemUrl(content.leetcodeUrl) ?? '',
     difficulty,
+    category,
   };
 }
 
@@ -114,12 +132,39 @@ export async function createProblem(sessionId: string): Promise<ProblemRecord> {
       ? Math.max(...records.map((record) => record.problem.order)) + 1
       : 0,
     answersVisible: false,
+    category: 'custom',
   };
-  const reference = await addDoc(
+  const sessionReference = doc(
     collection(db, `${sessionPath(sessionId)}/problems`),
-    problem,
   );
-  return { id: reference.id, problem };
+  const bankReference = doc(collection(db, 'problemBank'));
+  const problemWithBank: Problem = {
+    ...problem,
+    bankProblemId: bankReference.id,
+    bankOrigin: 'session',
+  };
+  const batch = writeBatch(db);
+  batch.set(sessionReference, problemWithBank);
+  batch.update(doc(db, sessionPath(sessionId)), {
+    bankProblemIds: arrayUnion(bankReference.id),
+  });
+  batch.set(doc(db, bankProblemPath(bankReference.id)), {
+    ...bankContent(problem),
+    category: problem.category,
+    isPublic: true,
+  });
+  for (const language of languages)
+    batch.set(doc(db, bankSolutionPath(bankReference.id, language)), {
+      code: '',
+    });
+  await batch.commit();
+  return { id: sessionReference.id, problem: problemWithBank };
+}
+
+function bankContent(problem: Problem) {
+  const { title, description, exampleInput, exampleOutput, constraints } =
+    problem;
+  return { title, description, exampleInput, exampleOutput, constraints };
 }
 
 export async function updateProblem(
@@ -155,9 +200,26 @@ export async function updateProblem(
       updates.difficulty = content.difficulty;
     else throw new Error('Select a supported Problem difficulty.');
   }
+  if (content.category !== undefined) {
+    if (!problemCategorySchema.safeParse(content.category).success)
+      throw new Error('Select a supported Problem category.');
+    updates.category = content.category;
+  }
   if (Object.keys(updates).length === 0)
     throw new Error('Select Problem content to save.');
-  await updateDoc(doc(officerDb(), problemPath(sessionId, problemId)), updates);
+  const db = officerDb();
+  const reference = doc(db, problemPath(sessionId, problemId));
+  const snapshot = await getDocFromServer(reference);
+  if (!snapshot.exists()) throw new Error('This Problem no longer exists.');
+  const current = problemSchema.parse(snapshot.data());
+  if (current.bankOrigin === 'session' && current.bankProblemId) {
+    const batch = writeBatch(db);
+    batch.update(reference, updates);
+    batch.update(doc(db, bankProblemPath(current.bankProblemId)), updates);
+    await batch.commit();
+  } else {
+    await updateDoc(reference, updates);
+  }
 }
 
 export async function setAnswersVisible(
@@ -208,7 +270,17 @@ export async function deleteProblem(
   problemId: string,
 ): Promise<void> {
   const db = officerDb();
+  const sessionProblems = await listProblems(sessionId);
+  const bankProblemIds = [
+    ...new Set(
+      sessionProblems
+        .filter((record) => record.id !== problemId)
+        .map((record) => record.problem.bankProblemId)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
   const batch = writeBatch(db);
   appendProblemDeletion(batch, db, sessionId, problemId);
+  batch.update(doc(db, sessionPath(sessionId)), { bankProblemIds });
   await batch.commit();
 }

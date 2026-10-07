@@ -18,6 +18,11 @@ import {
 } from '@/lib/firebase/problems';
 import type { ProblemCountState } from '@/lib/firebase/sessions';
 import type { Problem, SessionStatus } from '@/lib/domain';
+import {
+  addBankProblemToSession,
+  listOfficerBankProblems,
+  type BankProblemRecord,
+} from '@/lib/firebase/problem-bank';
 import ProblemEditor from './problem-editor';
 import OfficerSolutions from '../solutions/officer-solutions';
 import type {
@@ -56,6 +61,10 @@ export default function OfficerProblems({
     useState<OfficerSaveState | null>(null);
   const [actionsOpen, setActionsOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [bankPicker, setBankPicker] = useState<
+    | { status: 'closed' | 'loading' | 'error' }
+    | { status: 'ready'; records: BankProblemRecord[] }
+  >({ status: 'closed' });
   const lock = useRef(false);
   const tabs = useRef(new Map<string, HTMLButtonElement>());
   const addButton = useRef<HTMLButtonElement>(null);
@@ -204,6 +213,27 @@ export default function OfficerProblems({
       focusProblem(record.id);
     });
   }
+  async function openBankPicker() {
+    setBankPicker({ status: 'loading' });
+    try {
+      setBankPicker({
+        status: 'ready',
+        records: await listOfficerBankProblems(),
+      });
+    } catch {
+      setBankPicker({ status: 'error' });
+    }
+  }
+  function addFromBank(bankProblem: BankProblemRecord) {
+    void act('Adding Problem from bank', async () => {
+      const result = await addBankProblemToSession(sessionId, bankProblem.id);
+      const record: ProblemRecord = { id: result.id, problem: result.problem };
+      setRecords((current) => [...current, record]);
+      setBankPicker({ status: 'closed' });
+      select(record.id);
+      focusProblem(record.id);
+    });
+  }
   function move(direction: number) {
     if (!selected) return;
     const index = records.findIndex((record) => record.id === selected.id);
@@ -267,20 +297,88 @@ export default function OfficerProblems({
     >
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <h2 className="m-0 text-lg font-semibold leading-[26px]">Problems</h2>
-        {selected && (
+        <div className="flex flex-wrap gap-2">
           <button
             className={buttonClass}
-            disabled={!workspaceDirty || workspaceSaving || operation !== null}
-            onClick={() => void saveWorkspace()}
+            disabled={blocked || sessionStatus === 'live'}
+            onClick={() => void openBankPicker()}
           >
-            {workspaceSaving
-              ? 'Saving…'
-              : workspaceError
-                ? 'Retry'
-                : 'Save changes'}
+            Add from Problem Bank
           </button>
-        )}
+          {selected && (
+            <button
+              className={buttonClass}
+              disabled={
+                !workspaceDirty || workspaceSaving || operation !== null
+              }
+              onClick={() => void saveWorkspace()}
+            >
+              {workspaceSaving
+                ? 'Saving…'
+                : workspaceError
+                  ? 'Retry'
+                  : 'Save changes'}
+            </button>
+          )}
+        </div>
       </div>
+      {bankPicker.status !== 'closed' && (
+        <section
+          className="mb-4 rounded-md border border-border-soft bg-surface p-3"
+          aria-label="Choose a bank Problem"
+        >
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="m-0 text-base font-semibold">Problem Bank</h3>
+            <button
+              className={buttonClass}
+              onClick={() => setBankPicker({ status: 'closed' })}
+            >
+              Close
+            </button>
+          </div>
+          {bankPicker.status === 'loading' ? (
+            <p role="status">Loading bank Problems…</p>
+          ) : null}
+          {bankPicker.status === 'error' ? (
+            <div role="alert">
+              <p>Problem Bank could not be loaded.</p>
+              <button
+                className={buttonClass}
+                onClick={() => void openBankPicker()}
+              >
+                Retry
+              </button>
+            </div>
+          ) : null}
+          {bankPicker.status === 'ready' &&
+            (bankPicker.records.length ? (
+              <ul className="m-0 list-none p-0">
+                {bankPicker.records.map((entry) => (
+                  <li
+                    key={entry.id}
+                    className="flex flex-wrap items-center justify-between gap-2 border-t border-border-soft py-2"
+                  >
+                    <span>
+                      <strong>{entry.title}</strong>
+                      <span className="ml-2 text-sm text-muted">
+                        {entry.category}
+                      </span>
+                    </span>
+                    <button
+                      className={buttonClass}
+                      disabled={blocked}
+                      onClick={() => addFromBank(entry)}
+                    >
+                      Add to Session
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p>No reusable Problems yet.</p>
+            ))}
+        </section>
+      )}
       {workspaceDirty && (
         <p className="mb-3 text-sm text-muted">
           Unsaved changes. Save or revert changes before leaving this Problem.
@@ -360,7 +458,7 @@ export default function OfficerProblems({
                 <button
                   ref={addButton}
                   className={buttonClass}
-                  disabled={blocked}
+                  disabled={blocked || sessionStatus === 'live'}
                   onClick={add}
                   aria-label="Add problem"
                 >

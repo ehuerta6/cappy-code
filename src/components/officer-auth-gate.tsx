@@ -36,14 +36,18 @@ export default function OfficerAuthGate({ children }: { children: ReactNode }) {
             View member site
           </Link>
           {auth.status === 'authenticated' && (
-            <button
-              className="min-h-11 rounded px-2 text-sm text-muted hover:bg-hover hover:text-ink"
-              disabled={signingOut}
-              onClick={handleLogout}
-              type="button"
-            >
-              {signingOut ? 'Signing out…' : 'Sign out'}
-            </button>
+            <>
+              <Link href="/officer">Sessions</Link>
+              <Link href="/officer/problem-bank">Problem Bank</Link>
+              <button
+                className="min-h-11 rounded px-2 text-sm text-muted hover:bg-hover hover:text-ink"
+                disabled={signingOut}
+                onClick={handleLogout}
+                type="button"
+              >
+                {signingOut ? 'Signing out…' : 'Sign out'}
+              </button>
+            </>
           )}
         </nav>
       </AppHeader>

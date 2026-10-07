@@ -5,10 +5,16 @@ import { validateLeetcodeProblemUrl } from './problem-metadata';
 
 export const languages = ['python', 'java', 'cpp'] as const;
 export const problemDifficulties = ['easy', 'medium', 'hard'] as const;
+export const problemCategories = [
+  'custom',
+  'interview-style',
+  'competitive-programming',
+] as const;
 export const sessionBranches = ['intro', 'general', 'icpc'] as const;
 
 export const languageSchema = z.enum(languages);
 export const problemDifficultySchema = z.enum(problemDifficulties);
+export const problemCategorySchema = z.enum(problemCategories);
 export const sessionBranchSchema = z.enum(sessionBranches, {
   error: 'Choose Intro, General, or ICPC for this session.',
 });
@@ -52,6 +58,9 @@ export const problemSchema = z.object({
   answersVisible: z.boolean(),
   leetcodeUrl: leetcodeUrlSchema,
   difficulty: problemDifficultySchema.optional(),
+  category: problemCategorySchema.optional().default('custom'),
+  bankProblemId: z.string().optional(),
+  bankOrigin: z.enum(['session', 'bank']).optional(),
 });
 
 export const solutionSchema = z
@@ -79,6 +88,7 @@ export const solutionSchema = z
 
 export type Language = (typeof languages)[number];
 export type ProblemDifficulty = (typeof problemDifficulties)[number];
+export type ProblemCategory = (typeof problemCategories)[number];
 export type SessionBranch = (typeof sessionBranches)[number];
 export type SessionStatus = 'draft' | 'live' | 'ended';
 
@@ -115,6 +125,9 @@ export interface Problem {
   answersVisible: boolean;
   leetcodeUrl?: string;
   difficulty?: ProblemDifficulty;
+  category?: ProblemCategory;
+  bankProblemId?: string;
+  bankOrigin?: 'session' | 'bank';
 }
 
 export interface Solution {

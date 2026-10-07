@@ -60,6 +60,7 @@ describe('persisted domain schemas', () => {
       ...legacyProblem,
       title: 'Two Sum',
       constraints: '',
+      category: 'custom',
     });
     expect(
       problemSchema.parse({

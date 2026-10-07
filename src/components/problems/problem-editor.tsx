@@ -8,6 +8,7 @@ import {
   type ProblemRecord,
 } from '@/lib/firebase/problems';
 import type { SaveStateReporter } from '@/components/officer-save-state';
+import type { ProblemCategory } from '@/lib/domain';
 
 export default function ProblemEditor({
   sessionId,
@@ -115,6 +116,23 @@ export default function ProblemEditor({
           disabled={saving || disabled}
           required
         />
+      </label>
+      <label className="my-5 flex max-w-xs flex-col gap-2">
+        Problem category
+        <select
+          className="min-h-11 w-full rounded border border-border-strong bg-surface px-3 py-2 text-ink disabled:cursor-default disabled:bg-raised disabled:text-muted"
+          value={content.category}
+          onChange={(event) =>
+            edit('category', event.target.value as ProblemCategory)
+          }
+          disabled={saving || disabled}
+        >
+          <option value="custom">Custom</option>
+          <option value="interview-style">Interview-style</option>
+          <option value="competitive-programming">
+            Competitive Programming
+          </option>
+        </select>
       </label>
       <label className="my-5 flex max-w-xs flex-col gap-2">
         Difficulty

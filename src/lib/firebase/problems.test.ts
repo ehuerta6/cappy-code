@@ -8,10 +8,12 @@ const sdk = vi.hoisted(() => ({
   },
   db: {},
   addDoc: vi.fn(),
+  getDocFromServer: vi.fn(),
   getDocsFromServer: vi.fn(),
   updateDoc: vi.fn(),
   deleteField: vi.fn(() => 'DELETE_FIELD'),
   batchUpdate: vi.fn(),
+  batchSet: vi.fn(),
   batchDelete: vi.fn(),
   commit: vi.fn(),
 }));
@@ -21,12 +23,22 @@ vi.mock('./auth', () => ({ getOfficerAuth: () => sdk.user }));
 vi.mock('firebase/firestore', async (importOriginal) => ({
   ...(await importOriginal<typeof import('firebase/firestore')>()),
   collection: (_db: unknown, path: string) => ({ path }),
-  doc: (_db: unknown, path: string) => ({ path }),
+  doc: (first: unknown, path?: string) => {
+    const collection = path === undefined ? (first as { path: string }) : null;
+    return collection
+      ? {
+          path: `${collection.path}/${collection.path === 'problemBank' ? 'bank-new' : 'new'}`,
+          id: collection.path === 'problemBank' ? 'bank-new' : 'new',
+        }
+      : { path };
+  },
   addDoc: sdk.addDoc,
   getDocsFromServer: sdk.getDocsFromServer,
+  getDocFromServer: sdk.getDocFromServer,
   updateDoc: sdk.updateDoc,
   deleteField: sdk.deleteField,
   writeBatch: () => ({
+    set: sdk.batchSet,
     update: sdk.batchUpdate,
     delete: sdk.batchDelete,
     commit: sdk.commit,
@@ -60,12 +72,17 @@ beforeEach(() => {
   vi.clearAllMocks();
   sdk.user.currentUser = { uid: 'officer', isAnonymous: false };
   sdk.getDocsFromServer.mockResolvedValue({ docs: [] });
+  sdk.getDocFromServer.mockResolvedValue({
+    exists: () => true,
+    data: () => ({ ...problem }),
+  });
   sdk.addDoc.mockResolvedValue({ id: 'new' });
   sdk.updateDoc.mockResolvedValue(undefined);
   sdk.commit.mockResolvedValue(undefined);
+  sdk.batchSet.mockReset();
 });
 describe('officer problem persistence', () => {
-  it('creates only metadata, hidden answers, empty content and the next order', async () => {
+  it('creates a Session Problem and a reusable bank copy with empty Solutions', async () => {
     sdk.getDocsFromServer.mockResolvedValue({ docs: [document('old', 4)] });
     const result = await createProblem('session');
     const expected = {
@@ -76,21 +93,28 @@ describe('officer problem persistence', () => {
       constraints: '',
       order: 5,
       answersVisible: false,
+      category: 'custom',
+      bankProblemId: 'bank-new',
+      bankOrigin: 'session',
     };
     expect(result).toEqual({ id: 'new', problem: expected });
-    expect(sdk.addDoc).toHaveBeenCalledWith(
-      { path: 'sessions/session/problems' },
+    expect(sdk.batchSet).toHaveBeenCalledWith(
+      { path: 'sessions/session/problems/new', id: 'new' },
       expected,
     );
-    expect(Object.keys(sdk.addDoc.mock.calls[0][1]).sort()).toEqual([
-      'answersVisible',
-      'constraints',
-      'description',
-      'exampleInput',
-      'exampleOutput',
-      'order',
-      'title',
-    ]);
+    expect(sdk.batchSet).toHaveBeenCalledWith(
+      { path: 'problemBank/bank-new' },
+      {
+        title: 'Untitled Problem',
+        description: '',
+        exampleInput: '',
+        exampleOutput: '',
+        constraints: '',
+        category: 'custom',
+        isPublic: true,
+      },
+    );
+    expect(sdk.batchSet).toHaveBeenCalledTimes(5);
   });
   it('starts an empty session at order zero', async () => {
     expect((await createProblem('session')).problem.order).toBe(0);
@@ -205,7 +229,7 @@ describe('officer problem persistence', () => {
     });
     const records = await listProblems('session');
     expect(records.map((record) => record.id)).toEqual(['a', 'b', 'z']);
-    expect(records[0].problem).toEqual(problem);
+    expect(records[0].problem).toEqual({ ...problem, category: 'custom' });
   });
   it('loads old Problem records without inventing a LeetCode field and reads a link', async () => {
     sdk.getDocsFromServer.mockResolvedValue({
@@ -308,7 +332,11 @@ describe('officer problem persistence', () => {
       'sessions/session/problems/problem',
     ]);
     expect(sdk.commit).toHaveBeenCalledTimes(1);
-    expect(sdk.getDocsFromServer).not.toHaveBeenCalled();
+    expect(sdk.getDocsFromServer).toHaveBeenCalledOnce();
+    expect(sdk.batchUpdate).toHaveBeenCalledWith(
+      { path: 'sessions/session' },
+      { bankProblemIds: [] },
+    );
   });
   it.each([null, { uid: 'anonymous', isAnonymous: true }])(
     'guards all operations against signed-out/anonymous auth %s',

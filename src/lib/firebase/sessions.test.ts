@@ -135,6 +135,7 @@ describe('officer session persistence', () => {
       { path: 'sessions' },
       {
         ...session,
+        bankProblemIds: [],
         createdAt: 'SERVER_TIMESTAMP',
         updatedAt: 'SERVER_TIMESTAMP',
       },

@@ -52,6 +52,7 @@ export function PublicSessionDiscovery({ state }: { state: DiscoveryState }) {
   return (
     <main className="min-h-screen bg-canvas text-ink">
       <AppHeader>
+        <Link href="/problem-bank">Problem Bank</Link>
         <Link href="/officer">Officer login</Link>
       </AppHeader>
       <section
@@ -209,6 +210,7 @@ export function PublicSessionView({ state }: { state: SessionState }) {
   return (
     <main className="min-h-screen bg-canvas text-ink">
       <AppHeader>
+        <Link href="/problem-bank">Problem Bank</Link>
         <Link href="/officer">Officer login</Link>
       </AppHeader>
       {state.status === 'loading' ? (

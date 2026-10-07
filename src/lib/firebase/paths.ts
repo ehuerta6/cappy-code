@@ -11,6 +11,17 @@ export function sessionPath(sessionId: string): string {
   return `sessions/${documentId(sessionId)}`;
 }
 
+export function bankProblemPath(problemId: string): string {
+  return `problemBank/${documentId(problemId)}`;
+}
+
+export function bankSolutionPath(
+  problemId: string,
+  language: Language,
+): string {
+  return `${bankProblemPath(problemId)}/solutions/${language}`;
+}
+
 export function problemPath(sessionId: string, problemId: string): string {
   return `${sessionPath(sessionId)}/problems/${documentId(problemId)}`;
 }

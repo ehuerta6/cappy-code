@@ -50,6 +50,9 @@ test('Officer prepares and presents a Session through its public lifecycle', asy
     await officer.getByRole('button', { name: 'Add problem' }).click();
 
     await officer.getByLabel('Problem title').fill(problemTitle);
+    await officer
+      .getByLabel('Problem category')
+      .selectOption('interview-style');
     await officer.getByLabel('Difficulty').selectOption('medium');
     await officer
       .getByLabel('Description')
@@ -105,6 +108,18 @@ test('Officer prepares and presents a Session through its public lifecycle', asy
         .getByText('No live session right now.'),
     ).toBeVisible();
 
+    await member.goto('/problem-bank');
+    const bankLink = member.getByRole('link', { name: problemTitle });
+    await expect(bankLink).toBeVisible();
+    await bankLink.click();
+    await expect(member.getByText('python-answer-secret')).toBeVisible();
+    await expect(member.getByText('java-answer-secret')).toBeVisible();
+    await expect(member.getByText('cpp-answer-secret')).toBeVisible();
+    await expect(member.getByText('Time: O(n log n)')).toBeVisible();
+    const bankProblemId = new URL(member.url()).pathname.split('/').at(-1);
+    expect(bankProblemId).toBeTruthy();
+    await member.goto('/');
+
     await officer.getByRole('button', { name: 'Go Live' }).click();
     await expect(officer.getByText('live', { exact: true })).toBeVisible();
     await expect(member).toHaveURL(/\/sessions\//);
@@ -131,6 +146,19 @@ test('Officer prepares and presents a Session through its public lifecycle', asy
     await expect(member.getByText(/answer-secret/)).toHaveCount(0);
     const sessionId = new URL(member.url()).pathname.split('/').at(-1);
     expect(sessionId).toBeTruthy();
+    const liveSessionUrl = member.url();
+    await member.goto('/problem-bank');
+    await expect(member.getByRole('link', { name: problemTitle })).toHaveCount(
+      0,
+    );
+    await member.goto(`/problem-bank/${bankProblemId}`);
+    await expect(
+      member.getByRole('heading', { name: 'Problem unavailable' }),
+    ).toBeVisible();
+    await member.goto(liveSessionUrl);
+    await expect(
+      member.getByText('Waiting for the officer to reveal the solution…'),
+    ).toBeVisible();
 
     const problemListResponse = await fetch(
       `http://127.0.0.1:8080/v1/projects/demo-cappycode-local/databases/(default)/documents/sessions/${sessionId}/problems`,
@@ -178,6 +206,11 @@ test('Officer prepares and presents a Session through its public lifecycle', asy
         .getByRole('region', { name: 'General session history' })
         .getByText('No live session right now.'),
     ).toBeVisible();
+    await member.goto('/problem-bank');
+    await expect(
+      member.getByRole('link', { name: problemTitle }),
+    ).toBeVisible();
+    await member.goto('/');
 
     await officer.getByRole('button', { name: 'Go Live' }).click();
     await expect(member).toHaveURL(/\/sessions\//);
@@ -190,6 +223,11 @@ test('Officer prepares and presents a Session through its public lifecycle', asy
     await expect(member.getByText('python-answer-secret')).toBeVisible();
 
     const endedURL = member.url();
+    await member.goto('/problem-bank');
+    await expect(
+      member.getByRole('link', { name: problemTitle }),
+    ).toBeVisible();
+    await member.goto(endedURL);
     await member.reload();
     await expect(member.getByText('Ended', { exact: true })).toBeVisible();
     await expect(member.getByText('cpp-answer-secret')).toBeVisible();
