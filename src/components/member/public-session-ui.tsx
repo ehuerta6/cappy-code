@@ -462,7 +462,7 @@ function ProblemContent({
       </div>
       {problem.leetcodeUrl ? (
         <a
-          className="mb-3 inline-block text-sm text-muted underline decoration-border-strong underline-offset-4 hover:text-ink focus-visible:rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          className="inline-flex min-h-10 items-center text-sm text-muted underline decoration-border-strong underline-offset-4 hover:text-ink focus-visible:rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           href={problem.leetcodeUrl}
           target="_blank"
           rel="noopener noreferrer"
@@ -470,56 +470,69 @@ function ProblemContent({
           View on LeetCode ↗
         </a>
       ) : null}
-      {problem.description ? (
-        <div className="mb-5">
-          <ProblemMarkdown>{problem.description}</ProblemMarkdown>
-        </div>
-      ) : null}
-      <section className="my-5 mb-7" aria-labelledby="examples-heading">
-        <h3
-          className="mb-2 mt-0 text-base font-semibold leading-6"
-          id="examples-heading"
-        >
-          Examples
-        </h3>
-        <div className="grid sm:grid-cols-2">
-          <section className="min-w-0 p-3">
-            <h4 className="mb-2 mt-0 text-sm font-semibold leading-5 text-muted">
-              Input
-            </h4>
-            <div className="min-h-6 overflow-x-auto rounded-md bg-raised px-3 py-2 font-mono text-[15px] leading-[23px]">
-              <ProblemMarkdown>
-                {problem.exampleInput || 'No example input'}
-              </ProblemMarkdown>
+      <section
+        className="mt-4 mb-8 rounded-lg border border-border-soft bg-surface px-4 py-4 sm:px-6 sm:py-5"
+        aria-label="Problem content"
+      >
+        <div className="space-y-5">
+          {problem.description ? (
+            <div className="break-words">
+              <ProblemMarkdown>{problem.description}</ProblemMarkdown>
             </div>
-          </section>
-          <section className="min-w-0 border-t border-border-soft p-3 sm:border-l sm:border-t-0">
-            <h4 className="mb-2 mt-0 text-sm font-semibold leading-5 text-muted">
-              Expected output
-            </h4>
-            <div className="min-h-6 overflow-x-auto rounded-md bg-raised px-3 py-2 font-mono text-[15px] leading-[23px]">
-              <ProblemMarkdown>
-                {problem.exampleOutput || 'No expected output'}
-              </ProblemMarkdown>
+          ) : null}
+          {problem.constraints ? (
+            <section
+              className="border-t border-border-soft pt-4"
+              aria-labelledby={`constraints-${problem.id}`}
+            >
+              <h3
+                className="mb-2 mt-0 text-base font-semibold leading-6"
+                id={`constraints-${problem.id}`}
+              >
+                Constraints
+              </h3>
+              <p className="m-0 max-w-[80ch] whitespace-pre-wrap break-words text-base leading-[26px]">
+                {problem.constraints}
+              </p>
+            </section>
+          ) : null}
+          <section
+            className="border-t border-border-soft pt-4"
+            aria-labelledby={`examples-${problem.id}`}
+          >
+            <h3
+              className="mb-2 mt-0 text-base font-semibold leading-6"
+              id={`examples-${problem.id}`}
+            >
+              Examples
+            </h3>
+            <div className="grid sm:grid-cols-2 sm:divide-x sm:divide-border-soft">
+              <section className="min-w-0 py-2 sm:pr-5">
+                <h4 className="mb-1 mt-0 text-sm font-semibold leading-5 text-muted">
+                  Input
+                </h4>
+                <div className="min-w-0 break-words font-mono text-[15px] leading-[23px]">
+                  <ProblemMarkdown>
+                    {problem.exampleInput || 'No example input'}
+                  </ProblemMarkdown>
+                </div>
+              </section>
+              <section className="min-w-0 border-t border-border-soft py-3 sm:border-t-0 sm:pl-5 sm:pt-2">
+                <h4 className="mb-1 mt-0 text-sm font-semibold leading-5 text-muted">
+                  Expected output
+                </h4>
+                <div className="min-w-0 break-words font-mono text-[15px] leading-[23px]">
+                  <ProblemMarkdown>
+                    {problem.exampleOutput || 'No expected output'}
+                  </ProblemMarkdown>
+                </div>
+              </section>
             </div>
           </section>
         </div>
       </section>
-      {problem.constraints ? (
-        <section className="my-5 mb-7" aria-labelledby="constraints-heading">
-          <h3
-            className="mb-2 mt-0 text-base font-semibold leading-6"
-            id="constraints-heading"
-          >
-            Constraints
-          </h3>
-          <p className="m-0 max-w-[80ch] whitespace-pre-wrap text-base leading-[26px]">
-            {problem.constraints}
-          </p>
-        </section>
-      ) : null}
       <section
-        className="mt-7 border-t border-border-soft pt-6"
+        className="mt-8 border-t border-border-soft pt-6"
         aria-labelledby="solutions-heading"
       >
         <h2

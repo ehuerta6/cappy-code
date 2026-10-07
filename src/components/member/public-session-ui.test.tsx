@@ -247,9 +247,28 @@ describe('public member UI scaffold', () => {
     expect(screen.getByText('first output')).toBeTruthy();
     expect(screen.getByRole('heading', { name: 'Constraints' })).toBeTruthy();
     expect(screen.getByText(/1 ≤ nums.length/)).toBeTruthy();
-    expect(container.textContent!.indexOf('Constraints')).toBeGreaterThan(
-      container.textContent!.indexOf('Expected output'),
+    const problemContent = screen.getByRole('region', {
+      name: 'Problem content',
+    });
+    const problemText = problemContent.textContent ?? '';
+    expect(problemText.indexOf('First description')).toBeLessThan(
+      problemText.indexOf('Constraints'),
     );
+    expect(problemText.indexOf('Constraints')).toBeLessThan(
+      problemText.indexOf('Examples'),
+    );
+    expect(
+      within(problemContent).getAllByRole('heading', { name: 'Examples' }),
+    ).toHaveLength(1);
+    expect(
+      within(problemContent).getByRole('heading', { name: 'Input' }),
+    ).toBeTruthy();
+    expect(
+      within(problemContent).getByRole('heading', {
+        name: 'Expected output',
+      }),
+    ).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: 'Output' })).toBeNull();
     expect(container.textContent!.indexOf('Constraints')).toBeLessThan(
       container.textContent!.indexOf('Solutions'),
     );
@@ -391,6 +410,11 @@ describe('public member UI scaffold', () => {
     ).toBe(true);
     expect(screen.getByLabelText('Java Solution, read-only')).toBeTruthy();
     expect(screen.getByLabelText('C++ Solution, read-only')).toBeTruthy();
+    expect(
+      screen.getByRole('region', {
+        name: 'Three-language solution comparison',
+      }),
+    ).toBeTruthy();
     expect(screen.getAllByText('Expected output')).toHaveLength(1);
     expect(screen.queryByText('hello')).toBeNull();
     expect(screen.queryByText('java output')).toBeNull();
