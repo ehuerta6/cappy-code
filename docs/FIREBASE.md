@@ -30,20 +30,23 @@ npm run seed
 npm run dev
 ```
 
-The seed creates a local Officer account:
+The deterministic reset creates one Officer account in the local Auth
+Emulator:
 
-| Field    | Local value               |
-| -------- | ------------------------- |
-| Email    | `officer@cappycode.local` |
-| Password | `cappycode-local-only`    |
+| Field    | Local emulator value |
+| -------- | -------------------- |
+| Email    | `cappy@gmail.com`    |
+| Password | `cappy123`           |
 
-This account exists only in the Auth Emulator and is unrelated to the shared
-production Officer account. Members stay anonymous. The seed includes one draft
-custom Problem, a live linked Two Sum Problem with answers visible and a custom
-Problem with answers hidden, and an ended session with one linked and one custom
-Problem. Each has ordered metadata and Python, Java, and C++ source with prepared
-output. It covers LeetCode links and Problems without links for Member and Past
-history views.
+This credential is for the local Auth Emulator only. Never use it with
+production Firebase; it is unrelated to and must not modify the production
+Officer account. Members stay anonymous. The deterministic fixture contains
+one Live Session, two Draft Sessions, and ten Past Sessions dated across
+multiple weeks. It intentionally includes linked LeetCode and custom Problems,
+mixed reveal states, multiple Problems per Session, and prepared Python, Java,
+and C++ Solutions with Output for every Problem. This gives the Member archive,
+Officer Past history, reveal controls, Monaco panels, and explicit Save flows
+useful content immediately after reset.
 
 After destructive testing, restore the known state with the emulators still
 running:
@@ -53,9 +56,10 @@ npm run reset
 ```
 
 Reset clears the local Auth and Firestore emulator data before restoring the
-Officer account and seed Sessions. `npm run seed` reapplies the sample records
-without clearing other local data. Neither script targets a Firebase project
-outside the hard-coded local emulator endpoints.
+canonical local Officer and complete deterministic Session fixture.
+`npm run seed` reapplies the fixture without clearing other local data. Neither
+script targets a Firebase project outside the hard-coded
+`demo-cappycode-local` project and local emulator endpoints.
 The seed uses the existing Rules test helper to bypass Rules only while loading
 local setup data. The running application still uses the checked-in Rules for
 every app request.
@@ -76,6 +80,41 @@ production flag and real project values must be set for the production build.
 Routine development and destructive testing belong on emulators; use production
 only for targeted deployment smoke checks. Do not create test Sessions in
 production.
+
+## Production deployment (#73)
+
+The Next.js production app is deployed to Vercel at
+<https://cappycode.vercel.app>. The Vercel project `cappycode` is connected to
+the GitHub repository `ehuerta6/cappy-code` (formerly
+`ehuerta6/multi-language-ide`) and uses `main` as its production branch. Changes
+merged to `main` trigger production deployments. Firebase remains the backend
+for Firestore, Authentication, and Security Rules; do not enable Firebase App
+Hosting or upgrade the Firebase project to Blaze for this deployment.
+
+Configure the following project-level Vercel variables for the **Production**
+environment, using the Web app config from the existing Firebase project
+`cappycode-f133c`:
+
+- `NEXT_PUBLIC_FIREBASE_API_KEY`
+- `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`
+- `NEXT_PUBLIC_FIREBASE_PROJECT_ID`
+- `NEXT_PUBLIC_FIREBASE_APP_ID`
+- `NEXT_PUBLIC_USE_FIREBASE_EMULATORS=false`
+
+These public client config values are compiled into browser assets. Never put
+Officer passwords, service account credentials, or other secrets in
+`NEXT_PUBLIC_` variables. Changing a Vercel environment variable requires a
+new deployment before the production build uses it. Confirm the deployed app's
+Firestore requests target `cappycode-f133c`; production requests must not use
+localhost or emulator endpoints. Deploy Firestore Security Rules separately
+with the Firebase CLI when Rules changes are in scope.
+
+For a production release, verify anonymous Member access and authenticated
+Officer workflows with the production account, including explicit Save,
+LeetCode links and history, solution reveal/hide, Session lifecycle and ended
+archive, Monaco languages, and themes. Use only approved temporary smoke data
+and remove it when finished. Do not treat emulator or preview-deployment
+results as production verification.
 
 ## Local setup
 
