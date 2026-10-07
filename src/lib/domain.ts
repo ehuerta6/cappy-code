@@ -27,4 +27,8 @@ export interface Problem {
 
 export interface Solution {
   code: string;
+  timeComplexity?: string;
+  timeComplexityReason?: string;
+  spaceComplexity?: string;
+  spaceComplexityReason?: string;
 }

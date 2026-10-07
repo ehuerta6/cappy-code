@@ -64,6 +64,44 @@ describe('officer solution persistence', () => {
     }
     expect(sdk.getDocFromServer).toHaveBeenCalledTimes(3);
   });
+  it('round trips optional complexity independently for each language', async () => {
+    const time = {
+      timeComplexity: 'O(n)',
+      timeComplexityReason: 'One pass through the input.',
+      spaceComplexity: 'O(n)',
+      spaceComplexityReason: 'The map can hold each input value.',
+    };
+    await updateSolution('s', 'p', 'python', { code: 'py', ...time });
+    await updateSolution('s', 'p', 'java', {
+      code: 'java',
+      timeComplexity: 'O(n log n)',
+    });
+    expect(sdk.setDoc).toHaveBeenNthCalledWith(
+      1,
+      { path: 'sessions/s/problems/p/solutions/python' },
+      { code: 'py', ...time },
+    );
+    expect(sdk.setDoc).toHaveBeenNthCalledWith(
+      2,
+      { path: 'sessions/s/problems/p/solutions/java' },
+      { code: 'java', timeComplexity: 'O(n log n)' },
+    );
+    sdk.getDocFromServer.mockImplementation(async ({ path }) => ({
+      exists: () => true,
+      metadata: { hasPendingWrites: false },
+      data: () =>
+        path.endsWith('/python')
+          ? { code: 'py', ...time }
+          : path.endsWith('/java')
+            ? { code: 'java', timeComplexity: 'O(n log n)' }
+            : { code: 'legacy' },
+    }));
+    await expect(getSolutionsForProblem('s', 'p')).resolves.toEqual({
+      python: { code: 'py', ...time },
+      java: { code: 'java', timeComplexity: 'O(n log n)' },
+      cpp: { code: 'legacy' },
+    });
+  });
   it('maps missing solutions to empty content without creating documents', async () => {
     sdk.getDocFromServer.mockResolvedValue({
       exists: () => false,

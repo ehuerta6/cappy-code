@@ -25,7 +25,22 @@ function validateSolution(value: unknown): Solution {
   ) {
     throw new Error('A solution must contain source code text.');
   }
-  return { code: value.code };
+  const data = value as Record<string, unknown>;
+  const fields = [
+    'timeComplexity',
+    'timeComplexityReason',
+    'spaceComplexity',
+    'spaceComplexityReason',
+  ] as const;
+  const solution: Solution = { code: data.code as string };
+  for (const field of fields) {
+    const text = data[field];
+    if (text !== undefined && typeof text !== 'string')
+      throw new Error(`A solution ${field} must be text.`);
+    if (typeof text === 'string' && text.trim().length > 0)
+      solution[field] = text;
+  }
+  return solution;
 }
 
 export async function getSolutionsForProblem(

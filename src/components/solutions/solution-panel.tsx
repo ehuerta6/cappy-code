@@ -97,6 +97,113 @@ export default function SolutionPanel(props: Props) {
           }}
         />
       </div>
+      {mode === 'officer' ? (
+        <ComplexityEditor
+          solution={solution}
+          disabled={props.disabled}
+          onChange={props.onChange}
+        />
+      ) : (
+        <ComplexitySummary solution={solution} />
+      )}
     </section>
+  );
+}
+
+function ComplexityEditor({
+  solution,
+  disabled,
+  onChange,
+}: {
+  solution: Solution;
+  disabled?: boolean;
+  onChange: (solution: Solution) => void;
+}) {
+  return (
+    <div className="grid gap-3 border-t border-border-soft p-3">
+      <h4 className="m-0 text-sm font-semibold">Complexity analysis</h4>
+      <label className="grid gap-1 text-sm font-medium">
+        Time Complexity
+        <input
+          className="min-h-10 rounded border border-border-strong bg-surface px-3 font-normal text-ink"
+          value={solution.timeComplexity ?? ''}
+          disabled={disabled}
+          onChange={(event) =>
+            onChange({ ...solution, timeComplexity: event.target.value })
+          }
+          placeholder="e.g. O(n)"
+        />
+      </label>
+      <label className="grid gap-1 text-sm font-medium">
+        Time explanation
+        <textarea
+          className="min-h-16 rounded border border-border-strong bg-surface px-3 py-2 font-normal text-ink"
+          value={solution.timeComplexityReason ?? ''}
+          disabled={disabled}
+          onChange={(event) =>
+            onChange({ ...solution, timeComplexityReason: event.target.value })
+          }
+          rows={2}
+        />
+      </label>
+      <label className="grid gap-1 text-sm font-medium">
+        Space Complexity
+        <input
+          className="min-h-10 rounded border border-border-strong bg-surface px-3 font-normal text-ink"
+          value={solution.spaceComplexity ?? ''}
+          disabled={disabled}
+          onChange={(event) =>
+            onChange({ ...solution, spaceComplexity: event.target.value })
+          }
+          placeholder="e.g. O(n)"
+        />
+      </label>
+      <label className="grid gap-1 text-sm font-medium">
+        Space explanation
+        <textarea
+          className="min-h-16 rounded border border-border-strong bg-surface px-3 py-2 font-normal text-ink"
+          value={solution.spaceComplexityReason ?? ''}
+          disabled={disabled}
+          onChange={(event) =>
+            onChange({ ...solution, spaceComplexityReason: event.target.value })
+          }
+          rows={2}
+        />
+      </label>
+    </div>
+  );
+}
+
+function ComplexitySummary({ solution }: { solution: Solution }) {
+  const hasTime = solution.timeComplexity || solution.timeComplexityReason;
+  const hasSpace = solution.spaceComplexity || solution.spaceComplexityReason;
+  if (!hasTime && !hasSpace) return null;
+  return (
+    <dl className="grid gap-2 border-t border-border-soft p-3 text-sm">
+      {hasTime ? (
+        <div className="grid gap-0.5">
+          {solution.timeComplexity ? (
+            <dt className="font-semibold">Time: {solution.timeComplexity}</dt>
+          ) : (
+            <dt className="font-semibold">Time</dt>
+          )}
+          {solution.timeComplexityReason ? (
+            <dd className="m-0 text-muted">{solution.timeComplexityReason}</dd>
+          ) : null}
+        </div>
+      ) : null}
+      {hasSpace ? (
+        <div className="grid gap-0.5">
+          {solution.spaceComplexity ? (
+            <dt className="font-semibold">Space: {solution.spaceComplexity}</dt>
+          ) : (
+            <dt className="font-semibold">Space</dt>
+          )}
+          {solution.spaceComplexityReason ? (
+            <dd className="m-0 text-muted">{solution.spaceComplexityReason}</dd>
+          ) : null}
+        </div>
+      ) : null}
+    </dl>
   );
 }
