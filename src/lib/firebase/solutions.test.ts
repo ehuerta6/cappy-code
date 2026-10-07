@@ -28,44 +28,39 @@ beforeEach(() => {
   sdk.getDocFromServer.mockImplementation(async ({ path }) => ({
     exists: () => true,
     metadata: { hasPendingWrites: false },
-    data: () => ({ code: path, output: `output:${path}` }),
+    data: () => ({ code: path, output: `legacy:${path}` }),
   }));
 });
 
 describe('officer solution persistence', () => {
   it.each(languages)(
-    'writes independent %s source and output to its fixed child document',
+    'writes independent %s source to its fixed child document',
     async (language) => {
       await updateSolution('session', 'problem', language, {
         code: `${language} code`,
-        output: `${language} output`,
       });
       expect(sdk.setDoc).toHaveBeenCalledExactlyOnceWith(
         { path: `sessions/session/problems/problem/solutions/${language}` },
-        { code: `${language} code`, output: `${language} output` },
+        { code: `${language} code` },
       );
     },
   );
   it('strips extra fields and never writes Problem metadata', async () => {
     await updateSolution('s', 'p', 'python', {
       code: 'code',
-      output: 'output',
       title: 'metadata',
       language: 'python',
-    } as { code: string; output: string });
+    } as { code: string });
     expect(sdk.setDoc).toHaveBeenCalledExactlyOnceWith(
       { path: 'sessions/s/problems/p/solutions/python' },
-      { code: 'code', output: 'output' },
+      { code: 'code' },
     );
   });
   it('loads all three fixed documents separately for the requested Problem', async () => {
     const result = await getSolutionsForProblem('s', 'p');
     for (const language of languages) {
       const path = `sessions/s/problems/p/solutions/${language}`;
-      expect(result[language]).toEqual({
-        code: path,
-        output: `output:${path}`,
-      });
+      expect(result[language]).toEqual({ code: path });
     }
     expect(sdk.getDocFromServer).toHaveBeenCalledTimes(3);
   });
@@ -75,9 +70,9 @@ describe('officer solution persistence', () => {
       metadata: { hasPendingWrites: false },
     });
     expect(await getSolutionsForProblem('s', 'p')).toEqual({
-      python: { code: '', output: '' },
-      java: { code: '', output: '' },
-      cpp: { code: '', output: '' },
+      python: { code: '' },
+      java: { code: '' },
+      cpp: { code: '' },
     });
     expect(sdk.setDoc).not.toHaveBeenCalled();
   });
@@ -87,7 +82,7 @@ describe('officer solution persistence', () => {
       sdk.user.currentUser = user;
       await expect(getSolutionsForProblem('s', 'p')).rejects.toThrow('Sign in');
       await expect(
-        updateSolution('s', 'p', 'cpp', { code: '', output: '' }),
+        updateSolution('s', 'p', 'cpp', { code: '' }),
       ).rejects.toThrow('Sign in');
       expect(sdk.getFirestoreDb).not.toHaveBeenCalled();
     },
@@ -96,7 +91,7 @@ describe('officer solution persistence', () => {
     sdk.getDocFromServer.mockResolvedValue({
       exists: () => true,
       metadata: { hasPendingWrites: false },
-      data: () => ({ code: 1, output: '' }),
+      data: () => ({ code: 1, output: 'legacy ignored' }),
     });
     await expect(getSolutionsForProblem('s', 'p')).rejects.toThrow('text');
     sdk.getDocFromServer.mockResolvedValue({
@@ -109,7 +104,7 @@ describe('officer solution persistence', () => {
     sdk.setDoc.mockRejectedValue(new Error('offline'));
     sdk.getDocFromServer.mockRejectedValue(new Error('offline'));
     await expect(
-      updateSolution('s', 'p', 'java', { code: '', output: '' }),
+      updateSolution('s', 'p', 'java', { code: '' }),
     ).rejects.toThrow('offline');
     await expect(getSolutionsForProblem('s', 'p')).rejects.toThrow('offline');
   });

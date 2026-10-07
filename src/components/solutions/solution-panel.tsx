@@ -4,7 +4,6 @@ import Editor, { type BeforeMount } from '@monaco-editor/react';
 import { useId } from 'react';
 import type { Language, Solution } from '@/lib/domain';
 import { useColorTheme } from '@/components/theme-provider';
-import { getOutputHeight } from './solution-sizing';
 
 export const languageNames: Record<Language, string> = {
   python: 'Python',
@@ -54,7 +53,6 @@ export default function SolutionPanel(props: Props) {
   const theme = useColorTheme()?.theme;
   const dark = theme === 'dark';
   const name = languageNames[language];
-  const outputHeight = getOutputHeight(solution.output);
   return (
     <section
       className="flex min-w-0 flex-col overflow-hidden rounded-lg border border-border-soft bg-surface text-ink"
@@ -98,42 +96,6 @@ export default function SolutionPanel(props: Props) {
             padding: { top: 16, bottom: 16 },
           }}
         />
-      </div>
-      <div className="flex flex-1 flex-col px-3 pb-3 pt-3">
-        <label
-          className="mb-2 block text-[15px] font-semibold leading-[22px] text-ink"
-          id={`${id}-output`}
-          htmlFor={mode === 'officer' ? `${id}-field` : undefined}
-        >
-          Output
-        </label>
-        {props.mode === 'officer' ? (
-          <textarea
-            className="w-full resize-y overflow-auto whitespace-pre rounded bg-raised px-2.5 py-2 font-mono text-[15px] leading-[23px] text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-default disabled:text-muted"
-            id={`${id}-field`}
-            aria-label={`${name} prepared output`}
-            value={solution.output}
-            style={{ height: outputHeight, maxHeight: 230 }}
-            disabled={props.disabled}
-            onChange={(event) =>
-              props.onChange({ ...solution, output: event.target.value })
-            }
-            spellCheck={false}
-            rows={4}
-          />
-        ) : solution.output ? (
-          <pre
-            className="m-0 w-full overflow-auto whitespace-pre rounded bg-raised px-2.5 py-2 font-mono text-[15px] leading-[23px] text-ink"
-            aria-labelledby={`${id}-output`}
-            style={{ height: outputHeight, maxHeight: 230 }}
-          >
-            {solution.output}
-          </pre>
-        ) : (
-          <p className="mt-2 text-sm leading-5 text-muted">
-            No prepared output
-          </p>
-        )}
       </div>
     </section>
   );

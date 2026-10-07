@@ -95,12 +95,11 @@ function validateSolution(value: unknown): Solution {
   if (
     !value ||
     typeof value !== 'object' ||
-    typeof (value as Record<string, unknown>).code !== 'string' ||
-    typeof (value as Record<string, unknown>).output !== 'string'
+    typeof (value as Record<string, unknown>).code !== 'string'
   )
     throw new Error('A stored solution has invalid fields.');
   const data = value as Record<string, string>;
-  return { code: data.code, output: data.output };
+  return { code: data.code };
 }
 
 async function listSessionsWithStatus(status: 'live' | 'ended') {
@@ -171,9 +170,7 @@ export async function getMemberSolutions(
         throw new Error('Solution changes are awaiting confirmation.');
       return [
         language,
-        snapshot.exists()
-          ? validateSolution(snapshot.data())
-          : { code: '', output: '' },
+        snapshot.exists() ? validateSolution(snapshot.data()) : { code: '' },
       ] as const;
     }),
   );

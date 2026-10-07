@@ -87,9 +87,9 @@ const problems = [
   },
 ];
 const solutions = {
-  python: { code: 'python source', output: 'python output' },
-  java: { code: 'java source', output: 'java output' },
-  cpp: { code: 'cpp source', output: 'cpp output' },
+  python: { code: 'python source' },
+  java: { code: 'java source' },
+  cpp: { code: 'cpp source' },
 };
 
 beforeEach(() => {
