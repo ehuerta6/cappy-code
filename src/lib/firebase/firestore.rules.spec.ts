@@ -118,6 +118,38 @@ function anonymousAuthDb() {
 }
 
 describe('Firestore security rules', () => {
+  it('requires a supported branch on new Sessions and rejects invalid branch updates', async () => {
+    const db = officerDb();
+    await assertFails(
+      setDoc(doc(db, 'sessions/new-legacy'), {
+        title: 'New session',
+        status: 'draft',
+      }),
+    );
+    for (const branch of ['intro', 'general', 'icpc']) {
+      await assertSucceeds(
+        setDoc(doc(db, `sessions/new-${branch}`), {
+          branch,
+          title: 'New session',
+          status: 'draft',
+        }),
+      );
+    }
+    await assertFails(
+      setDoc(doc(db, 'sessions/invalid'), {
+        branch: 'advanced',
+        title: 'Invalid session',
+        status: 'draft',
+      }),
+    );
+    await assertFails(
+      updateDoc(doc(db, 'sessions/draft'), { branch: 'advanced' }),
+    );
+    await assertSucceeds(
+      updateDoc(doc(db, 'sessions/draft'), { branch: 'general' }),
+    );
+  });
+
   it('allows an authenticated officer to read and write draft sessions, problems, and fixed solutions', async () => {
     const db = officerDb();
     await assertSucceeds(getDoc(doc(db, 'sessions/draft')));

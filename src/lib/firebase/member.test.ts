@@ -36,6 +36,7 @@ import {
 } from './member';
 
 const live = {
+  branch: 'intro',
   title: 'Intro practice',
   date: '2026-10-04',
   status: 'live',
@@ -147,9 +148,25 @@ describe('anonymous member persistence', () => {
     const record = await getMemberSession('legacy');
     expect(record?.session).not.toHaveProperty('activeProblemId');
     expect(record?.session).toMatchObject({
+      branch: 'intro',
       title: 'Intro practice',
       status: 'live',
     });
+  });
+
+  it('parses every public branch and rejects unsupported values', async () => {
+    sdk.getDocFromServer.mockResolvedValueOnce(
+      snapshot('general', { ...live, branch: 'general' }),
+    );
+    await expect(getMemberSession('general')).resolves.toMatchObject({
+      session: { branch: 'general' },
+    });
+    sdk.getDocFromServer.mockResolvedValueOnce(
+      snapshot('invalid', { ...live, branch: 'advanced' }),
+    );
+    await expect(getMemberSession('invalid')).rejects.toThrow(
+      'Choose Intro, General, or ICPC',
+    );
   });
 
   it('reads public Problem metadata and sorts by order then document ID', async () => {

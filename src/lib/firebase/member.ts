@@ -14,6 +14,7 @@ import {
   languages,
   type Problem,
   type SessionStatus,
+  type SessionBranch,
   type Solution,
 } from '../domain';
 import { validateLeetcodeProblemUrl } from '../problem-metadata';
@@ -23,7 +24,12 @@ import { sessionPath, solutionPath } from './paths';
 
 export interface MemberSessionRecord {
   id: string;
-  session: { title: string; date: string; status: 'live' | 'ended' };
+  session: {
+    branch: SessionBranch;
+    title: string;
+    date: string;
+    status: 'live' | 'ended';
+  };
 }
 
 export interface MemberProblemRecord {
@@ -48,10 +54,15 @@ function validateSessionRecord(
     !publicStatuses.includes(data.status as SessionStatus)
   )
     throw new Error('A stored session has invalid fields.');
+  const metadata = validateSessionMetadata({
+    branch: data.branch,
+    title: data.title,
+    date: data.date,
+  });
   return {
     id,
     session: {
-      ...validateSessionMetadata({ title: data.title, date: data.date }),
+      ...metadata,
       status: data.status as 'live' | 'ended',
     },
   };

@@ -61,6 +61,7 @@ import type { MemberSessionRecord } from '@/lib/firebase/member';
 const session = {
   id: 'session',
   session: {
+    branch: 'intro' as const,
     title: 'Intro practice',
     date: '2026-10-04',
     status: 'live' as const,

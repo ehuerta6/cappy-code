@@ -46,10 +46,19 @@ service cloud.firestore {
         ).data.status != 'live';
     }
 
+    function hasSupportedBranch(data) {
+      return data.keys().hasAny(['branch'])
+        && data.branch in ['intro', 'general', 'icpc'];
+    }
+
     match /sessions/{sessionId} {
       allow read: if isOfficer() || resource.data.status in ['live', 'ended'];
-      allow create: if isOfficer() && request.resource.data.status == 'draft';
+      allow create: if isOfficer()
+        && request.resource.data.status == 'draft'
+        && hasSupportedBranch(request.resource.data);
       allow update: if isOfficer()
+        && (!request.resource.data.keys().hasAny(['branch'])
+          || hasSupportedBranch(request.resource.data))
         && (request.resource.data.status == resource.data.status
           || (resource.data.status == 'draft'
             && request.resource.data.status == 'live'

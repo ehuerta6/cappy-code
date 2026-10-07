@@ -56,6 +56,7 @@ const record = {
   id: 'session-id',
   problemCount: 1,
   session: {
+    branch: 'intro' as const,
     title: 'Arrays',
     date: '2026-10-08',
     status: 'draft',
@@ -137,11 +138,15 @@ describe('Officer Sessions surface', () => {
     ]);
     render(<OfficerSessions />);
     await screen.findByText('No Sessions yet');
+    fireEvent.change(screen.getByLabelText('Branch for new session'), {
+      target: { value: 'general' },
+    });
     fireEvent.click(screen.getByRole('button', { name: '+ New session' }));
     expect(
       await screen.findByRole('heading', { name: 'Untitled Session' }),
     ).toBeTruthy();
     expect(api.createSession).toHaveBeenCalledWith({
+      branch: 'general',
       title: 'Untitled Session',
       date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
     });
@@ -181,32 +186,85 @@ describe('Officer Sessions surface', () => {
       },
     ]);
     render(<OfficerSessions />);
-    await screen.findByRole('heading', { name: 'Past' });
-    expect(screen.getByRole('heading', { name: 'Live' })).toBeTruthy();
-    expect(screen.getByRole('heading', { name: 'Upcoming' })).toBeTruthy();
-    expect(
-      screen
-        .getByRole('region', { name: 'Upcoming' })
-        .querySelector('time')
-        ?.getAttribute('datetime'),
-    ).toBe('2025-01-01');
-    expect(
-      screen
-        .getByRole('region', { name: 'Live' })
-        .querySelector('time')
-        ?.getAttribute('datetime'),
-    ).toBe('2026-01-01');
-    const pastRows = screen
-      .getByRole('region', { name: 'Past' })
-      .querySelectorAll('button');
+    const intro = await screen.findByRole('region', {
+      name: 'Intro session history',
+    });
+    expect(screen.getByRole('heading', { name: 'General' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'ICPC' })).toBeTruthy();
+    const live = within(intro).getByRole('region', {
+      name: 'Live Intro sessions',
+    });
+    const upcoming = within(intro).getByRole('region', {
+      name: 'Upcoming Intro sessions',
+    });
+    const past = within(intro).getByRole('region', {
+      name: 'Past Intro sessions',
+    });
+    expect(upcoming.querySelector('time')?.getAttribute('datetime')).toBe(
+      '2025-01-01',
+    );
+    expect(live.querySelector('time')?.getAttribute('datetime')).toBe(
+      '2026-01-01',
+    );
+    const pastRows = past.querySelectorAll('button');
     expect(pastRows[0].textContent).toContain('Oct 1');
     expect(pastRows[1].textContent).toContain('Sep 1');
     expect(pastRows[0].textContent).toContain('1 Problem');
     expect(
-      await within(screen.getByRole('region', { name: 'Past' })).findAllByText(
-        'No Problems recorded.',
-      ),
+      await within(past).findAllByText('No Problems recorded.'),
     ).toHaveLength(2);
+  });
+
+  it('groups Officer Sessions into three independent branch history regions', async () => {
+    api.listSessions.mockResolvedValue([
+      {
+        ...record,
+        id: 'intro-past',
+        session: { ...record.session, title: 'Intro past', status: 'ended' },
+      },
+      {
+        ...record,
+        id: 'general-live',
+        session: {
+          ...record.session,
+          branch: 'general',
+          title: 'General live',
+          status: 'live',
+        },
+      },
+      {
+        ...record,
+        id: 'icpc-draft',
+        session: { ...record.session, branch: 'icpc', title: 'ICPC practice' },
+      },
+    ]);
+    const { container } = render(<OfficerSessions />);
+    const intro = await screen.findByRole('region', {
+      name: 'Intro session history',
+    });
+    const general = screen.getByRole('region', {
+      name: 'General session history',
+    });
+    const icpc = screen.getByRole('region', { name: 'ICPC session history' });
+    expect(
+      within(intro).getByRole('button', { name: /Intro past/ }),
+    ).toBeTruthy();
+    expect(
+      within(general).getByRole('button', { name: /General live/ }),
+    ).toBeTruthy();
+    expect(
+      within(icpc).getByRole('button', { name: /ICPC practice/ }),
+    ).toBeTruthy();
+    for (const region of [intro, general, icpc]) {
+      expect(region.getAttribute('tabindex')).toBe('0');
+      expect(region.className).toContain('md:overflow-y-auto');
+      expect(region.className).toContain('md:max-h-');
+      expect(region.className).toContain('md:overscroll-contain');
+    }
+    expect(
+      container.querySelector('section[aria-label="Officer sessions"]')
+        ?.className,
+    ).not.toContain('overflow-y-auto');
   });
 
   it('shows ended-session Problem summaries directly under Past in order and keeps row navigation', async () => {
@@ -289,7 +347,12 @@ describe('Officer Sessions surface', () => {
     );
 
     render(<OfficerSessions />);
-    const past = await screen.findByRole('region', { name: 'Past' });
+    const intro = await screen.findByRole('region', {
+      name: 'Intro session history',
+    });
+    const past = within(intro).getByRole('region', {
+      name: 'Past Intro sessions',
+    });
     const newerHistory = await within(past).findByRole('region', {
       name: 'Problem history for Arrays & Hashing',
     });
@@ -373,7 +436,12 @@ describe('Officer Sessions surface', () => {
     });
 
     render(<OfficerSessions />);
-    const past = await screen.findByRole('region', { name: 'Past' });
+    const intro = await screen.findByRole('region', {
+      name: 'Intro session history',
+    });
+    const past = within(intro).getByRole('region', {
+      name: 'Past Intro sessions',
+    });
     const failedHistory = within(past).getByRole('region', {
       name: 'Problem history for Unavailable history',
     });
@@ -528,6 +596,7 @@ describe('Officer Sessions surface', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
     await waitFor(() =>
       expect(api.updateSession).toHaveBeenCalledWith('session-id', {
+        branch: 'intro',
         title: 'Edited archive',
         date: '2026-10-08',
       }),
@@ -536,7 +605,9 @@ describe('Officer Sessions surface', () => {
       expect(screen.getByRole('status').textContent).toBe('Saved ✓'),
     );
     fireEvent.click(screen.getByRole('button', { name: 'Back to Sessions' }));
-    expect(await screen.findByRole('heading', { name: 'Past' })).toBeTruthy();
+    expect(
+      await screen.findByRole('region', { name: 'Intro session history' }),
+    ).toBeTruthy();
     expect(
       screen.getByRole('button', { name: /Oct 8.*Arrays.*1 Problem.*ended/ }),
     ).toBeTruthy();
@@ -576,6 +647,7 @@ describe('Officer Sessions surface', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
     expect(screen.getByRole('status').textContent).toBe('Saving…');
     expect(api.updateSession).toHaveBeenCalledWith('session-id', {
+      branch: 'intro',
       title: 'Hashing',
       date: '2026-10-09',
     });

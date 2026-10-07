@@ -7,7 +7,27 @@ describe('session calendar metadata', () => {
   it('trims the title and preserves a calendar date string', () => {
     expect(
       validateSessionMetadata({ title: ' Arrays ', date: '2028-02-29' }),
-    ).toEqual({ title: 'Arrays', date: '2028-02-29' });
+    ).toEqual({ branch: 'intro', title: 'Arrays', date: '2028-02-29' });
+  });
+  it('accepts each supported Session branch and maps legacy missing values to Intro', () => {
+    expect(
+      validateSessionMetadata({ title: 'Arrays', date: '2026-10-08' }).branch,
+    ).toBe('intro');
+    for (const branch of ['intro', 'general', 'icpc'] as const) {
+      expect(
+        validateSessionMetadata({ branch, title: 'Arrays', date: '2026-10-08' })
+          .branch,
+      ).toBe(branch);
+    }
+  });
+  it('rejects unsupported Session branches', () => {
+    expect(() =>
+      validateSessionMetadata({
+        branch: 'other',
+        title: 'Arrays',
+        date: '2026-10-08',
+      }),
+    ).toThrow('Choose Intro, General, or ICPC');
   });
   it.each([
     '2026-02-29',

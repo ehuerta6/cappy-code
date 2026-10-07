@@ -7,6 +7,11 @@ import {
   type SessionRecord,
 } from '@/lib/firebase/sessions';
 import { listProblems, type ProblemRecord } from '@/lib/firebase/problems';
+import {
+  sessionBranches,
+  sessionBranchLabels,
+  type SessionBranch,
+} from '@/lib/domain';
 import { todayCalendarDate } from '@/lib/session-metadata';
 import SessionEditor from './session-editor';
 
@@ -16,6 +21,7 @@ export default function OfficerSessions() {
   const [loadError, setLoadError] = useState(false);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState(false);
+  const [createBranch, setCreateBranch] = useState<SessionBranch>('intro');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [revision, setRevision] = useState(0);
   const openAfterLoad = useRef<string | null>(null);
@@ -57,6 +63,7 @@ export default function OfficerSessions() {
     setCreateError(false);
     try {
       const id = await createSession({
+        branch: createBranch,
         title: 'Untitled Session',
         date: todayCalendarDate(),
       });
@@ -83,43 +90,42 @@ export default function OfficerSessions() {
     );
   }
 
-  const groups = [
-    {
-      label: 'Live',
-      records: records
-        .filter((record) => record.session.status === 'live')
-        .sort((a, b) => a.session.date.localeCompare(b.session.date)),
-    },
-    {
-      label: 'Upcoming',
-      records: records
-        .filter((record) => record.session.status === 'draft')
-        .sort((a, b) => a.session.date.localeCompare(b.session.date)),
-    },
-    {
-      label: 'Past',
-      records: records
-        .filter((record) => record.session.status === 'ended')
-        .sort((a, b) => b.session.date.localeCompare(a.session.date)),
-    },
-  ];
-
   return (
     <section
-      className="mx-auto w-full max-w-[1440px] text-base leading-relaxed"
+      className="mx-auto flex w-full max-w-[1440px] flex-col text-base leading-relaxed"
       aria-label="Officer sessions"
     >
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3 sm:gap-6">
         <h1 className="m-0 text-[28px] font-semibold leading-9 tracking-tight">
           Sessions
         </h1>
-        <button
-          className="min-h-11 rounded border border-accent bg-accent px-3 py-2 font-semibold text-accent-contrast hover:border-accent-hover hover:bg-accent-hover disabled:cursor-default disabled:bg-raised disabled:text-muted"
-          onClick={() => void create()}
-          disabled={creating || loading || loadError}
-        >
-          {creating ? 'Creating…' : '+ New session'}
-        </button>
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="flex flex-col gap-1 text-sm">
+            <span>Branch for new session</span>
+            <select
+              className="min-h-11 rounded border border-border-strong bg-surface px-3 py-2 text-ink"
+              aria-label="Branch for new session"
+              value={createBranch}
+              onChange={(event) =>
+                setCreateBranch(event.target.value as SessionBranch)
+              }
+              disabled={creating || loading || loadError}
+            >
+              {sessionBranches.map((branch) => (
+                <option key={branch} value={branch}>
+                  {sessionBranchLabels[branch]}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            className="min-h-11 rounded border border-accent bg-accent px-3 py-2 font-semibold text-accent-contrast hover:border-accent-hover hover:bg-accent-hover disabled:cursor-default disabled:bg-raised disabled:text-muted"
+            onClick={() => void create()}
+            disabled={creating || loading || loadError}
+          >
+            {creating ? 'Creating…' : '+ New session'}
+          </button>
+        </div>
       </div>
       {createError && (
         <p role="alert">
@@ -142,64 +148,118 @@ export default function OfficerSessions() {
       ) : records.length === 0 ? (
         <p>No Sessions yet</p>
       ) : (
-        groups.map(
-          ({ label, records: groupRecords }) =>
-            groupRecords.length > 0 && (
-              <section key={label} aria-label={label}>
-                <h2 className="mb-2 mt-7 text-lg font-semibold leading-[26px]">
-                  {label}
-                </h2>
-                <ul className="m-0 max-w-5xl list-none p-0">
-                  {groupRecords.map((record) => (
-                    <li className="border-b border-border-soft" key={record.id}>
-                      <button
-                        className="flex min-h-14 w-full max-w-5xl flex-wrap items-center justify-start gap-x-4 gap-y-1 rounded px-2 py-3 text-left text-ink hover:bg-hover focus-visible:relative focus-visible:z-10 disabled:cursor-default disabled:bg-raised disabled:text-muted max-sm:items-start max-sm:flex-col"
-                        onClick={() => setSelectedId(record.id)}
-                        disabled={creating}
-                      >
-                        <time
-                          className="w-[4.5rem] shrink-0 text-sm text-muted"
-                          dateTime={record.session.date}
-                        >
-                          {new Intl.DateTimeFormat('en-US', {
-                            month: 'short',
-                            day: 'numeric',
-                            timeZone: 'UTC',
-                          }).format(
-                            new Date(`${record.session.date}T00:00:00Z`),
-                          )}
-                        </time>
-                        <span className="min-w-0 max-w-[40ch] break-words font-semibold">
-                          {record.session.title}
-                        </span>
-                        <span className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted max-sm:pl-0">
-                          <span>
-                            {record.problemCount === null
-                              ? 'Problem count unavailable'
-                              : `${record.problemCount} ${record.problemCount === 1 ? 'Problem' : 'Problems'}`}
-                          </span>
-                        </span>
-                        <span
-                          className={`inline-flex min-h-7 shrink-0 items-center rounded border border-border-soft px-2.5 py-0.5 text-sm font-semibold capitalize leading-5 ${record.session.status === 'live' ? 'border-success/50 bg-success-surface text-success' : record.session.status === 'draft' ? 'border-warning/50 text-warning' : 'text-muted'}`}
-                        >
-                          {record.session.status}
-                        </span>
-                      </button>
-                      {record.session.status === 'ended' ? (
-                        <PastSessionProblemHistory
-                          sessionId={record.id}
-                          sessionTitle={record.session.title}
-                        />
-                      ) : null}
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            ),
-        )
+        <div className="grid gap-6 md:grid-cols-3 md:gap-4">
+          {sessionBranches.map((branch) => (
+            <section
+              className="min-w-0"
+              key={branch}
+              aria-labelledby={`branch-${branch}-heading`}
+            >
+              <h2
+                className="mb-2 mt-7 text-lg font-semibold leading-[26px] md:mt-0"
+                id={`branch-${branch}-heading`}
+              >
+                {sessionBranchLabels[branch]}
+              </h2>
+              <div
+                className="space-y-5 md:max-h-[calc(100dvh-17rem)] md:overflow-y-auto md:overscroll-contain md:pr-2"
+                role="region"
+                aria-label={`${sessionBranchLabels[branch]} session history`}
+                tabIndex={0}
+              >
+                {statusGroups(branch, records).map(
+                  ({ label, records: group }) => (
+                    <section
+                      key={label}
+                      aria-label={`${label} ${sessionBranchLabels[branch]} sessions`}
+                    >
+                      <h3 className="mb-2 mt-0 text-sm font-semibold leading-5 text-muted">
+                        {label}
+                      </h3>
+                      {group.length ? (
+                        <ul className="m-0 list-none p-0">
+                          {group.map((record) => (
+                            <li
+                              className="border-b border-border-soft"
+                              key={record.id}
+                            >
+                              <button
+                                className="flex min-h-14 w-full flex-wrap items-center justify-start gap-x-3 gap-y-1 rounded px-2 py-3 text-left text-ink hover:bg-hover focus-visible:relative focus-visible:z-10 disabled:cursor-default disabled:bg-raised disabled:text-muted max-sm:items-start max-sm:flex-col"
+                                onClick={() => setSelectedId(record.id)}
+                                disabled={creating}
+                              >
+                                <time
+                                  className="shrink-0 text-sm text-muted"
+                                  dateTime={record.session.date}
+                                >
+                                  {new Intl.DateTimeFormat('en-US', {
+                                    month: 'short',
+                                    day: 'numeric',
+                                    timeZone: 'UTC',
+                                  }).format(
+                                    new Date(
+                                      `${record.session.date}T00:00:00Z`,
+                                    ),
+                                  )}
+                                </time>
+                                <span className="min-w-0 break-words font-semibold">
+                                  {record.session.title}
+                                </span>
+                                <span className="text-sm text-muted">
+                                  {record.problemCount === null
+                                    ? 'Problem count unavailable'
+                                    : `${record.problemCount} ${record.problemCount === 1 ? 'Problem' : 'Problems'}`}
+                                </span>
+                                <span
+                                  className={`inline-flex min-h-7 shrink-0 items-center rounded border border-border-soft px-2.5 py-0.5 text-sm font-semibold capitalize leading-5 ${record.session.status === 'live' ? 'border-success/50 bg-success-surface text-success' : record.session.status === 'draft' ? 'border-warning/50 text-warning' : 'text-muted'}`}
+                                >
+                                  {record.session.status}
+                                </span>
+                              </button>
+                              {record.session.status === 'ended' ? (
+                                <PastSessionProblemHistory
+                                  sessionId={record.id}
+                                  sessionTitle={record.session.title}
+                                />
+                              ) : null}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="m-0 text-sm text-muted">
+                          No {label.toLowerCase()} sessions.
+                        </p>
+                      )}
+                    </section>
+                  ),
+                )}
+              </div>
+            </section>
+          ))}
+        </div>
       )}
     </section>
   );
+}
+
+function statusGroups(branch: SessionBranch, records: SessionRecord[]) {
+  const branchRecords = records.filter(
+    (record) => record.session.branch === branch,
+  );
+  return [
+    { label: 'Live', status: 'live', reverse: false },
+    { label: 'Upcoming', status: 'draft', reverse: false },
+    { label: 'Past', status: 'ended', reverse: true },
+  ].map(({ label, status, reverse }) => ({
+    label,
+    records: branchRecords
+      .filter((record) => record.session.status === status)
+      .sort((a, b) =>
+        reverse
+          ? b.session.date.localeCompare(a.session.date)
+          : a.session.date.localeCompare(b.session.date),
+      ),
+  }));
 }
 
 function PastSessionProblemHistory({

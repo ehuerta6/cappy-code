@@ -8,9 +8,15 @@ import AppHeader from '@/components/app-header';
 import ProblemMarkdown from '@/components/member/problem-markdown';
 import SolutionWorkspace from '@/components/solutions/solution-workspace';
 import { useAnswersVisible } from '@/hooks/use-answer-visibility';
+import {
+  sessionBranches,
+  sessionBranchLabels,
+  type SessionBranch,
+} from '@/lib/domain';
 
 export interface PublicSessionSummary {
   id: string;
+  branch: SessionBranch;
   title: string;
   date: string;
   status: 'live' | 'ended';
@@ -74,36 +80,66 @@ export function PublicSessionDiscovery({ state }: { state: DiscoveryState }) {
             </button>
           </div>
         ) : state.status === 'empty' ? (
-          <>
-            <SessionGroup
-              title="Live"
-              sessions={[]}
-              emptyMessage="No live session right now."
-            />
-            <SessionGroup
-              title="Past"
-              sessions={[]}
-              emptyMessage="No past sessions yet."
-            />
-          </>
+          <BranchDiscovery sessions={[]} />
         ) : (
-          <>
-            <SessionGroup
-              title="Live"
-              sessions={sessions.filter((session) => session.status === 'live')}
-              emptyMessage="No live session right now."
-            />
-            <SessionGroup
-              title="Past"
-              sessions={sessions.filter(
-                (session) => session.status === 'ended',
-              )}
-              emptyMessage="No past sessions yet."
-            />
-          </>
+          <BranchDiscovery sessions={sessions} />
         )}
       </section>
     </main>
+  );
+}
+
+function BranchDiscovery({ sessions }: { sessions: PublicSessionSummary[] }) {
+  return (
+    <div className="mt-6 grid gap-7 md:mt-8 md:grid-cols-3 md:gap-5">
+      {sessionBranches.map((branch) => (
+        <BranchColumn
+          key={branch}
+          branch={branch}
+          sessions={sessions.filter((session) => session.branch === branch)}
+        />
+      ))}
+    </div>
+  );
+}
+
+function BranchColumn({
+  branch,
+  sessions,
+}: {
+  branch: SessionBranch;
+  sessions: PublicSessionSummary[];
+}) {
+  const live = sessions.filter((session) => session.status === 'live');
+  const past = sessions
+    .filter((session) => session.status === 'ended')
+    .sort((a, b) => b.date.localeCompare(a.date) || a.id.localeCompare(b.id));
+  return (
+    <section className="min-w-0" aria-labelledby={`branch-${branch}-heading`}>
+      <h2
+        className="mb-2 mt-0 text-lg font-semibold leading-[26px]"
+        id={`branch-${branch}-heading`}
+      >
+        {sessionBranchLabels[branch]}
+      </h2>
+      <div
+        className="space-y-6 md:max-h-[calc(100dvh-14rem)] md:overflow-y-auto md:overscroll-contain md:pr-2"
+        role="region"
+        aria-label={`${sessionBranchLabels[branch]} session history`}
+        tabIndex={0}
+      >
+        <SessionGroup
+          title="Live"
+          sessions={live}
+          emptyMessage="No live session right now."
+        />
+        <SessionGroup
+          title="Past"
+          sessions={past}
+          emptyMessage="No past sessions yet."
+        />
+      </div>
+    </section>
   );
 }
 
@@ -117,16 +153,16 @@ function SessionGroup({
   emptyMessage: string;
 }) {
   return (
-    <section className="mt-8 first:mt-7" aria-label={title}>
-      <h2 className="mb-2 mt-0 text-lg font-semibold leading-[26px]">
+    <section aria-label={title}>
+      <h3 className="mb-2 mt-0 text-sm font-semibold leading-5 text-muted">
         {title}
-      </h2>
+      </h3>
       {sessions.length ? (
-        <ul className="m-0 max-w-5xl list-none p-0">
+        <ul className="m-0 list-none p-0">
           {sessions.map((session) => (
             <li className="border-b border-border-soft" key={session.id}>
               <Link
-                className="flex min-h-[52px] max-w-5xl flex-wrap items-center gap-x-4 gap-y-2 rounded px-2 py-3 text-ink no-underline hover:bg-hover focus-visible:relative focus-visible:z-10 [&:hover_.session-title]:text-accent-hover [&:hover_.session-title]:underline"
+                className="flex min-h-[52px] flex-wrap items-center gap-x-3 gap-y-2 rounded px-2 py-3 text-ink no-underline hover:bg-hover focus-visible:relative focus-visible:z-10 [&:hover_.session-title]:text-accent-hover [&:hover_.session-title]:underline"
                 href={`/sessions/${encodeURIComponent(session.id)}`}
               >
                 <time
@@ -135,7 +171,7 @@ function SessionGroup({
                 >
                   {formatDate(session.date)}
                 </time>
-                <span className="session-title min-w-0 max-w-[40ch] break-words font-semibold">
+                <span className="session-title min-w-0 break-words font-semibold">
                   {session.title}
                 </span>
                 <span
@@ -148,7 +184,7 @@ function SessionGroup({
           ))}
         </ul>
       ) : (
-        <p className="m-0 text-muted">{emptyMessage}</p>
+        <p className="m-0 text-sm text-muted">{emptyMessage}</p>
       )}
     </section>
   );
@@ -285,6 +321,9 @@ function SessionContent({
           className={`inline-flex min-h-7 shrink-0 items-center rounded border px-2.5 py-0.5 text-sm font-semibold capitalize leading-5 ${state.session.status === 'live' ? 'border-success/50 bg-success-surface text-success' : 'border-border-soft text-muted'}`}
         >
           {state.session.status === 'live' ? 'Live' : 'Ended'}
+        </span>
+        <span className="text-sm text-muted">
+          {sessionBranchLabels[state.session.branch]}
         </span>
         <time
           className="text-sm leading-5 text-muted"

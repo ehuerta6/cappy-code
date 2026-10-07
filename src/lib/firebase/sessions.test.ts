@@ -62,7 +62,11 @@ import {
   updateSession,
 } from './sessions';
 
-const metadata = { title: 'Arrays', date: '2026-10-08' };
+const metadata = {
+  branch: 'intro' as const,
+  title: 'Arrays',
+  date: '2026-10-08',
+};
 const timestamp = Timestamp.fromMillis(1000);
 const session = {
   ...metadata,
@@ -137,13 +141,29 @@ describe('officer session persistence', () => {
     );
   });
 
+  it.each(['intro', 'general', 'icpc'] as const)(
+    'creates a draft Session in the %s branch',
+    async (branch) => {
+      await createSession({ ...metadata, branch });
+      expect(sdk.addDoc).toHaveBeenCalledWith(
+        { path: 'sessions' },
+        expect.objectContaining({ branch, status: 'draft' }),
+      );
+    },
+  );
+
   it('edits only metadata and updatedAt, leaving createdAt and lifecycle fields stable', async () => {
-    await updateSession('session-id', { title: 'Hashing', date: '2026-10-09' });
+    await updateSession('session-id', {
+      ...metadata,
+      title: 'Hashing',
+      date: '2026-10-09',
+    });
     expect(sdk.updateDoc).toHaveBeenCalledWith(
       { path: 'sessions/session-id' },
       {
         title: 'Hashing',
         date: '2026-10-09',
+        branch: 'intro',
         updatedAt: 'SERVER_TIMESTAMP',
       },
     );
@@ -173,6 +193,23 @@ describe('officer session persistence', () => {
     const [record] = await listSessions();
     expect(record.session).not.toHaveProperty('activeProblemId');
     expect(record.session).toMatchObject({ title: 'Arrays', status: 'draft' });
+  });
+
+  it('treats stored Sessions without a branch as Intro and rejects unsupported branches', async () => {
+    const legacySession = { ...session };
+    Reflect.deleteProperty(legacySession, 'branch');
+    sdk.getDocsFromServer.mockResolvedValueOnce({
+      docs: [document('legacy', legacySession)],
+    });
+    await expect(listSessions()).resolves.toMatchObject([
+      { session: { branch: 'intro' } },
+    ]);
+    sdk.getDocsFromServer.mockResolvedValueOnce({
+      docs: [document('invalid', { ...session, branch: 'advanced' })],
+    });
+    await expect(listSessions()).rejects.toThrow(
+      'Choose Intro, General, or ICPC',
+    );
   });
 
   it('keeps Sessions available when a Problem count cannot be read', async () => {
