@@ -99,7 +99,7 @@ const problems = [
     id: 'two-sum',
     title: 'Two Sum',
     description:
-      'Given an integer array and a target, return the indices of two distinct values that add up to the target.',
+      'Given an integer array `nums` and a target, return the **indices** of two distinct values that add up to the target.',
     exampleInput: 'nums = [2, 7, 11, 15], target = 9',
     exampleOutput: '[0, 1]',
     constraints:

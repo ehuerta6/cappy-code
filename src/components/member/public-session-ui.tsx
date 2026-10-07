@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { ProblemSolutions } from '@/lib/firebase/solutions';
 import type { ProblemDifficulty } from '@/lib/domain';
 import AppHeader from '@/components/app-header';
+import ProblemMarkdown from '@/components/member/problem-markdown';
 import SolutionWorkspace from '@/components/solutions/solution-workspace';
 import { useAnswersVisible } from '@/hooks/use-answer-visibility';
 
@@ -439,9 +440,9 @@ function ProblemContent({
         </a>
       ) : null}
       {problem.description ? (
-        <p className="mb-5 max-w-[80ch] whitespace-pre-wrap text-base leading-[26px]">
-          {problem.description}
-        </p>
+        <div className="mb-5">
+          <ProblemMarkdown>{problem.description}</ProblemMarkdown>
+        </div>
       ) : null}
       <section className="my-5 mb-7" aria-labelledby="examples-heading">
         <h3
@@ -455,17 +456,21 @@ function ProblemContent({
             <h4 className="mb-2 mt-0 text-sm font-semibold leading-5 text-muted">
               Input
             </h4>
-            <pre className="m-0 min-h-6 overflow-auto whitespace-pre-wrap rounded-md bg-raised px-3 py-2 font-mono text-[15px] leading-[23px]">
-              {problem.exampleInput || 'No example input'}
-            </pre>
+            <div className="min-h-6 overflow-x-auto rounded-md bg-raised px-3 py-2 font-mono text-[15px] leading-[23px]">
+              <ProblemMarkdown>
+                {problem.exampleInput || 'No example input'}
+              </ProblemMarkdown>
+            </div>
           </section>
           <section className="min-w-0 border-t border-border-soft p-3 sm:border-l sm:border-t-0">
             <h4 className="mb-2 mt-0 text-sm font-semibold leading-5 text-muted">
               Expected output
             </h4>
-            <pre className="m-0 min-h-6 overflow-auto whitespace-pre-wrap rounded-md bg-raised px-3 py-2 font-mono text-[15px] leading-[23px]">
-              {problem.exampleOutput || 'No expected output'}
-            </pre>
+            <div className="min-h-6 overflow-x-auto rounded-md bg-raised px-3 py-2 font-mono text-[15px] leading-[23px]">
+              <ProblemMarkdown>
+                {problem.exampleOutput || 'No expected output'}
+              </ProblemMarkdown>
+            </div>
           </section>
         </div>
       </section>

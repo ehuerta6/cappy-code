@@ -258,15 +258,16 @@ describe('Officer Problem workspace', () => {
     const description = screen.getByLabelText(
       'Description',
     ) as HTMLTextAreaElement;
-    fireEvent.change(description, { target: { value: 'New statement' } });
+    const markdownSource = 'New **statement**\n\n- first line';
+    fireEvent.change(description, { target: { value: markdownSource } });
     fireEvent.change(screen.getByLabelText('Problem title'), {
       target: { value: 'Renamed' },
     });
     fireEvent.change(screen.getByLabelText('Example input'), {
-      target: { value: '4 5' },
+      target: { value: '`4 5`' },
     });
     fireEvent.change(screen.getByLabelText('Expected output'), {
-      target: { value: '9' },
+      target: { value: '**9**' },
     });
     fireEvent.change(screen.getByLabelText('Constraints'), {
       target: { value: '1 ≤ n ≤ 100\nValues are distinct.' },
@@ -283,16 +284,16 @@ describe('Officer Problem workspace', () => {
     expect(api.updateProblem).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
     await screen.findByRole('alert');
-    expect(description.value).toBe('New statement');
+    expect(description.value).toBe(markdownSource);
     expect(onBusyChange).toHaveBeenLastCalledWith(true);
     fireEvent.click(await screen.findByRole('button', { name: 'Retry' }));
     await waitFor(() => expect(onBusyChange).toHaveBeenLastCalledWith(false));
     expect(onSaveStateChange).toHaveBeenLastCalledWith(null);
     expect(api.updateProblem).toHaveBeenLastCalledWith('session', 'first', {
       title: 'Renamed',
-      description: 'New statement',
-      exampleInput: '4 5',
-      exampleOutput: '9',
+      description: markdownSource,
+      exampleInput: '`4 5`',
+      exampleOutput: '**9**',
       constraints: '1 ≤ n ≤ 100\nValues are distinct.',
       leetcodeUrl: 'https://leetcode.com/problems/two-sum/',
     });
