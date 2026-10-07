@@ -244,6 +244,61 @@ describe('public member UI scaffold', () => {
     ).toBeNull();
   });
 
+  it('renders Markdown in description and examples while keeping constraints plain text', () => {
+    const load = vi.fn().mockResolvedValue(solutions);
+    const markdownProblem: PublicProblem = {
+      ...problems[0],
+      description:
+        'Use **bold**, *italic*, and `nums`.\n\n- first item\n- second item\n\n[Reference](https://example.com)',
+      exampleInput: '```html\n<script>alert(1)</script>\n```',
+      exampleOutput: '1. first\n2. second',
+      constraints: '**This remains literal text.**',
+    };
+    const { container } = render(
+      <PublicSessionView state={viewState(load, [markdownProblem])} />,
+    );
+
+    expect(screen.getByText('bold').tagName).toBe('STRONG');
+    expect(screen.getByText('italic').tagName).toBe('EM');
+    expect(screen.getByText('nums').tagName).toBe('CODE');
+    expect(
+      screen.getAllByRole('listitem').map((item) => item.textContent),
+    ).toEqual(['first item', 'second item', 'first', 'second']);
+    const reference = screen.getByRole('link', { name: 'Reference' });
+    expect(reference.getAttribute('target')).toBe('_blank');
+    expect(reference.getAttribute('rel')).toBe('noopener noreferrer');
+    expect(container.querySelector('pre code')?.textContent).toBe(
+      '<script>alert(1)</script>\n',
+    );
+    expect(
+      Array.from(container.querySelectorAll('ol li')).map(
+        (item) => item.textContent,
+      ),
+    ).toEqual(['first', 'second']);
+    expect(screen.getByText('**This remains literal text.**')).toBeTruthy();
+  });
+
+  it('does not execute raw HTML or unsafe Markdown links', () => {
+    const load = vi.fn().mockResolvedValue(solutions);
+    const unsafeProblem: PublicProblem = {
+      ...problems[0],
+      description:
+        '<script>window.markdownExecuted = true</script><img src=x onerror="window.markdownExecuted = true"> [unsafe](javascript:alert(1))',
+    };
+    const { container } = render(
+      <PublicSessionView state={viewState(load, [unsafeProblem])} />,
+    );
+
+    expect(container.querySelector('.problem-markdown script')).toBeNull();
+    expect(
+      container.querySelector(
+        '.problem-markdown [onclick], .problem-markdown img',
+      ),
+    ).toBeNull();
+    expect(window).not.toHaveProperty('markdownExecuted');
+    expect(screen.queryByRole('link', { name: 'unsafe' })).toBeNull();
+  });
+
   it('renders the hidden state without requesting solution documents', () => {
     const load = vi.fn().mockResolvedValue(solutions);
     const { container } = render(<PublicSessionView state={viewState(load)} />);
