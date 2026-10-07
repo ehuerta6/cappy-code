@@ -4,6 +4,7 @@ const sdk = vi.hoisted(() => ({
   db: {},
   getDocFromServer: vi.fn(),
   getDocsFromServer: vi.fn(),
+  onSnapshot: vi.fn(),
   getFirestoreDb: vi.fn(),
 }));
 
@@ -23,6 +24,7 @@ vi.mock('firebase/firestore', () => ({
   }),
   getDocFromServer: sdk.getDocFromServer,
   getDocsFromServer: sdk.getDocsFromServer,
+  onSnapshot: sdk.onSnapshot,
 }));
 
 import {
@@ -30,6 +32,7 @@ import {
   getMemberSolutions,
   listMemberProblems,
   listMemberSessions,
+  subscribeToMemberSessions,
 } from './member';
 
 const live = {
@@ -88,6 +91,36 @@ describe('anonymous member persistence', () => {
         constraints: [{ field: 'status', operator: '==', value: 'ended' }],
       },
     ]);
+  });
+
+  it('subscribes to the public live and ended lifecycle and reports changes', () => {
+    const onValue = vi.fn();
+    const onError = vi.fn();
+    const unsubscribe = vi.fn();
+    sdk.onSnapshot.mockImplementationOnce(
+      (_query: unknown, next: (value: unknown) => void) => {
+        next({
+          docs: [
+            snapshot('live', live),
+            snapshot('past', { ...live, status: 'ended' }),
+          ],
+        });
+        return unsubscribe;
+      },
+    );
+
+    expect(subscribeToMemberSessions(onValue, onError)).toBe(unsubscribe);
+    expect(onValue).toHaveBeenCalledWith([
+      { id: 'live', session: { ...live } },
+      { id: 'past', session: { ...live, status: 'ended' } },
+    ]);
+    expect(onError).not.toHaveBeenCalled();
+    expect(sdk.onSnapshot.mock.calls[0][0]).toEqual({
+      reference: { path: 'sessions' },
+      constraints: [
+        { field: 'status', operator: 'in', value: ['live', 'ended'] },
+      ],
+    });
   });
 
   it('does not expose draft Sessions through a direct public read', async () => {

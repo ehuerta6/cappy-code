@@ -5,6 +5,7 @@ import {
   doc,
   getDocFromServer,
   getDocsFromServer,
+  onSnapshot,
   query,
   where,
 } from 'firebase/firestore';
@@ -125,6 +126,48 @@ export async function listMemberSessions(): Promise<MemberSessionRecord[]> {
     (a, b) =>
       b.session.date.localeCompare(a.session.date) || a.id.localeCompare(b.id),
   );
+}
+
+export function subscribeToMemberSessions(
+  onValue: (sessions: MemberSessionRecord[]) => void,
+  onError: (error: Error) => void,
+): () => void {
+  try {
+    return onSnapshot(
+      query(
+        collection(getFirestoreDb(), 'sessions'),
+        where('status', 'in', publicStatuses),
+      ),
+      (snapshot) => {
+        try {
+          const records = snapshot.docs.map((document) => {
+            if (document.metadata.hasPendingWrites)
+              throw new Error('Session changes are awaiting confirmation.');
+            return validateSessionRecord(document.id, document.data());
+          });
+          onValue(
+            records.sort(
+              (a, b) =>
+                b.session.date.localeCompare(a.session.date) ||
+                a.id.localeCompare(b.id),
+            ),
+          );
+        } catch (error) {
+          onError(
+            error instanceof Error
+              ? error
+              : new Error('Session data is invalid.'),
+          );
+        }
+      },
+      onError,
+    );
+  } catch (error) {
+    onError(
+      error instanceof Error ? error : new Error('Session updates failed.'),
+    );
+    return () => {};
+  }
 }
 
 export async function getMemberSession(

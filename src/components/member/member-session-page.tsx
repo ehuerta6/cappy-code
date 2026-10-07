@@ -1,10 +1,11 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  getMemberSession,
   getMemberSolutions,
   listMemberProblems,
+  subscribeToMemberSessions,
   type MemberSessionRecord,
 } from '@/lib/firebase/member';
 import {
@@ -19,16 +20,19 @@ export default function MemberSessionPage({
 }: {
   sessionId: string;
 }) {
+  const router = useRouter();
   const [session, setSession] = useState<MemberSessionRecord | null>(null);
-  const [sessionStatus, setSessionStatus] = useState<'loading' | 'unavailable'>(
+  const [sessionStatus, setSessionStatus] = useState<'loading' | 'error'>(
     'loading',
   );
+  const [retryVersion, setRetryVersion] = useState(0);
   const [problems, setProblems] = useState<
     | { status: 'loading' }
     | { status: 'error' }
     | { status: 'ready'; records: PublicProblem[] }
   >({ status: 'loading' });
   const problemsRequest = useRef(0);
+  const loadedProblemsFor = useRef<string | null>(null);
 
   const reloadProblems = useCallback(async () => {
     const request = ++problemsRequest.current;
@@ -51,26 +55,42 @@ export default function MemberSessionPage({
     setSession(null);
     setProblems({ status: 'loading' });
     setSessionStatus('loading');
-    void getMemberSession(sessionId).then(
-      (record) => {
+    loadedProblemsFor.current = null;
+    const unsubscribe = subscribeToMemberSessions(
+      (records) => {
         if (!active) return;
+        const live = records.find(({ session }) => session.status === 'live');
+        if (live && live.id !== sessionId) {
+          setSession(null);
+          router.replace(`/sessions/${encodeURIComponent(live.id)}`);
+          return;
+        }
+        const record = records.find(({ id }) => id === sessionId);
         if (!record) {
-          setSessionStatus('unavailable');
+          setSession(null);
+          if (!live) router.replace('/');
           return;
         }
         setSession(record);
         setSessionStatus('loading');
-        void reloadProblems();
+        if (loadedProblemsFor.current !== sessionId) {
+          loadedProblemsFor.current = sessionId;
+          void reloadProblems();
+        }
       },
       () => {
-        if (active) setSessionStatus('unavailable');
+        if (active) {
+          setSession(null);
+          setSessionStatus('error');
+        }
       },
     );
     return () => {
       active = false;
+      unsubscribe();
       problemsRequest.current += 1;
     };
-  }, [reloadProblems, sessionId]);
+  }, [reloadProblems, router, retryVersion, sessionId]);
 
   const loadRevealedSolutions = useCallback(
     (problemId: string) => getMemberSolutions(sessionId, problemId),
@@ -78,8 +98,11 @@ export default function MemberSessionPage({
   );
 
   let state: SessionState;
-  if (!session && sessionStatus === 'unavailable') {
-    state = { status: 'unavailable' };
+  if (!session && sessionStatus === 'error') {
+    state = {
+      status: 'error',
+      onRetry: () => setRetryVersion((value) => value + 1),
+    };
   } else if (!session) {
     state = { status: 'loading' };
   } else {

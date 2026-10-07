@@ -16,7 +16,9 @@ const firebase = vi.hoisted(() => ({
   signOut: vi.fn(),
   listSessions: vi.fn(),
   listMemberSessions: vi.fn(),
+  subscribeToMemberSessions: vi.fn(),
 }));
+const navigation = vi.hoisted(() => ({ replace: vi.fn() }));
 vi.mock('client-only', () => ({}));
 vi.mock('@/lib/firebase/auth', () => ({ getOfficerAuth: () => ({}) }));
 vi.mock('firebase/auth', () => ({
@@ -32,7 +34,9 @@ vi.mock('@/lib/firebase/sessions', () => ({
 }));
 vi.mock('@/lib/firebase/member', () => ({
   listMemberSessions: firebase.listMemberSessions,
+  subscribeToMemberSessions: firebase.subscribeToMemberSessions,
 }));
+vi.mock('next/navigation', () => ({ useRouter: () => navigation }));
 vi.mock('@monaco-editor/react', () => ({
   default: ({ options }: { options: { readOnly: boolean } }) => (
     <div
@@ -54,6 +58,7 @@ beforeEach(() => {
   });
   firebase.listSessions.mockResolvedValue([]);
   firebase.listMemberSessions.mockResolvedValue([]);
+  firebase.subscribeToMemberSessions.mockReturnValue(vi.fn());
   firebase.signOut.mockResolvedValue(undefined);
 });
 afterEach(cleanup);
@@ -110,6 +115,6 @@ describe('Officer Session route integration', () => {
     expect(screen.queryByRole('button', { name: 'Delete session' })).toBeNull();
     expect(firebase.onAuthStateChanged).not.toHaveBeenCalled();
     expect(firebase.listSessions).not.toHaveBeenCalled();
-    expect(firebase.listMemberSessions).toHaveBeenCalledOnce();
+    expect(firebase.subscribeToMemberSessions).toHaveBeenCalledOnce();
   });
 });

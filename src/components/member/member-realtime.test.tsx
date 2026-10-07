@@ -13,7 +13,9 @@ const member = vi.hoisted(() => ({
   getMemberSession: vi.fn(),
   listMemberProblems: vi.fn(),
   getMemberSolutions: vi.fn(),
+  subscribeToMemberSessions: vi.fn(),
 }));
+const navigation = vi.hoisted(() => ({ replace: vi.fn() }));
 const listeners = vi.hoisted(() => ({
   subscribeToAnswersVisible: vi.fn(),
   answers: [] as Array<{
@@ -26,6 +28,7 @@ const listeners = vi.hoisted(() => ({
 }));
 
 vi.mock('@/lib/firebase/member', () => member);
+vi.mock('next/navigation', () => ({ useRouter: () => navigation }));
 vi.mock('@/lib/firebase/answer-visibility', () => ({
   subscribeToAnswersVisible: listeners.subscribeToAnswersVisible,
 }));
@@ -53,6 +56,7 @@ vi.mock('@monaco-editor/react', () => ({
 }));
 
 import MemberSessionPage from './member-session-page';
+import type { MemberSessionRecord } from '@/lib/firebase/member';
 
 const session = {
   id: 'session',
@@ -103,6 +107,13 @@ beforeEach(() => {
   member.getMemberSession.mockResolvedValue(session);
   member.listMemberProblems.mockResolvedValue(problems);
   member.getMemberSolutions.mockResolvedValue(solutions);
+  member.subscribeToMemberSessions.mockImplementation(
+    (onValue: (records: MemberSessionRecord[]) => void) => {
+      queueMicrotask(() => onValue([session]));
+      return vi.fn();
+    },
+  );
+  navigation.replace.mockReset();
   listeners.subscribeToAnswersVisible.mockImplementation(
     (
       sessionId: string,
@@ -173,10 +184,16 @@ describe('Member answer visibility realtime', () => {
   });
 
   it('loads ended-session Solutions without an answer-visibility listener or gate', async () => {
-    member.getMemberSession.mockResolvedValueOnce({
-      ...session,
-      session: { ...session.session, status: 'ended' },
-    });
+    member.subscribeToMemberSessions.mockImplementationOnce(
+      (onValue: (records: MemberSessionRecord[]) => void) => {
+        queueMicrotask(() =>
+          onValue([
+            { ...session, session: { ...session.session, status: 'ended' } },
+          ]),
+        );
+        return vi.fn();
+      },
+    );
     render(<MemberSessionPage sessionId="session" />);
 
     expect(
@@ -220,5 +237,44 @@ describe('Member answer visibility realtime', () => {
     await waitFor(() => expect(listeners.answers).toHaveLength(1));
     unmount();
     expect(listeners.answers[0].unsubscribe).toHaveBeenCalledOnce();
+  });
+
+  it('automatically exits when the Session becomes Not Live', async () => {
+    let onValue: ((records: MemberSessionRecord[]) => void) | undefined;
+    member.subscribeToMemberSessions.mockImplementationOnce(
+      (next: (records: MemberSessionRecord[]) => void) => {
+        onValue = next;
+        queueMicrotask(() => onValue?.([session]));
+        return vi.fn();
+      },
+    );
+    render(<MemberSessionPage sessionId="session" />);
+    await screen.findByText('First description');
+    act(() => onValue?.([]));
+    await waitFor(() => expect(navigation.replace).toHaveBeenCalledWith('/'));
+    expect(screen.queryByText('First description')).toBeNull();
+  });
+
+  it('redirects an ended-session visit to the currently live Session', async () => {
+    member.subscribeToMemberSessions.mockImplementationOnce(
+      (onValue: (records: MemberSessionRecord[]) => void) => {
+        queueMicrotask(() =>
+          onValue?.([
+            { ...session, id: 'live-now' },
+            {
+              ...session,
+              id: 'past',
+              session: { ...session.session, status: 'ended' },
+            },
+          ]),
+        );
+        return vi.fn();
+      },
+    );
+    render(<MemberSessionPage sessionId="past" />);
+    await waitFor(() =>
+      expect(navigation.replace).toHaveBeenCalledWith('/sessions/live-now'),
+    );
+    expect(screen.queryByText('First description')).toBeNull();
   });
 });
