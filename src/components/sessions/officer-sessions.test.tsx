@@ -463,6 +463,34 @@ describe('Officer Sessions surface', () => {
     expect(screen.getByRole('button', { name: 'Go Live' })).toBeTruthy();
   });
 
+  it('explains when another Session is already live', async () => {
+    api.transitionSession.mockRejectedValueOnce(
+      new Error(
+        'Another Session is already live. Set it to Not Live or end it before starting this one.',
+      ),
+    );
+    await openEditor();
+    fireEvent.click(screen.getByRole('button', { name: 'Go Live' }));
+    expect((await screen.findByRole('alert')).textContent).toContain(
+      'Another Session is already live. Set it to Not Live or end it before starting this one.',
+    );
+  });
+
+  it('returns a live Session to draft without confirmation and keeps the content manager available', async () => {
+    const confirm = vi.spyOn(window, 'confirm');
+    api.listSessions.mockResolvedValueOnce([
+      { ...record, session: { ...record.session, status: 'live' } },
+    ]);
+    await openEditor();
+    fireEvent.click(screen.getByRole('button', { name: 'Not Live' }));
+    expect(api.transitionSession).toHaveBeenCalledWith('session-id', 'draft');
+    await waitFor(() => expect(screen.getByText('draft')).toBeTruthy());
+    expect(
+      screen.getByRole('button', { name: 'Manage problems' }),
+    ).toBeTruthy();
+    expect(confirm).not.toHaveBeenCalled();
+  });
+
   it('confirms ending a live session and leaves the session editable in history', async () => {
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
     api.listSessions
@@ -478,7 +506,9 @@ describe('Officer Sessions surface', () => {
     await openEditor();
     fireEvent.click(screen.getByRole('button', { name: 'End Session' }));
     expect(confirm).toHaveBeenCalledWith(
-      expect.stringContaining('End “Arrays”'),
+      expect.stringContaining(
+        "End “Arrays”? It will move to Past, and all prepared Python, Java, and C++ Solutions will become public regardless of each Problem's answer visibility.",
+      ),
     );
     expect(api.transitionSession).toHaveBeenCalledWith('session-id', 'ended');
     await screen.findByText('ended');

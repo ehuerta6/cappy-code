@@ -5,11 +5,14 @@ import {
   collection,
   doc,
   getCountFromServer,
+  getDocFromServer,
   getDocsFromServer,
+  query,
   runTransaction,
   serverTimestamp,
   Timestamp,
   updateDoc,
+  where,
   writeBatch,
 } from 'firebase/firestore';
 import type { Session } from '../domain';
@@ -111,9 +114,13 @@ export async function listSessions(): Promise<SessionRecord[]> {
 
 export async function transitionSession(
   id: string,
-  nextStatus: 'live' | 'ended',
+  nextStatus: 'live' | 'draft' | 'ended',
 ): Promise<void> {
-  if (nextStatus !== 'live' && nextStatus !== 'ended') {
+  if (
+    nextStatus !== 'live' &&
+    nextStatus !== 'draft' &&
+    nextStatus !== 'ended'
+  ) {
     throw new Error('Unsupported session status transition.');
   }
   const db = officerDb();
@@ -128,7 +135,19 @@ export async function transitionSession(
     }
   }
 
+  const liveSessionReference = doc(db, 'sessionControl/liveSession');
+  const legacyLiveSessions =
+    nextStatus === 'live' &&
+    !(await getDocFromServer(liveSessionReference)).exists()
+      ? (
+          await getDocsFromServer(
+            query(collection(db, 'sessions'), where('status', '==', 'live')),
+          )
+        ).docs
+      : [];
+
   await runTransaction(db, async (transaction) => {
+    const liveSessionSnapshot = await transaction.get(liveSessionReference);
     const snapshot = await transaction.get(reference);
     if (!snapshot.exists()) {
       throw new Error('This session no longer exists.');
@@ -139,8 +158,39 @@ export async function transitionSession(
       throw new Error(
         nextStatus === 'live'
           ? 'Only draft sessions can go live.'
-          : 'Only live sessions can be ended.',
+          : `Only live sessions can be marked ${nextStatus === 'draft' ? 'not live' : 'ended'}.`,
       );
+    }
+
+    let liveSessionId: string | null = liveSessionSnapshot.exists()
+      ? (liveSessionSnapshot.data().sessionId as string | null)
+      : null;
+
+    if (!liveSessionSnapshot.exists()) {
+      const otherLiveSession = legacyLiveSessions.find(
+        (liveSession) => liveSession.id !== id,
+      );
+
+      if (nextStatus === 'live' && otherLiveSession) {
+        throw new Error(
+          'Another Session is already live. Set it to Not Live or end it before starting this one.',
+        );
+      }
+
+      liveSessionId = legacyLiveSessions[0]?.id ?? null;
+      if (nextStatus !== 'live') liveSessionId = null;
+    }
+
+    if (nextStatus === 'live' && liveSessionId && liveSessionId !== id) {
+      throw new Error(
+        'Another Session is already live. Set it to Not Live or end it before starting this one.',
+      );
+    }
+    const releasesLiveClaim = nextStatus !== 'live' && liveSessionId === id;
+    if (nextStatus === 'live' || releasesLiveClaim) {
+      transaction.set(liveSessionReference, {
+        sessionId: nextStatus === 'live' ? id : null,
+      });
     }
     transaction.update(reference, {
       status: nextStatus,
@@ -165,12 +215,26 @@ export async function deleteSession(id: string): Promise<void> {
   const problems = await getDocsFromServer(
     collection(db, `${sessionPath(id)}/problems`),
   );
+  const sessionReference = doc(db, sessionPath(id));
+  const liveSessionReference = doc(db, 'sessionControl/liveSession');
+  const [session, liveSession] = await Promise.all([
+    getDocFromServer(sessionReference),
+    getDocFromServer(liveSessionReference),
+  ]);
+  const releasesLiveClaim =
+    session.exists() &&
+    session.data().status === 'live' &&
+    liveSession.exists() &&
+    liveSession.data().sessionId === id;
   // Keep the entire cascade atomic within Firestore's 500-write batch limit.
-  if (problems.docs.length * 4 + 1 > 500)
+  if (problems.docs.length * 4 + 1 + Number(releasesLiveClaim) > 500)
     throw new Error('Too many problems to delete this session in one batch.');
   const batch = writeBatch(db);
   for (const problem of problems.docs)
     appendProblemDeletion(batch, db, id, problem.id);
-  batch.delete(doc(db, sessionPath(id)));
+  if (releasesLiveClaim) {
+    batch.update(liveSessionReference, { sessionId: null });
+  }
+  batch.delete(sessionReference);
   await batch.commit();
 }
