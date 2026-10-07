@@ -102,6 +102,8 @@ const problems = [
       'Given an integer array and a target, return the indices of two distinct values that add up to the target.',
     exampleInput: 'nums = [2, 7, 11, 15], target = 9',
     exampleOutput: '[0, 1]',
+    constraints:
+      '2 ≤ nums.length ≤ 10⁴\n-10⁹ ≤ nums[i] ≤ 10⁹\n-10⁹ ≤ target ≤ 10⁹\nExactly one valid answer exists; do not use the same element twice.',
     answersVisible: true,
     leetcodeUrl: 'https://leetcode.com/problems/two-sum/',
     solution: 'two-sum',
@@ -137,6 +139,8 @@ const problems = [
       'Return the first value that appears for a second time while scanning the list from left to right.',
     exampleInput: 'ids = [14, 6, 9, 6, 14]',
     exampleOutput: '6',
+    constraints:
+      'The answer is the first repeated value encountered from left to right.',
     answersVisible: false,
     solution: 'first-repeat',
     solutionComplexities: {
@@ -194,6 +198,7 @@ const problems = [
       'Choose one day to buy and a later day to sell. Return the greatest possible profit, or zero when no trade helps.',
     exampleInput: 'prices = [7, 1, 5, 3, 6, 4]',
     exampleOutput: '5',
+    constraints: '1 ≤ prices.length ≤ 10⁵\nPrices are non-negative integers.',
     answersVisible: false,
     leetcodeUrl:
       'https://leetcode.com/problems/best-time-to-buy-and-sell-stock/',
@@ -207,6 +212,8 @@ const problems = [
       'Find the length of the longest substring that contains no repeated characters.',
     exampleInput: 's = "abcabcbb"',
     exampleOutput: '3',
+    constraints:
+      '0 ≤ s.length ≤ 5 × 10⁴\ns contains printable ASCII characters.',
     answersVisible: false,
     leetcodeUrl:
       'https://leetcode.com/problems/longest-substring-without-repeating-characters/',
@@ -253,6 +260,7 @@ const problems = [
       'Check that every opening bracket is closed by the matching type in the correct order.',
     exampleInput: 's = "([]{})"',
     exampleOutput: 'true',
+    constraints: 's contains only the bracket characters ()[]{}.',
     answersVisible: false,
     leetcodeUrl: 'https://leetcode.com/problems/valid-parentheses/',
     solution: 'valid-parentheses',
@@ -265,6 +273,7 @@ const problems = [
       'Return true when any value occurs at least twice in the input array.',
     exampleInput: 'nums = [1, 2, 3, 1]',
     exampleOutput: 'true',
+    constraints: '1 ≤ nums.length ≤ 10⁵\nValues are integers.',
     answersVisible: true,
     leetcodeUrl: 'https://leetcode.com/problems/contains-duplicate/',
     solution: 'contains-duplicate',
@@ -277,6 +286,8 @@ const problems = [
       'Return each position’s product of all other values without using division.',
     exampleInput: 'nums = [1, 2, 3, 4]',
     exampleOutput: '[24, 12, 8, 6]',
+    constraints:
+      '2 ≤ nums.length ≤ 10⁵\nProducts fit in a signed 32-bit integer.',
     answersVisible: false,
     leetcodeUrl: 'https://leetcode.com/problems/product-of-array-except-self/',
     solution: 'product-except-self',
@@ -300,6 +311,7 @@ const problems = [
       'Choose two vertical lines that contain the greatest possible amount of water.',
     exampleInput: 'height = [1, 8, 6, 2, 5, 4, 8, 3, 7]',
     exampleOutput: '49',
+    constraints: '2 ≤ height.length ≤ 10⁵\n0 ≤ height[i] ≤ 10⁴',
     answersVisible: false,
     leetcodeUrl: 'https://leetcode.com/problems/container-with-most-water/',
     solution: 'container-water',
@@ -370,6 +382,7 @@ const problems = [
       'Return the index of target in a sorted array, or -1 when it is absent.',
     exampleInput: 'nums = [-1, 0, 3, 5, 9, 12], target = 9',
     exampleOutput: '4',
+    constraints: '1 ≤ nums.length ≤ 10⁴\nnums is sorted in ascending order.',
     answersVisible: true,
     leetcodeUrl: 'https://leetcode.com/problems/binary-search/',
     solution: 'binary-search',
@@ -416,6 +429,7 @@ const problems = [
       'Return the number of nodes on the longest path from the root down to a leaf.',
     exampleInput: 'root = [3, 9, 20, null, null, 15, 7]',
     exampleOutput: '3',
+    constraints: 'The tree contains at most 10⁴ nodes.',
     answersVisible: true,
     leetcodeUrl: 'https://leetcode.com/problems/maximum-depth-of-binary-tree/',
     solution: 'max-depth-tree',
@@ -428,6 +442,7 @@ const problems = [
       'Return the number of levels in a binary tree that contain at least one node.',
     exampleInput: 'root = [8, 4, 12, 2, 6]',
     exampleOutput: '3',
+    constraints: 'The tree contains at most 10⁴ nodes.',
     answersVisible: false,
     solution: 'count-tree-levels',
   },
@@ -1183,9 +1198,15 @@ void sink(vector<vector<char>>& grid, int r, int c) {
 
 function assertFixture() {
   const counts = Object.groupBy(sessions, (session) => session.status);
+  const constrainedProblems = problems.filter(
+    (problem) =>
+      typeof problem.constraints === 'string' && problem.constraints.trim(),
+  );
   if (
     sessions.length !== 13 ||
     problems.length !== 28 ||
+    constrainedProblems.length < 10 ||
+    constrainedProblems.length === problems.length ||
     counts.live?.length !== 1 ||
     counts.draft?.length !== 2 ||
     counts.ended?.length !== 10
@@ -1211,6 +1232,8 @@ function assertFixture() {
       ) ||
       typeof problem.exampleInput !== 'string' ||
       typeof problem.exampleOutput !== 'string' ||
+      (problem.constraints !== undefined &&
+        typeof problem.constraints !== 'string') ||
       !problem.exampleOutput.trim()
     )
       throw new Error(

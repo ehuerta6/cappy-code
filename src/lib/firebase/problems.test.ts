@@ -44,6 +44,7 @@ const content = {
   description: 'Find a pair',
   exampleInput: '1 2',
   exampleOutput: '3',
+  constraints: '1 ≤ n ≤ 100',
 };
 const problem = { ...content, order: 0, answersVisible: false };
 function document(
@@ -71,6 +72,7 @@ describe('officer problem persistence', () => {
       description: '',
       exampleInput: '',
       exampleOutput: '',
+      constraints: '',
       order: 5,
       answersVisible: false,
     };
@@ -81,6 +83,7 @@ describe('officer problem persistence', () => {
     );
     expect(Object.keys(sdk.addDoc.mock.calls[0][1]).sort()).toEqual([
       'answersVisible',
+      'constraints',
       'description',
       'exampleInput',
       'exampleOutput',
@@ -91,7 +94,7 @@ describe('officer problem persistence', () => {
   it('starts an empty session at order zero', async () => {
     expect((await createProblem('session')).problem.order).toBe(0);
   });
-  it('edits the four content fields without writing extra fields or reveal state', async () => {
+  it('edits Problem content without writing Solution fields or reveal state', async () => {
     await updateProblem('session', 'problem', {
       ...content,
       title: ' Two Sum ',
@@ -108,6 +111,15 @@ describe('officer problem persistence', () => {
     expect(sdk.updateDoc).toHaveBeenCalledExactlyOnceWith(
       { path: 'sessions/session/problems/problem' },
       { description: 'New statement' },
+    );
+  });
+  it('writes constraints as plain Problem metadata', async () => {
+    await updateProblem('session', 'problem', {
+      constraints: '1 ≤ n ≤ 100\nValues are distinct.',
+    });
+    expect(sdk.updateDoc).toHaveBeenCalledExactlyOnceWith(
+      { path: 'sessions/session/problems/problem' },
+      { constraints: '1 ≤ n ≤ 100\nValues are distinct.' },
     );
   });
   it('accepts a blank LeetCode field and removes any saved URL', async () => {
@@ -180,7 +192,14 @@ describe('officer problem persistence', () => {
   it('loads old Problem records without inventing a LeetCode field and reads a link', async () => {
     sdk.getDocsFromServer.mockResolvedValue({
       docs: [
-        document('legacy', 0),
+        document('legacy', 0, {
+          title: problem.title,
+          description: problem.description,
+          exampleInput: problem.exampleInput,
+          exampleOutput: problem.exampleOutput,
+          order: 0,
+          answersVisible: false,
+        }),
         document('linked', 1, {
           ...problem,
           order: 1,
@@ -190,9 +209,27 @@ describe('officer problem persistence', () => {
     });
     const records = await listProblems('session');
     expect(records[0].problem).not.toHaveProperty('leetcodeUrl');
+    expect(records[0].problem.constraints).toBe('');
     expect(records[1].problem.leetcodeUrl).toBe(
       'https://leetcode.com/problems/two-sum/',
     );
+  });
+  it('loads multiline constraints when present and defaults only missing values to empty text', async () => {
+    sdk.getDocsFromServer.mockResolvedValue({
+      docs: [
+        document('legacy', 0, { ...problem, order: 0, constraints: undefined }),
+        document('new', 1, {
+          ...problem,
+          order: 1,
+          constraints: '1 ≤ n ≤ 100\nValues are distinct.',
+        }),
+      ],
+    });
+    const records = await listProblems('session');
+    expect(records.map(({ problem: item }) => item.constraints)).toEqual([
+      '',
+      '1 ≤ n ≤ 100\nValues are distinct.',
+    ]);
   });
   it('writes dense order values atomically and preserves the order on reload', async () => {
     sdk.getDocsFromServer.mockResolvedValue({

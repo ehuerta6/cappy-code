@@ -23,10 +23,14 @@ export interface ProblemRecord {
 }
 export type ProblemContent = Pick<
   Problem,
-  'title' | 'description' | 'exampleInput' | 'exampleOutput'
+  'title' | 'description' | 'exampleInput' | 'exampleOutput' | 'constraints'
 > & { leetcodeUrl: string };
 
-type ProblemContentInput = Omit<ProblemContent, 'leetcodeUrl'> & {
+type ProblemContentInput = Omit<
+  ProblemContent,
+  'leetcodeUrl' | 'constraints'
+> & {
+  constraints?: string;
   leetcodeUrl?: string;
 };
 
@@ -42,10 +46,14 @@ export function validateProblemContent(
 ): ProblemContent {
   if (typeof content.title !== 'string' || !content.title.trim())
     throw new Error('Enter a problem title.');
+  const constraints = content.constraints ?? '';
   if (
-    [content.description, content.exampleInput, content.exampleOutput].some(
-      (field) => typeof field !== 'string',
-    )
+    [
+      content.description,
+      content.exampleInput,
+      content.exampleOutput,
+      constraints,
+    ].some((field) => typeof field !== 'string')
   )
     throw new Error('Problem content must be text.');
   return {
@@ -53,6 +61,7 @@ export function validateProblemContent(
     description: content.description,
     exampleInput: content.exampleInput,
     exampleOutput: content.exampleOutput,
+    constraints,
     leetcodeUrl: validateLeetcodeProblemUrl(content.leetcodeUrl) ?? '',
   };
 }
@@ -82,6 +91,7 @@ export async function listProblems(
       description: data.description,
       exampleInput: data.exampleInput,
       exampleOutput: data.exampleOutput,
+      constraints: data.constraints === undefined ? '' : data.constraints,
     });
     return {
       id: document.id,
@@ -90,6 +100,7 @@ export async function listProblems(
         description: content.description,
         exampleInput: content.exampleInput,
         exampleOutput: content.exampleOutput,
+        constraints: content.constraints,
         order: data.order,
         answersVisible: data.answersVisible,
         ...(leetcodeUrl ? { leetcodeUrl } : {}),
@@ -109,6 +120,7 @@ export async function createProblem(sessionId: string): Promise<ProblemRecord> {
     description: '',
     exampleInput: '',
     exampleOutput: '',
+    constraints: '',
     order: records.length
       ? Math.max(...records.map((record) => record.problem.order)) + 1
       : 0,
@@ -136,6 +148,7 @@ export async function updateProblem(
     'description',
     'exampleInput',
     'exampleOutput',
+    'constraints',
   ] as const) {
     if (content[field] !== undefined) {
       if (typeof content[field] !== 'string')

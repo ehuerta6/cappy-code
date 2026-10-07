@@ -69,6 +69,7 @@ function validateProblemRecord(
     typeof data.description !== 'string' ||
     typeof data.exampleInput !== 'string' ||
     typeof data.exampleOutput !== 'string' ||
+    (data.constraints !== undefined && typeof data.constraints !== 'string') ||
     typeof data.order !== 'number' ||
     !Number.isFinite(data.order) ||
     typeof data.answersVisible !== 'boolean'
@@ -85,6 +86,7 @@ function validateProblemRecord(
       description: data.description,
       exampleInput: data.exampleInput,
       exampleOutput: data.exampleOutput,
+      constraints: data.constraints === undefined ? '' : data.constraints,
       order: data.order,
       answersVisible: data.answersVisible,
       ...(leetcodeUrl ? { leetcodeUrl } : {}),

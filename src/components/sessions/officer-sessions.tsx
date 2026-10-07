@@ -269,6 +269,12 @@ function PastSessionProblemHistory({
               <p className="m-0 mt-1 whitespace-pre-wrap break-words text-sm leading-5 text-muted">
                 {problem.description || 'No description provided'}
               </p>
+              {problem.constraints ? (
+                <p className="m-0 mt-1 whitespace-pre-wrap break-words text-sm leading-5 text-muted">
+                  <span className="font-medium text-ink">Constraints: </span>
+                  {problem.constraints}
+                </p>
+              ) : null}
               <p className="m-0 mt-1 min-w-0 break-all text-sm leading-5 text-muted">
                 <span className="font-medium text-ink">LeetCode: </span>
                 {problem.leetcodeUrl ? (

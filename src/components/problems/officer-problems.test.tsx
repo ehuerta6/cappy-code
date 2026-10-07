@@ -56,6 +56,7 @@ const first = {
     description: 'Find pair',
     exampleInput: '1 2',
     exampleOutput: '3',
+    constraints: '',
     order: 0,
     answersVisible: false,
   },
@@ -267,6 +268,9 @@ describe('Officer Problem workspace', () => {
     fireEvent.change(screen.getByLabelText('Expected output'), {
       target: { value: '9' },
     });
+    fireEvent.change(screen.getByLabelText('Constraints'), {
+      target: { value: '1 ≤ n ≤ 100\nValues are distinct.' },
+    });
     fireEvent.change(screen.getByLabelText('LeetCode link (optional)'), {
       target: { value: 'https://leetcode.com/problems/two-sum/' },
     });
@@ -289,6 +293,7 @@ describe('Officer Problem workspace', () => {
       description: 'New statement',
       exampleInput: '4 5',
       exampleOutput: '9',
+      constraints: '1 ≤ n ≤ 100\nValues are distinct.',
       leetcodeUrl: 'https://leetcode.com/problems/two-sum/',
     });
     expect(api.updateProblem).toHaveBeenCalledTimes(2);
