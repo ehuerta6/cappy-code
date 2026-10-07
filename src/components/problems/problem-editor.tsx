@@ -164,7 +164,7 @@ export default function ProblemEditor({
             />
           </label>
           <label className="my-3 flex flex-col gap-2">
-            Example output
+            Expected output
             <textarea
               className="min-h-[76px] w-full resize-y rounded border border-border-strong bg-surface px-3 py-2 font-mono text-[15px] leading-6 text-ink disabled:cursor-default disabled:bg-raised disabled:text-muted"
               rows={3}

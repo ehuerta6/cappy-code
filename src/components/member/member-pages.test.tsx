@@ -66,9 +66,9 @@ const problem = {
   },
 };
 const solutions = {
-  python: { code: 'print(6)', output: '6' },
-  java: { code: 'class Main {}', output: '6' },
-  cpp: { code: 'int main() {}', output: '6' },
+  python: { code: 'print(6)' },
+  java: { code: 'class Main {}' },
+  cpp: { code: 'int main() {}' },
 };
 
 beforeEach(() => {

@@ -99,9 +99,9 @@ const problems: PublicProblem[] = [
   },
 ];
 const solutions: ProblemSolutions = {
-  python: { code: 'print("hello")', output: 'hello' },
-  java: { code: 'class Main {}', output: 'java output' },
-  cpp: { code: 'int main() {}', output: '' },
+  python: { code: 'print("hello")' },
+  java: { code: 'class Main {}' },
+  cpp: { code: 'int main() {}' },
 };
 
 function viewState(
@@ -188,6 +188,9 @@ describe('public member UI scaffold', () => {
     expect(screen.getByText('First description')).toBeTruthy();
     expect(screen.getByText('first input')).toBeTruthy();
     expect(screen.getByText('first output')).toBeTruthy();
+    expect(screen.getAllByText('Expected output')).toHaveLength(1);
+    expect(screen.queryByText('hello')).toBeNull();
+    expect(screen.queryByText('java output')).toBeNull();
     const leetcodeLink = screen.getByRole('link', {
       name: 'View on LeetCode ↗',
     });
@@ -230,7 +233,13 @@ describe('public member UI scaffold', () => {
 
   it('renders the hidden state without requesting solution documents', () => {
     const load = vi.fn().mockResolvedValue(solutions);
-    render(<PublicSessionView state={viewState(load)} />);
+    const { container } = render(<PublicSessionView state={viewState(load)} />);
+    expect(screen.getByText('first input')).toBeTruthy();
+    expect(screen.getByText('first output')).toBeTruthy();
+    expect(screen.getAllByText('Expected output')).toHaveLength(1);
+    expect(container.textContent!.indexOf('Expected output')).toBeLessThan(
+      container.textContent!.indexOf('Solutions'),
+    );
     expect(screen.getByText('Answers hidden')).toBeTruthy();
     expect(
       screen.getByText('Waiting for the officer to reveal the solution…'),
@@ -260,7 +269,9 @@ describe('public member UI scaffold', () => {
     ).toBe(true);
     expect(screen.getByLabelText('Java Solution, read-only')).toBeTruthy();
     expect(screen.getByLabelText('C++ Solution, read-only')).toBeTruthy();
-    expect(screen.getByText('hello').tagName).toBe('PRE');
+    expect(screen.getAllByText('Expected output')).toHaveLength(1);
+    expect(screen.queryByText('hello')).toBeNull();
+    expect(screen.queryByText('java output')).toBeNull();
     expect(
       screen.queryByRole('button', { name: /run|translate|submit/i }),
     ).toBeNull();

@@ -21,13 +21,11 @@ function validateSolution(value: unknown): Solution {
     !value ||
     typeof value !== 'object' ||
     !('code' in value) ||
-    !('output' in value) ||
-    typeof value.code !== 'string' ||
-    typeof value.output !== 'string'
+    typeof value.code !== 'string'
   ) {
-    throw new Error('A solution must contain code and output text.');
+    throw new Error('A solution must contain source code text.');
   }
-  return { code: value.code, output: value.output };
+  return { code: value.code };
 }
 
 export async function getSolutionsForProblem(
@@ -46,7 +44,7 @@ export async function getSolutionsForProblem(
         language,
         solution: snapshot.exists()
           ? validateSolution(snapshot.data())
-          : { code: '', output: '' },
+          : { code: '' },
       };
     }),
   );

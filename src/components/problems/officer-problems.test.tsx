@@ -107,9 +107,9 @@ beforeEach(() => {
   api.setAnswersVisible.mockResolvedValue(undefined);
   api.deleteProblem.mockResolvedValue(undefined);
   api.getSolutionsForProblem.mockResolvedValue({
-    python: { code: 'python source', output: '' },
-    java: { code: 'java source', output: '' },
-    cpp: { code: 'cpp source', output: '' },
+    python: { code: 'python source' },
+    java: { code: 'java source' },
+    cpp: { code: 'cpp source' },
   });
   api.updateSolution.mockResolvedValue(undefined);
 });
@@ -264,7 +264,7 @@ describe('Officer Problem workspace', () => {
     fireEvent.change(screen.getByLabelText('Example input'), {
       target: { value: '4 5' },
     });
-    fireEvent.change(screen.getByLabelText('Example output'), {
+    fireEvent.change(screen.getByLabelText('Expected output'), {
       target: { value: '9' },
     });
     fireEvent.change(screen.getByLabelText('LeetCode link (optional)'), {
@@ -415,7 +415,7 @@ describe('Officer Problem workspace', () => {
     expect(api.deleteProblem).toHaveBeenLastCalledWith('session', 'first');
   });
 
-  it('keeps Solution edits local and blocks tab changes until explicit save confirms', async () => {
+  it('saves the shared Problem example and language source together on explicit save', async () => {
     const initialBusyChanges = onBusyChange.mock.calls.length;
     await loaded();
     const python = await screen.findByLabelText('Python Solution, editable');
@@ -423,8 +423,12 @@ describe('Officer Problem workspace', () => {
       'officer/session/first/python',
     );
     expect(api.getSolutionsForProblem).toHaveBeenCalledWith('session', 'first');
-    const javaOutput = screen.getByLabelText('Java prepared output');
-    fireEvent.change(javaOutput, { target: { value: 'prepared output' } });
+    fireEvent.change(screen.getByLabelText('Expected output'), {
+      target: { value: 'shared expected result' },
+    });
+    fireEvent.change(screen.getByLabelText('C++ Solution, editable'), {
+      target: { value: 'updated C++ source' },
+    });
     expect(onBusyChange).toHaveBeenLastCalledWith(true);
     expect(
       (screen.getByRole('tab', { name: 'Anagram' }) as HTMLButtonElement)
@@ -436,13 +440,15 @@ describe('Officer Problem workspace', () => {
       expect(api.updateSolution).toHaveBeenCalledWith(
         'session',
         'first',
-        'java',
+        'cpp',
         {
-          code: 'java source',
-          output: 'prepared output',
+          code: 'updated C++ source',
         },
       ),
     );
+    expect(api.updateProblem).toHaveBeenCalledWith('session', 'first', {
+      exampleOutput: 'shared expected result',
+    });
     await waitFor(() => expect(onBusyChange).toHaveBeenLastCalledWith(false));
     fireEvent.click(screen.getByRole('tab', { name: 'Anagram' }));
     await screen.findByLabelText('Python Solution, editable');

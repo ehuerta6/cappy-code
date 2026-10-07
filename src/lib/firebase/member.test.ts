@@ -171,27 +171,29 @@ describe('anonymous member persistence', () => {
       async ({ path }: { path: string }) =>
         snapshot(path.split('/').at(-1) ?? '', {
           code: path,
-          output: 'prepared',
+          output: 'legacy output ignored',
         }),
     );
     const solutions = await getMemberSolutions('s', 'p');
     expect(solutions.python.code).toBe(
       'sessions/s/problems/p/solutions/python',
     );
-    expect(solutions.java.output).toBe('prepared');
+    expect(solutions.java).toEqual({
+      code: 'sessions/s/problems/p/solutions/java',
+    });
     expect(solutions.cpp.code).toBe('sessions/s/problems/p/solutions/cpp');
     expect(sdk.getDocFromServer).toHaveBeenCalledTimes(3);
   });
 
-  it('maps missing solution documents to empty source and output', async () => {
+  it('maps missing solution documents to empty source', async () => {
     sdk.getDocFromServer.mockImplementation(async () => ({
       exists: () => false,
       metadata: { hasPendingWrites: false },
     }));
     await expect(getMemberSolutions('past', 'problem')).resolves.toEqual({
-      python: { code: '', output: '' },
-      java: { code: '', output: '' },
-      cpp: { code: '', output: '' },
+      python: { code: '' },
+      java: { code: '' },
+      cpp: { code: '' },
     });
   });
 });

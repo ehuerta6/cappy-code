@@ -44,7 +44,7 @@ Officer account. Members stay anonymous. The deterministic fixture contains
 one Live Session, two Draft Sessions, and ten Past Sessions dated across
 multiple weeks. It intentionally includes linked LeetCode and custom Problems,
 mixed reveal states, multiple Problems per Session, and prepared Python, Java,
-and C++ Solutions with Output for every Problem. This gives the Member archive,
+and C++ Solutions for every Problem. This gives the Member archive,
 Officer Past history, reveal controls, Monaco panels, and explicit Save flows
 useful content immediately after reset.
 
@@ -181,20 +181,20 @@ responses. Firestore Security Rules independently enforce backend access.
 | ---------------------------------------------------------------- | ---------- | ---------------------------------------------------------------------------------------------------------- |
 | `sessions/{sessionId}`                                           | `Session`  | `title`, `date`, `status`, `createdAt`, `updatedAt`                                                        |
 | `sessions/{sessionId}/problems/{problemId}`                      | `Problem`  | `title`, `description`, `exampleInput`, `exampleOutput`, `order`, `answersVisible`, optional `leetcodeUrl` |
-| `sessions/{sessionId}/problems/{problemId}/solutions/{language}` | `Solution` | `code`, `output`                                                                                           |
 | `sessionControl/liveSession`                                     | control    | `sessionId` (active Session ID, or `null` when no Session is live)                                         |
+| `sessions/{sessionId}/problems/{problemId}/solutions/{language}` | `Solution` | `code`                                                                                                     |
 
 - `Language` is exactly `python | java | cpp`; each language identifies its own Solution document.
 - `SessionStatus` is `draft | live | ended`.
 - `date` is a calendar date string in `YYYY-MM-DD` format. `createdAt` and `updatedAt` are Firestore `Timestamp` values in resolved persisted records; later write workflows can use SDK `serverTimestamp()` and must handle pending timestamp snapshots if needed.
 - `order` is a numeric sort key within the session. Problem reordering writes dense zero-based integers; ties on reads sort by document ID.
-- `output` is officer-prepared static text, not an execution result.
+- `exampleOutput` is the Problem's officer-prepared expected result, not an execution result.
 
 `sessionPath`, `problemPath`, and `solutionPath` centralize nested document paths and reject empty IDs or IDs containing `/`. They return strings for SDK `doc()` calls; collection access can use SDK `collection()` with `sessions`, or a document reference and its subcollection name. Session and Problem CRUD use small concrete Firestore functions. No generic repositories, converters, or unchecked typed snapshot casts are introduced. These TypeScript types describe the intended shape; they do not validate incoming Firestore data.
 
 ## Access boundary
 
-Problem documents hold member-facing metadata and `answersVisible`. Prepared code and output exist only in the separate Solution subcollection, consistent with [Firestore's hierarchical data model](https://firebase.google.com/docs/firestore/data-model). Draft Sessions are officer-only; anonymous members can read metadata under `live` and `ended` Sessions.
+Problem documents hold member-facing metadata, the shared example input and expected output, and `answersVisible`. Prepared code exists only in the separate Solution subcollection, consistent with [Firestore's hierarchical data model](https://firebase.google.com/docs/firestore/data-model). Draft Sessions are officer-only; anonymous members can read metadata under `live` and `ended` Sessions. Existing Solution documents may still contain a legacy `output` field; current readers ignore it and current writes omit it.
 
 Anonymous Solution reads for live Sessions require the parent Problem's `answersVisible` to be true. For ended Sessions, all fixed-language Solution documents are public regardless of that field. Draft Solutions remain officer-only. Hiding live answers in the UI alone provides no protection; Firestore Rules deny those reads.
 
@@ -316,7 +316,7 @@ Deletion uses a named confirmation with Cancel, keyboard dismissal, and focus
 restoration to a remaining tab or Add problem. Empty Sessions show the Add first
 problem state; loading and read failure remain distinct.
 
-Problem metadata and all dirty language source/output edits stay local until one
+Problem metadata and all dirty language source edits stay local until one
 **Save changes** action persists the selected Problem workspace. Successful parts
 are confirmed independently; failed parts stay dirty and provide a specific
 retryable error. Failed edits remain visible; navigation, creation, ordering and
@@ -338,17 +338,18 @@ No rules were deployed to a production project by this change.
 `updateSolution`, using only the fixed `python`, `java`, and `cpp` document IDs.
 Every operation checks for a current non-anonymous Officer Auth session before
 accessing Firestore. The language ID establishes which Language a document holds;
-Solution records contain only `code` and prepared static `output`.
+the active Solution record contains only `code`.
 
 Solution documents are created lazily by the first confirmed save. Reading a
 Problem maps missing documents to empty editor values without creating data. The
 officer workspace requests all three fixed documents from the server when a
 Problem is selected. It does not store Solution fields in Problem metadata.
 
-The three integrated Solution panels appear below the selected Problem content.
-Each panel combines its language heading, Monaco source editor, and editable
-prepared Output field. Source and output update local drafts while editing; the
-selected Problem's single explicit save persists dirty language documents.
+The Problem editor prepares the shared example input and expected output. The
+three integrated Solution panels appear below the selected Problem content and
+contain a language heading and Monaco source editor. Source updates stay local
+while editing; the selected Problem's single explicit save persists dirty
+Problem content and language documents.
 Confirmed language documents stay confirmed if another write fails. Failed saves
 retain edits, identify the affected Language, and can be retried without rewriting
 clean language documents. Unsaved changes block Problem switching and leaving the
@@ -383,9 +384,10 @@ Auth gate, account UI, or write function is used. For live Sessions, the hidden
 AnswerGate renders without requesting Solution documents until
 `answersVisible` becomes true. For ended Sessions, all three fixed Solution
 documents are requested automatically, regardless of `answersVisible`. The
-read model maps missing documents to empty source and Output. Firestore Rules
-remain authoritative for every read. The reusable `SolutionWorkspace` renders
-returned records in read-only Monaco panels with their prepared Output.
+read model maps missing documents to empty source and ignores any legacy
+Solution `output` field. Firestore Rules remain authoritative for every read.
+The shared Problem example appears before Solutions, and the reusable
+`SolutionWorkspace` renders returned records in read-only Monaco panels.
 
 ## Realtime answer visibility
 
