@@ -9,7 +9,7 @@ const api = vi.hoisted(() => ({
   getMemberSolutions: vi.fn(),
   subscribeToMemberSessions: vi.fn(),
 }));
-const navigation = vi.hoisted(() => ({ replace: vi.fn() }));
+const navigation = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }));
 const realtime = vi.hoisted(() => ({
   answersVisible: false,
 }));
@@ -94,6 +94,7 @@ beforeEach(() => {
     },
   );
   navigation.replace.mockReset();
+  navigation.push.mockReset();
 });
 afterEach(() => {
   cleanup();
@@ -101,11 +102,12 @@ afterEach(() => {
 });
 
 describe('public member page integration', () => {
-  it('automatically opens the live Session for Members', async () => {
+  it('keeps Session discovery available while a Session is live', async () => {
     render(<MemberHome />);
-    await waitFor(() =>
-      expect(navigation.replace).toHaveBeenCalledWith('/sessions/intro'),
-    );
+    expect(
+      await screen.findByRole('link', { name: /Intro practice/ }),
+    ).toBeTruthy();
+    expect(navigation.replace).not.toHaveBeenCalled();
     expect(
       screen.queryByRole('button', { name: /create|delete|edit/i }),
     ).toBeNull();
@@ -116,6 +118,32 @@ describe('public member page integration', () => {
     expect(await screen.findByText('Find the pair.')).toBeTruthy();
     expect(screen.getByText('Answers hidden')).toBeTruthy();
     expect(api.getMemberSolutions).not.toHaveBeenCalled();
+  });
+
+  it('keeps a direct ended Session open while another Session is live', async () => {
+    const ended = {
+      id: 'past-session',
+      session: { ...session.session, status: 'ended' as const },
+    };
+    api.subscribeToMemberSessions.mockImplementationOnce(
+      (onValue: (records: MemberSessionRecord[]) => void) => {
+        queueMicrotask(() => onValue([session, ended]));
+        return vi.fn();
+      },
+    );
+    render(<MemberSessionPage sessionId="past-session" />);
+    expect(await screen.findByText('Find the pair.')).toBeTruthy();
+    await waitFor(() =>
+      expect(navigation.replace).toHaveBeenCalledWith(
+        '/sessions/past-session/arrays',
+      ),
+    );
+  });
+
+  it('shows an unavailable state for a Problem ID outside the Session', async () => {
+    render(<MemberSessionPage sessionId="intro" problemId="missing-problem" />);
+    expect(await screen.findByText('Problem unavailable')).toBeTruthy();
+    expect(screen.queryByText('Find the pair.')).toBeNull();
   });
 
   it('requests revealed Solutions and renders all three editors read-only', async () => {

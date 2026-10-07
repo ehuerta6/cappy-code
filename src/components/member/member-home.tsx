@@ -1,6 +1,5 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import {
   subscribeToMemberSessions,
@@ -12,7 +11,6 @@ import {
 } from './public-session-ui';
 
 export default function MemberHome() {
-  const router = useRouter();
   const [sessions, setSessions] = useState<
     | { status: 'loading' }
     | { status: 'error' }
@@ -28,21 +26,10 @@ export default function MemberHome() {
     );
   }, [retryVersion]);
 
-  const liveSession =
-    sessions.status === 'ready'
-      ? sessions.records.find(({ session }) => session.status === 'live')
-      : undefined;
-
-  useEffect(() => {
-    if (liveSession) {
-      router.replace(`/sessions/${encodeURIComponent(liveSession.id)}`);
-    }
-  }, [liveSession, router]);
-
   let state: DiscoveryState;
   if (sessions.status === 'error') {
     state = { status: 'error', onRetry: () => setRetryVersion((v) => v + 1) };
-  } else if (sessions.status === 'loading' || liveSession) {
+  } else if (sessions.status === 'loading') {
     state = { status: 'loading' };
   } else if (sessions.records.length) {
     state = {

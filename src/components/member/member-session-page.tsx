@@ -1,6 +1,5 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   getMemberSolutions,
@@ -17,14 +16,15 @@ import {
 
 export default function MemberSessionPage({
   sessionId,
+  problemId = null,
 }: {
   sessionId: string;
+  problemId?: string | null;
 }) {
-  const router = useRouter();
   const [session, setSession] = useState<MemberSessionRecord | null>(null);
-  const [sessionStatus, setSessionStatus] = useState<'loading' | 'error'>(
-    'loading',
-  );
+  const [sessionStatus, setSessionStatus] = useState<
+    'loading' | 'error' | 'unavailable'
+  >('loading');
   const [retryVersion, setRetryVersion] = useState(0);
   const [problems, setProblems] = useState<
     | { status: 'loading' }
@@ -59,16 +59,10 @@ export default function MemberSessionPage({
     const unsubscribe = subscribeToMemberSessions(
       (records) => {
         if (!active) return;
-        const live = records.find(({ session }) => session.status === 'live');
-        if (live && live.id !== sessionId) {
-          setSession(null);
-          router.replace(`/sessions/${encodeURIComponent(live.id)}`);
-          return;
-        }
         const record = records.find(({ id }) => id === sessionId);
         if (!record) {
           setSession(null);
-          if (!live) router.replace('/');
+          setSessionStatus('unavailable');
           return;
         }
         setSession(record);
@@ -90,7 +84,7 @@ export default function MemberSessionPage({
       unsubscribe();
       problemsRequest.current += 1;
     };
-  }, [reloadProblems, router, retryVersion, sessionId]);
+  }, [reloadProblems, retryVersion, sessionId]);
 
   const loadRevealedSolutions = useCallback(
     (problemId: string) => getMemberSolutions(sessionId, problemId),
@@ -104,7 +98,10 @@ export default function MemberSessionPage({
       onRetry: () => setRetryVersion((value) => value + 1),
     };
   } else if (!session) {
-    state = { status: 'loading' };
+    state =
+      sessionStatus === 'unavailable'
+        ? { status: 'unavailable', kind: 'session' }
+        : { status: 'loading' };
   } else {
     state = {
       status: 'ready',
@@ -112,6 +109,7 @@ export default function MemberSessionPage({
         id: session.id,
         ...session.session,
       } satisfies PublicSessionSummary,
+      selectedProblemId: problemId,
       problems:
         problems.status === 'error'
           ? { status: 'error', onRetry: () => void reloadProblems() }
