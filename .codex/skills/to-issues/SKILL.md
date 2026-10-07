@@ -70,12 +70,14 @@ Independent issues should remain independent so they may be implemented concurre
 
 Think of the result as a dependency graph:
 
+```text
 Parent spec
 ├── Issue A
 ├── Issue B
-│ └── Issue D
+│   └── Issue D
 └── Issue C
-└── Issue E
+    └── Issue E
+```
 
 An issue is ready when all of its blockers are complete.
 
