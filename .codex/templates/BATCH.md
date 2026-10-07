@@ -24,6 +24,7 @@ Base SHA: <sha>
 ### Wave 1
 
 Issues:
+
 - #<issue>
 - #<issue>
 
