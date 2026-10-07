@@ -55,7 +55,7 @@ export default function SolutionPanel(props: Props) {
   const name = languageNames[language];
   return (
     <section
-      className="flex min-w-0 flex-col overflow-hidden rounded-lg border border-border-soft bg-surface text-ink"
+      className={`flex min-w-0 flex-col overflow-hidden text-ink ${mode === 'member' ? 'bg-surface' : 'rounded-lg border border-border-soft bg-surface'}`}
       aria-labelledby={`${id}-heading`}
     >
       <h3
