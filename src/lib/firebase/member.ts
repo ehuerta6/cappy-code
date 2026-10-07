@@ -10,15 +10,15 @@ import {
   where,
 } from 'firebase/firestore';
 import {
-  isProblemDifficulty,
   languages,
+  problemSchema,
+  sessionSchema,
+  solutionSchema,
   type Problem,
   type SessionStatus,
   type SessionBranch,
   type Solution,
 } from '../domain';
-import { validateLeetcodeProblemUrl } from '../problem-metadata';
-import { validateSessionMetadata } from '../session-metadata';
 import { getFirestoreDb } from './client';
 import { sessionPath, solutionPath } from './paths';
 
@@ -45,25 +45,26 @@ function validateSessionRecord(
   id: string,
   value: unknown,
 ): MemberSessionRecord {
-  if (!value || typeof value !== 'object')
+  const parsed = sessionSchema.safeParse(value);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    const message = issue?.message;
+    if (
+      issue?.path[0] === 'date' ||
+      message === 'Choose Intro, General, or ICPC for this session.'
+    )
+      throw new Error(message);
     throw new Error('A stored session has invalid fields.');
-  const data = value as Record<string, unknown>;
-  if (
-    typeof data.title !== 'string' ||
-    typeof data.date !== 'string' ||
-    !publicStatuses.includes(data.status as SessionStatus)
-  )
+  }
+  if (!publicStatuses.includes(parsed.data.status as SessionStatus))
     throw new Error('A stored session has invalid fields.');
-  const metadata = validateSessionMetadata({
-    branch: data.branch,
-    title: data.title,
-    date: data.date,
-  });
   return {
     id,
     session: {
-      ...metadata,
-      status: data.status as 'live' | 'ended',
+      branch: parsed.data.branch,
+      title: parsed.data.title,
+      date: parsed.data.date,
+      status: parsed.data.status as 'live' | 'ended',
     },
   };
 }
@@ -72,67 +73,21 @@ function validateProblemRecord(
   id: string,
   value: unknown,
 ): MemberProblemRecord {
-  if (!value || typeof value !== 'object')
+  const parsed = problemSchema.safeParse(value);
+  if (!parsed.success) {
+    const leetcodeIssue = parsed.error.issues.find(
+      (issue) => issue.path[0] === 'leetcodeUrl',
+    );
+    if (leetcodeIssue) throw new Error(leetcodeIssue.message);
     throw new Error('A stored problem has invalid fields.');
-  const data = value as Record<string, unknown>;
-  if (
-    typeof data.title !== 'string' ||
-    !data.title.trim() ||
-    typeof data.description !== 'string' ||
-    typeof data.exampleInput !== 'string' ||
-    typeof data.exampleOutput !== 'string' ||
-    (data.constraints !== undefined && typeof data.constraints !== 'string') ||
-    (data.difficulty !== undefined && !isProblemDifficulty(data.difficulty)) ||
-    typeof data.order !== 'number' ||
-    !Number.isFinite(data.order) ||
-    typeof data.answersVisible !== 'boolean'
-  )
-    throw new Error('A stored problem has invalid fields.');
-  const leetcodeUrl =
-    data.leetcodeUrl === undefined
-      ? undefined
-      : validateLeetcodeProblemUrl(data.leetcodeUrl);
-  return {
-    id,
-    problem: {
-      title: data.title.trim(),
-      description: data.description,
-      exampleInput: data.exampleInput,
-      exampleOutput: data.exampleOutput,
-      constraints: data.constraints === undefined ? '' : data.constraints,
-      order: data.order,
-      answersVisible: data.answersVisible,
-      ...(leetcodeUrl ? { leetcodeUrl } : {}),
-      ...(isProblemDifficulty(data.difficulty)
-        ? { difficulty: data.difficulty }
-        : {}),
-    },
-  };
+  }
+  return { id, problem: parsed.data };
 }
 
 function validateSolution(value: unknown): Solution {
-  if (
-    !value ||
-    typeof value !== 'object' ||
-    typeof (value as Record<string, unknown>).code !== 'string'
-  )
-    throw new Error('A stored solution has invalid fields.');
-  const data = value as Record<string, unknown>;
-  const fields = [
-    'timeComplexity',
-    'timeComplexityReason',
-    'spaceComplexity',
-    'spaceComplexityReason',
-  ] as const;
-  const solution: Solution = { code: data.code as string };
-  for (const field of fields) {
-    const text = data[field];
-    if (text !== undefined && typeof text !== 'string')
-      throw new Error('A stored solution has invalid fields.');
-    if (typeof text === 'string' && text.trim().length > 0)
-      solution[field] = text;
-  }
-  return solution;
+  const parsed = solutionSchema.safeParse(value);
+  if (!parsed.success) throw new Error('A stored solution has invalid fields.');
+  return parsed.data;
 }
 
 async function listSessionsWithStatus(status: 'live' | 'ended') {

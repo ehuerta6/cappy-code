@@ -9,6 +9,7 @@ import {
   type SessionRecord,
 } from '@/lib/firebase/sessions';
 import { validateSessionMetadata } from '@/lib/session-metadata';
+import { formatCalendarDate } from '@/lib/calendar-date';
 import OfficerProblems from '../problems/officer-problems';
 import type { OfficerSaveState } from '@/components/officer-save-state';
 import {
@@ -293,7 +294,7 @@ export default function SessionEditor({
             <p className="mt-1 flex flex-wrap items-center gap-2 text-sm leading-5 text-muted">
               CIC {sessionBranchLabels[branch]} Session{' '}
               <span aria-hidden="true">•</span>{' '}
-              <time dateTime={date}>{formatDate(date)}</time>
+              <time dateTime={date}>{formatCalendarDate(date)}</time>
             </p>
           </div>
           <div className="flex flex-wrap items-center justify-start gap-x-3 gap-y-2">
@@ -343,7 +344,7 @@ export default function SessionEditor({
           <p className="mt-1 flex flex-wrap items-center gap-2 text-sm leading-5 text-muted">
             CIC {sessionBranchLabels[branch]} Session{' '}
             <span aria-hidden="true">•</span>{' '}
-            <time dateTime={date}>{formatDate(date)}</time>
+            <time dateTime={date}>{formatCalendarDate(date)}</time>
           </p>
         </div>
         <div className="flex flex-wrap items-center justify-start gap-x-3 gap-y-2">
@@ -441,13 +442,4 @@ export default function SessionEditor({
       )}
     </section>
   );
-}
-
-function formatDate(date: string) {
-  const [year, month, day] = date.split('-').map(Number);
-  if (!year || !month || !day) return date;
-  return new Intl.DateTimeFormat('en', {
-    dateStyle: 'medium',
-    timeZone: 'UTC',
-  }).format(new Date(Date.UTC(year, month - 1, day)));
 }

@@ -12,7 +12,7 @@ import {
   sessionBranchLabels,
   type SessionBranch,
 } from '@/lib/domain';
-import { todayCalendarDate } from '@/lib/session-metadata';
+import { todayCalendarDate } from '@/lib/calendar-date';
 import SessionEditor from './session-editor';
 
 export default function OfficerSessions() {

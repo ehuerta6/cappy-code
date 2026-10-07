@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { todayCalendarDate, validateSessionMetadata } from './session-metadata';
+import { formatCalendarDate, todayCalendarDate } from './calendar-date';
+import { validateSessionMetadata } from './session-metadata';
 
 afterEach(() => vi.useRealTimers());
 
@@ -50,5 +51,9 @@ describe('session calendar metadata', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 9, 8, 23, 30));
     expect(todayCalendarDate()).toBe('2026-10-08');
+  });
+  it('formats a calendar date without shifting it across time zones', () => {
+    expect(formatCalendarDate('2026-10-08')).toBe('Oct 8, 2026');
+    expect(formatCalendarDate('not-a-date')).toBe('not-a-date');
   });
 });

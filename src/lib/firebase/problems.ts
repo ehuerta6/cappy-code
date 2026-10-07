@@ -14,6 +14,7 @@ import {
 import {
   isProblemDifficulty,
   languages,
+  problemSchema,
   type Problem,
   type ProblemDifficulty,
 } from '../domain';
@@ -85,42 +86,15 @@ export async function listProblems(
   const records = snapshot.docs.map((document): ProblemRecord => {
     if (document.metadata.hasPendingWrites)
       throw new Error('Problem changes are still awaiting confirmation.');
-    const data = document.data();
-    if (data.difficulty !== undefined && !isProblemDifficulty(data.difficulty))
+    const parsed = problemSchema.safeParse(document.data());
+    if (!parsed.success) {
+      const leetcodeIssue = parsed.error.issues.find(
+        (issue) => issue.path[0] === 'leetcodeUrl',
+      );
+      if (leetcodeIssue) throw new Error(leetcodeIssue.message);
       throw new Error('A stored problem has invalid fields.');
-    const leetcodeUrl =
-      data.leetcodeUrl === undefined
-        ? undefined
-        : validateLeetcodeProblemUrl(data.leetcodeUrl);
-    if (
-      typeof data.order !== 'number' ||
-      !Number.isFinite(data.order) ||
-      typeof data.answersVisible !== 'boolean'
-    )
-      throw new Error('A stored problem has invalid fields.');
-    const content = validateProblemContent({
-      title: data.title,
-      description: data.description,
-      exampleInput: data.exampleInput,
-      exampleOutput: data.exampleOutput,
-      constraints: data.constraints === undefined ? '' : data.constraints,
-    });
-    return {
-      id: document.id,
-      problem: {
-        title: content.title,
-        description: content.description,
-        exampleInput: content.exampleInput,
-        exampleOutput: content.exampleOutput,
-        constraints: content.constraints,
-        order: data.order,
-        answersVisible: data.answersVisible,
-        ...(leetcodeUrl ? { leetcodeUrl } : {}),
-        ...(isProblemDifficulty(data.difficulty)
-          ? { difficulty: data.difficulty }
-          : {}),
-      },
-    };
+    }
+    return { id: document.id, problem: parsed.data };
   });
   return records.sort(
     (a, b) => a.problem.order - b.problem.order || a.id.localeCompare(b.id),

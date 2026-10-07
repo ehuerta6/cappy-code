@@ -1,7 +1,12 @@
 import 'client-only';
 
 import { doc, getDocFromServer, setDoc } from 'firebase/firestore';
-import { languages, type Language, type Solution } from '../domain';
+import {
+  languages,
+  solutionSchema,
+  type Language,
+  type Solution,
+} from '../domain';
 import { getOfficerAuth } from './auth';
 import { getFirestoreDb } from './client';
 import { solutionPath } from './paths';
@@ -17,30 +22,23 @@ function officerDb() {
 }
 
 function validateSolution(value: unknown): Solution {
-  if (
-    !value ||
-    typeof value !== 'object' ||
-    !('code' in value) ||
-    typeof value.code !== 'string'
-  ) {
+  const parsed = solutionSchema.safeParse(value);
+  if (!parsed.success && parsed.error.issues[0]?.path[0] === 'code') {
     throw new Error('A solution must contain source code text.');
   }
-  const data = value as Record<string, unknown>;
-  const fields = [
-    'timeComplexity',
-    'timeComplexityReason',
-    'spaceComplexity',
-    'spaceComplexityReason',
-  ] as const;
-  const solution: Solution = { code: data.code as string };
-  for (const field of fields) {
-    const text = data[field];
-    if (text !== undefined && typeof text !== 'string')
+  if (!parsed.success) {
+    const field = parsed.error.issues[0]?.path[0];
+    if (
+      field === 'timeComplexity' ||
+      field === 'timeComplexityReason' ||
+      field === 'spaceComplexity' ||
+      field === 'spaceComplexityReason'
+    ) {
       throw new Error(`A solution ${field} must be text.`);
-    if (typeof text === 'string' && text.trim().length > 0)
-      solution[field] = text;
+    }
+    throw new Error('A solution must contain source code text.');
   }
-  return solution;
+  return parsed.data;
 }
 
 export async function getSolutionsForProblem(
