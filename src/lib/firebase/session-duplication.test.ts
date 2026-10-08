@@ -194,6 +194,91 @@ describe('duplicateSession', () => {
     ).toBe(false);
   });
 
+  it('sorts source Problems by persisted order instead of Firestore iteration order', async () => {
+    sdk.getDocsFromServer.mockResolvedValue({
+      docs: [
+        firestoreDocument('problem-c', {
+          ...savedProblem,
+          title: 'C',
+          order: 2,
+        }),
+        firestoreDocument('problem-a', {
+          ...savedProblem,
+          title: 'A',
+          order: 0,
+        }),
+        firestoreDocument('problem-b', {
+          ...savedProblem,
+          title: 'B',
+          order: 1,
+        }),
+      ],
+    });
+    vi.mocked(getApproaches).mockResolvedValue([]);
+
+    await duplicateSession('source');
+
+    expect(sdk.set).toHaveBeenCalledWith(
+      expect.objectContaining({ path: 'sessions/copy-1/problems/copy-2' }),
+      expect.objectContaining({ title: 'A', order: 0 }),
+    );
+    expect(sdk.set).toHaveBeenCalledWith(
+      expect.objectContaining({ path: 'sessions/copy-1/problems/copy-3' }),
+      expect.objectContaining({ title: 'B', order: 1 }),
+    );
+    expect(sdk.set).toHaveBeenCalledWith(
+      expect.objectContaining({ path: 'sessions/copy-1/problems/copy-4' }),
+      expect.objectContaining({ title: 'C', order: 2 }),
+    );
+  });
+
+  it('uses document IDs to order equal or invalid persisted Problem orders', async () => {
+    sdk.getDocsFromServer.mockResolvedValue({
+      docs: [
+        firestoreDocument('problem-z', {
+          ...savedProblem,
+          title: 'Invalid Z',
+          order: Number.NaN,
+        }),
+        firestoreDocument('problem-b', {
+          ...savedProblem,
+          title: 'Equal B',
+          order: 1,
+        }),
+        firestoreDocument('problem-a', {
+          ...savedProblem,
+          title: 'Equal A',
+          order: 1,
+        }),
+        firestoreDocument('problem-x', {
+          ...savedProblem,
+          title: 'Invalid X',
+          order: 'broken',
+        }),
+      ],
+    });
+    vi.mocked(getApproaches).mockResolvedValue([]);
+
+    await duplicateSession('source');
+
+    expect(sdk.set).toHaveBeenCalledWith(
+      expect.objectContaining({ path: 'sessions/copy-1/problems/copy-2' }),
+      expect.objectContaining({ title: 'Equal A', order: 0 }),
+    );
+    expect(sdk.set).toHaveBeenCalledWith(
+      expect.objectContaining({ path: 'sessions/copy-1/problems/copy-3' }),
+      expect.objectContaining({ title: 'Equal B', order: 1 }),
+    );
+    expect(sdk.set).toHaveBeenCalledWith(
+      expect.objectContaining({ path: 'sessions/copy-1/problems/copy-4' }),
+      expect.objectContaining({ title: 'Invalid X', order: 2 }),
+    );
+    expect(sdk.set).toHaveBeenCalledWith(
+      expect.objectContaining({ path: 'sessions/copy-1/problems/copy-5' }),
+      expect.objectContaining({ title: 'Invalid Z', order: 3 }),
+    );
+  });
+
   it('copies legacy primary Solutions into a new explicit Approach', async () => {
     vi.mocked(getApproaches).mockResolvedValue([
       { ...approach, id: 'primary', name: 'Primary Approach' },

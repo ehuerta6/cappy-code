@@ -168,7 +168,7 @@ service cloud.firestore {
       match /problems/{problemId} {
         allow read: if isOfficer() || sessionIsPublic(sessionId);
         allow create: if isOfficer()
-          && get(/databases/$(database)/documents/sessions/$(sessionId)).data.status == 'draft';
+          && getAfter(/databases/$(database)/documents/sessions/$(sessionId)).data.status == 'draft';
         allow update: if isOfficer()
           && (get(/databases/$(database)/documents/sessions/$(sessionId)).data.status == 'draft'
             || (get(/databases/$(database)/documents/sessions/$(sessionId)).data.status == 'live'
@@ -189,9 +189,10 @@ service cloud.firestore {
 
         match /approaches/{approachId} {
           function sessionState() { return get(/databases/$(database)/documents/sessions/$(sessionId)).data.status; }
+          function sessionStateAfter() { return getAfter(/databases/$(database)/documents/sessions/$(sessionId)).data.status; }
           allow read: if isOfficer() || (sessionIsPublic(sessionId) &&
             (sessionIsEnded(sessionId) || answersAreVisible(sessionId, problemId)));
-          allow create: if isOfficer() && sessionState() == 'draft'
+          allow create: if isOfficer() && sessionStateAfter() == 'draft'
             && request.resource.data.keys().hasAll(['name', 'tags', 'order']) && request.resource.data.keys().hasOnly(['name', 'tags', 'order'])
             && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.tags is list
             && request.resource.data.tags.hasOnly(['Arrays', 'Hash Map', 'Two Pointers', 'Binary Search', 'Stack', 'Queue', 'Linked List', 'Tree', 'Graph', 'DFS', 'BFS', 'Dynamic Programming', 'Greedy', 'Backtracking', 'Union Find', 'Shortest Path'])

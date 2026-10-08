@@ -87,12 +87,30 @@ export async function duplicateSession(id: string): Promise<string> {
   );
   if (sourceProblems.docs.some((problem) => problem.metadata.hasPendingWrites))
     throw new Error('Problem changes are awaiting confirmation.');
-  const problems = sourceProblems.docs.map((problem) => {
-    const result = problemSchema.safeParse(problem.data());
-    if (!result.success)
-      throw new Error('A saved Problem is invalid and cannot be copied.');
-    return { id: problem.id, problem: result.data };
-  });
+  const problems = sourceProblems.docs
+    .map((problem) => {
+      const data = problem.data();
+      const hasValidOrder =
+        typeof data.order === 'number' && Number.isFinite(data.order);
+      const result = problemSchema.safeParse({
+        ...data,
+        order: hasValidOrder ? data.order : 0,
+      });
+      if (!result.success)
+        throw new Error('A saved Problem is invalid and cannot be copied.');
+      return { id: problem.id, problem: result.data, hasValidOrder };
+    })
+    .sort((left, right) => {
+      if (left.hasValidOrder && right.hasValidOrder) {
+        if (left.problem.order < right.problem.order) return -1;
+        if (left.problem.order > right.problem.order) return 1;
+      }
+      if (left.hasValidOrder !== right.hasValidOrder)
+        return left.hasValidOrder ? -1 : 1;
+      if (left.id < right.id) return -1;
+      if (left.id > right.id) return 1;
+      return 0;
+    });
   const prepared = await Promise.all(
     problems.map(async ({ id: problemId, problem }) => ({
       problem,

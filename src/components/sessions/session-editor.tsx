@@ -80,6 +80,8 @@ export default function SessionEditor({
   const busy = useRef(false);
   const dirty =
     branch !== saved.branch || title !== saved.title || date !== saved.date;
+  const contentBusy =
+    contentSaveState?.dirty === true || contentSaveState?.saving === true;
 
   useEffect(() => {
     if (!readinessWarnings) return;
@@ -347,7 +349,16 @@ export default function SessionEditor({
   }
 
   async function duplicate() {
-    if (busy.current || dirty || duplicating || deleting || saving) return;
+    if (
+      busy.current ||
+      dirty ||
+      contentBusy ||
+      problemBusy ||
+      duplicating ||
+      deleting ||
+      saving
+    )
+      return;
     busy.current = true;
     setDuplicating(true);
     setDuplicateError(null);
@@ -373,11 +384,24 @@ export default function SessionEditor({
       >
         <button
           className={`${contextualButtonClass} mb-3`}
-          disabled={problemBusy}
+          disabled={problemBusy || contentBusy}
+          aria-describedby={
+            contentBusy ? 'session-content-save-guard' : undefined
+          }
           onClick={() => setProblemsOpen(false)}
         >
           Back to session
         </button>
+        {contentBusy && (
+          <p
+            id="session-content-save-guard"
+            className="mb-3 text-sm text-muted"
+            role="status"
+          >
+            Save or revert Problem and Solution edits before returning to this
+            Session.
+          </p>
+        )}
         <div className="mb-6 flex items-start justify-between gap-4 max-sm:mb-5 max-sm:flex-col">
           <div>
             <div className="flex flex-wrap items-center gap-3">
@@ -609,12 +633,31 @@ export default function SessionEditor({
       <button
         className={`${contextualButtonClass} ml-2`}
         onClick={() => void duplicate()}
+        aria-describedby={
+          contentBusy ? 'session-content-save-guard' : undefined
+        }
         disabled={
-          dirty || saving || deleting || duplicating || transitionPending
+          dirty ||
+          contentBusy ||
+          problemBusy ||
+          saving ||
+          deleting ||
+          duplicating ||
+          transitionPending
         }
       >
         {duplicating ? 'Duplicating…' : 'Duplicate session'}
       </button>
+      {contentBusy && (
+        <p
+          id="session-content-save-guard"
+          className="mt-3 text-sm text-muted"
+          role="status"
+        >
+          Save or revert Problem and Solution edits before duplicating this
+          Session.
+        </p>
+      )}
       <button
         className="ml-2 min-h-11 rounded px-3 py-2 text-sm text-danger hover:bg-danger-surface disabled:cursor-default disabled:text-muted"
         onClick={() => void remove()}

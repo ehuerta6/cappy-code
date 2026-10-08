@@ -216,6 +216,61 @@ function anonymousAuthDb() {
 }
 
 describe('Firestore security rules', () => {
+  it('allows one atomic new draft Session copy and its children, but denies child creates under a live Session', async () => {
+    const db = officerDb();
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'sessions/atomic-copy'), {
+      branch: 'general',
+      title: 'Copied Session',
+      date: '2026-10-08',
+      status: 'draft',
+    });
+    batch.set(doc(db, 'sessions/atomic-copy/problems/problem-copy'), {
+      title: 'Copied Problem',
+      description: 'A representative Problem',
+      exampleInput: '1',
+      exampleOutput: '1',
+      constraints: '',
+      order: 0,
+      answersVisible: false,
+    });
+    batch.set(
+      doc(
+        db,
+        'sessions/atomic-copy/problems/problem-copy/approaches/approach-copy',
+      ),
+      { name: 'Primary', tags: ['Arrays'], order: 0 },
+    );
+    for (const language of ['python', 'java', 'cpp']) {
+      batch.set(
+        doc(
+          db,
+          `sessions/atomic-copy/problems/problem-copy/approaches/approach-copy/solutions/${language}`,
+        ),
+        { code: `${language} source`, timeComplexity: 'O(1)' },
+      );
+    }
+    await assertSucceeds(batch.commit());
+
+    await assertFails(
+      setDoc(doc(db, 'sessions/live/problems/new-problem'), {
+        title: 'Forbidden Problem',
+        description: '',
+        exampleInput: '',
+        exampleOutput: '',
+        order: 1,
+        answersVisible: false,
+      }),
+    );
+    await assertFails(
+      setDoc(doc(db, 'sessions/live/problems/hidden/approaches/new-approach'), {
+        name: 'Forbidden',
+        tags: [],
+        order: 1,
+      }),
+    );
+  });
+
   it('requires a supported branch on new Sessions and rejects invalid branch updates', async () => {
     const db = officerDb();
     await assertFails(
