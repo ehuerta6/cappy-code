@@ -17,6 +17,7 @@ import {
   languages,
   problemCategorySchema,
   problemDifficultySchema,
+  problemSchema,
   solutionSchema,
   type ProblemCategory,
   type ProblemDifficulty,
@@ -243,4 +244,70 @@ export async function addBankProblemToSession(
   });
   await batch.commit();
   return { id: reference.id, problem: sessionProblem };
+}
+
+export async function materializeSessionProblemInBank(
+  sessionId: string,
+  problemId: string,
+): Promise<{ bankProblemId: string } | null> {
+  const db = officerDb();
+  const problemReference = doc(db, problemPath(sessionId, problemId));
+  const snapshot = await getDocFromServer(problemReference);
+  if (!snapshot.exists()) throw new Error('This Problem no longer exists.');
+  const stored = snapshot.data();
+  if (
+    stored.bankOrigin !== 'session' ||
+    stored.bankCopyPending !== true ||
+    typeof stored.bankProblemId !== 'string'
+  )
+    return null;
+
+  const parsedProblem = problemSchema.safeParse(stored);
+  if (!parsedProblem.success)
+    throw new Error('The saved Problem has invalid fields.');
+  if (parsedProblem.data.title === 'Untitled Problem') return null;
+
+  const solutionEntries = await Promise.all(
+    languages.map(async (language) => {
+      const solutionSnapshot = await getDocFromServer(
+        doc(db, solutionPath(sessionId, problemId, language)),
+      );
+      if (solutionSnapshot.metadata.hasPendingWrites)
+        throw new Error('Solution changes are awaiting confirmation.');
+      return [
+        language,
+        solutionSnapshot.exists()
+          ? validateSolution(solutionSnapshot.data())
+          : { code: '' },
+      ] as const;
+    }),
+  );
+
+  const bankProblemId = stored.bankProblemId;
+  const bankReference = doc(db, bankProblemPath(bankProblemId));
+  const problem = parsedProblem.data;
+  const bankContent: BankProblemContent = {
+    title: problem.title,
+    description: problem.description,
+    constraints: problem.constraints,
+    exampleInput: problem.exampleInput,
+    exampleOutput: problem.exampleOutput,
+    category: problem.category,
+    ...(problem.difficulty ? { difficulty: problem.difficulty } : {}),
+    ...(problem.leetcodeUrl ? { leetcodeUrl: problem.leetcodeUrl } : {}),
+  };
+  const batch = writeBatch(db);
+  batch.set(bankReference, { ...bankContent, isPublic: true });
+  for (const [language, solution] of solutionEntries)
+    batch.set(doc(db, bankSolutionPath(bankProblemId, language)), solution);
+  batch.update(problemReference, {
+    bankProblemId,
+    bankOrigin: 'session',
+    bankCopyPending: deleteField(),
+  });
+  batch.update(doc(db, sessionPath(sessionId)), {
+    bankProblemIds: arrayUnion(bankProblemId),
+  });
+  await batch.commit();
+  return { bankProblemId };
 }

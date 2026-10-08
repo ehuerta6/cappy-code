@@ -21,6 +21,7 @@ import type { Problem, SessionStatus } from '@/lib/domain';
 import {
   addBankProblemToSession,
   listOfficerBankProblems,
+  materializeSessionProblemInBank,
   type BankProblemRecord,
 } from '@/lib/firebase/problem-bank';
 import ProblemEditor from './problem-editor';
@@ -59,6 +60,10 @@ export default function OfficerProblems({
     useState<OfficerSaveState | null>(null);
   const [solutionSaveState, setSolutionSaveState] =
     useState<OfficerSaveState | null>(null);
+  const [materializingBankCopy, setMaterializingBankCopy] = useState(false);
+  const [materializationError, setMaterializationError] = useState<
+    string | null
+  >(null);
   const [actionsOpen, setActionsOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [bankPicker, setBankPicker] = useState<
@@ -70,7 +75,11 @@ export default function OfficerProblems({
   const addButton = useRef<HTMLButtonElement>(null);
   const actionsButton = useRef<HTMLButtonElement>(null);
   const selected = records.find((record) => record.id === selectedId);
-  const blocked = editing || solutionPending || operation !== null;
+  const hasPendingBankCopy = records.some(
+    (record) => record.problem.bankCopyPending === true,
+  );
+  const blocked =
+    editing || solutionPending || operation !== null || materializingBankCopy;
   const handleProblemSaved = useCallback(
     (content: ProblemContent) => {
       if (!selectedId) return;
@@ -91,19 +100,67 @@ export default function OfficerProblems({
   const workspaceDirty =
     problemSaveState?.dirty === true || solutionSaveState?.dirty === true;
   const workspaceSaving =
-    problemSaveState?.saving === true || solutionSaveState?.saving === true;
-  const workspaceError = problemSaveState?.error || solutionSaveState?.error;
+    problemSaveState?.saving === true ||
+    solutionSaveState?.saving === true ||
+    materializingBankCopy;
+  const workspaceError =
+    problemSaveState?.error || solutionSaveState?.error || materializationError;
+  const bankCopyReadyToCreate =
+    selected?.problem.bankCopyPending === true &&
+    selected.problem.title !== 'Untitled Problem';
   const saveWorkspace = useCallback(async () => {
-    if (workspaceSaving) return;
-    await Promise.all([
-      problemSaveState?.dirty ? problemSaveState.save() : undefined,
-      solutionSaveState?.dirty ? solutionSaveState.save() : undefined,
+    if (workspaceSaving) return false;
+    setMaterializationError(null);
+    const results = await Promise.all([
+      problemSaveState?.dirty ? problemSaveState.save() : true,
+      solutionSaveState?.dirty ? solutionSaveState.save() : true,
     ]);
-  }, [problemSaveState, solutionSaveState, workspaceSaving]);
+    if (!results.every(Boolean)) return false;
+
+    if (selected?.problem.bankCopyPending) {
+      setMaterializingBankCopy(true);
+      try {
+        const result = await materializeSessionProblemInBank(
+          sessionId,
+          selected.id,
+        );
+        if (result)
+          setRecords((current) =>
+            current.map((record) =>
+              record.id === selected.id
+                ? {
+                    ...record,
+                    problem: {
+                      ...record.problem,
+                      bankProblemId: result.bankProblemId,
+                      bankCopyPending: false,
+                    },
+                  }
+                : record,
+            ),
+          );
+        return true;
+      } catch {
+        setMaterializationError(
+          'Reusable Bank copy could not be created. Your Session content is saved; retry to create the copy.',
+        );
+        return false;
+      } finally {
+        setMaterializingBankCopy(false);
+      }
+    }
+    return true;
+  }, [
+    problemSaveState,
+    selected,
+    sessionId,
+    solutionSaveState,
+    workspaceSaving,
+  ]);
 
   useEffect(() => {
-    onBusyChange(blocked);
-  }, [blocked, onBusyChange]);
+    onBusyChange(blocked || hasPendingBankCopy);
+  }, [blocked, hasPendingBankCopy, onBusyChange]);
 
   useEffect(() => {
     onSaveStateChange(
@@ -111,7 +168,7 @@ export default function OfficerProblems({
         ? {
             dirty: workspaceDirty,
             saving: workspaceSaving,
-            error: workspaceError,
+            error: workspaceError ?? undefined,
             save: saveWorkspace,
           }
         : null,
@@ -296,7 +353,12 @@ export default function OfficerProblems({
       aria-label="Session problems"
     >
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="m-0 text-lg font-semibold leading-[26px]">Problems</h2>
+        <div>
+          <h2 className="m-0 text-lg font-semibold leading-[26px]">Problems</h2>
+          <p className="mb-0 mt-1 text-sm text-muted">
+            Changes here apply to this Session only.
+          </p>
+        </div>
         <div className="flex flex-wrap gap-2">
           <button
             className={buttonClass}
@@ -305,21 +367,22 @@ export default function OfficerProblems({
           >
             Add from Problem Bank
           </button>
-          {selected && (
-            <button
-              className={buttonClass}
-              disabled={
-                !workspaceDirty || workspaceSaving || operation !== null
-              }
-              onClick={() => void saveWorkspace()}
-            >
-              {workspaceSaving
-                ? 'Saving…'
-                : workspaceError
-                  ? 'Retry'
-                  : 'Save changes'}
-            </button>
-          )}
+          {selected &&
+            (workspaceDirty ||
+              bankCopyReadyToCreate ||
+              materializationError) && (
+              <button
+                className={buttonClass}
+                disabled={workspaceSaving || operation !== null}
+                onClick={() => void saveWorkspace()}
+              >
+                {workspaceSaving
+                  ? 'Saving…'
+                  : workspaceError
+                    ? 'Retry'
+                    : 'Save changes'}
+              </button>
+            )}
         </div>
       </div>
       {bankPicker.status !== 'closed' && (
@@ -336,6 +399,10 @@ export default function OfficerProblems({
               Close
             </button>
           </div>
+          <p className="my-2 text-sm text-muted">
+            Adding a Problem copies its current content and Solutions into this
+            Session.
+          </p>
           {bankPicker.status === 'loading' ? (
             <p role="status">Loading bank Problems…</p>
           ) : null}
@@ -387,6 +454,11 @@ export default function OfficerProblems({
       {workspaceError && (
         <p className="mb-3 text-sm text-danger" role="alert">
           {workspaceError}
+        </p>
+      )}
+      {selected?.problem.bankCopyPending && (
+        <p className="mb-3 text-sm text-muted" role="status">
+          Save a titled Problem to create its reusable Bank copy.
         </p>
       )}
       {loading ? (

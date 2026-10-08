@@ -82,7 +82,7 @@ beforeEach(() => {
   sdk.batchSet.mockReset();
 });
 describe('officer problem persistence', () => {
-  it('creates a Session Problem and a reusable bank copy with empty Solutions', async () => {
+  it('creates a private-to-officers pending Session Problem without publishing an empty Bank entry', async () => {
     sdk.getDocsFromServer.mockResolvedValue({ docs: [document('old', 4)] });
     const result = await createProblem('session');
     const expected = {
@@ -96,28 +96,25 @@ describe('officer problem persistence', () => {
       category: 'custom',
       bankProblemId: 'bank-new',
       bankOrigin: 'session',
+      bankCopyPending: true,
     };
     expect(result).toEqual({ id: 'new', problem: expected });
     expect(sdk.batchSet).toHaveBeenCalledWith(
       { path: 'sessions/session/problems/new', id: 'new' },
       expected,
     );
-    expect(sdk.batchSet).toHaveBeenCalledWith(
-      { path: 'problemBank/bank-new' },
-      {
-        title: 'Untitled Problem',
-        description: '',
-        exampleInput: '',
-        exampleOutput: '',
-        constraints: '',
-        category: 'custom',
-        isPublic: true,
-      },
-    );
-    expect(sdk.batchSet).toHaveBeenCalledTimes(5);
+    expect(sdk.batchSet).toHaveBeenCalledTimes(1);
+    expect(sdk.batchUpdate).not.toHaveBeenCalled();
+    expect(sdk.commit).toHaveBeenCalledOnce();
   });
   it('starts an empty session at order zero', async () => {
     expect((await createProblem('session')).problem.order).toBe(0);
+  });
+  it('does not report direct creation success when its atomic snapshot batch fails', async () => {
+    const error = new Error('offline');
+    sdk.commit.mockRejectedValueOnce(error);
+    await expect(createProblem('session')).rejects.toBe(error);
+    expect(sdk.batchSet).toHaveBeenCalledTimes(1);
   });
   it('edits Problem content without writing Solution fields or reveal state', async () => {
     await updateProblem('session', 'problem', {
@@ -137,6 +134,23 @@ describe('officer problem persistence', () => {
       { path: 'sessions/session/problems/problem' },
       { description: 'New statement' },
     );
+  });
+  it('does not synchronize edits from legacy origin-linked Session Problems', async () => {
+    sdk.getDocFromServer.mockResolvedValue({
+      exists: () => true,
+      data: () => ({
+        ...problem,
+        bankProblemId: 'legacy-bank',
+        bankOrigin: 'session',
+      }),
+    });
+    await updateProblem('session', 'problem', { description: 'Session edit' });
+    expect(sdk.updateDoc).toHaveBeenCalledExactlyOnceWith(
+      { path: 'sessions/session/problems/problem' },
+      { description: 'Session edit' },
+    );
+    expect(sdk.batchUpdate).not.toHaveBeenCalled();
+    expect(sdk.batchSet).not.toHaveBeenCalled();
   });
   it('writes constraints as plain Problem metadata', async () => {
     await updateProblem('session', 'problem', {
@@ -323,19 +337,48 @@ describe('officer problem persistence', () => {
   );
   it('atomically removes all fixed solution paths including missing children then problem metadata', async () => {
     await deleteProblem('session', 'problem');
-    expect(
-      sdk.batchDelete.mock.calls.map(([reference]) => reference.path),
-    ).toEqual([
+    const deletedPaths = sdk.batchDelete.mock.calls.map(
+      ([reference]) => reference.path,
+    );
+    expect(deletedPaths).toEqual([
       'sessions/session/problems/problem/solutions/python',
       'sessions/session/problems/problem/solutions/java',
       'sessions/session/problems/problem/solutions/cpp',
       'sessions/session/problems/problem',
     ]);
+    expect(
+      deletedPaths.every((path: string) => !path.startsWith('problemBank/')),
+    ).toBe(true);
     expect(sdk.commit).toHaveBeenCalledTimes(1);
     expect(sdk.getDocsFromServer).toHaveBeenCalledOnce();
     expect(sdk.batchUpdate).toHaveBeenCalledWith(
       { path: 'sessions/session' },
       { bankProblemIds: [] },
+    );
+  });
+  it('does not include unmaterialized reserved Bank IDs in the live hiding list', async () => {
+    sdk.getDocsFromServer.mockResolvedValue({
+      docs: [
+        document('remove'),
+        document('pending', 1, {
+          ...problem,
+          order: 1,
+          bankProblemId: 'reserved-bank',
+          bankOrigin: 'session',
+          bankCopyPending: true,
+        }),
+        document('materialized', 2, {
+          ...problem,
+          order: 2,
+          bankProblemId: 'saved-bank',
+          bankOrigin: 'session',
+        }),
+      ],
+    });
+    await deleteProblem('session', 'remove');
+    expect(sdk.batchUpdate).toHaveBeenCalledWith(
+      { path: 'sessions/session' },
+      { bankProblemIds: ['saved-bank'] },
     );
   });
   it.each([null, { uid: 'anonymous', isAnonymous: true }])(

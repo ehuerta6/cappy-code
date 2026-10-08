@@ -112,10 +112,36 @@ test('Officer prepares and presents a Session through its public lifecycle', asy
     const bankLink = member.getByRole('link', { name: problemTitle });
     await expect(bankLink).toBeVisible();
     await bankLink.click();
+    await expect(
+      member.getByRole('heading', { name: problemTitle }),
+    ).toBeVisible();
+    await expect(
+      member.getByText('Use a map to find the matching pair.'),
+    ).toBeVisible();
+    await expect(
+      member.getByText('2 ≤ values.length ≤ 100,000', { exact: true }),
+    ).toBeVisible();
+    await expect(
+      member.getByText('values = [4, 8, 12], target = 12'),
+    ).toBeVisible();
+    await expect(member.getByText('[0, 1]', { exact: true })).toBeVisible();
+    await expect(member.getByText(/medium/i)).toBeVisible();
+    await expect(
+      member.getByRole('link', { name: /LeetCode/ }),
+    ).toHaveAttribute('href', 'https://leetcode.com/problems/two-sum/');
     await expect(member.getByText('python-answer-secret')).toBeVisible();
     await expect(member.getByText('java-answer-secret')).toBeVisible();
     await expect(member.getByText('cpp-answer-secret')).toBeVisible();
+    await expect(member.getByText('Time: O(n)', { exact: true })).toHaveCount(
+      2,
+    );
     await expect(member.getByText('Time: O(n log n)')).toBeVisible();
+    await expect(member.getByText('Space: O(n)', { exact: true })).toHaveCount(
+      2,
+    );
+    await expect(member.getByText('Space: O(1)', { exact: true })).toHaveCount(
+      1,
+    );
     const bankProblemId = new URL(member.url()).pathname.split('/').at(-1);
     expect(bankProblemId).toBeTruthy();
     await member.goto('/');
@@ -138,7 +164,7 @@ test('Officer prepares and presents a Session through its public lifecycle', asy
       member.getByText('values = [4, 8, 12], target = 12'),
     ).toBeVisible();
     await expect(member.getByText('[0, 1]', { exact: true })).toBeVisible();
-    await expect(member.getByText('Medium', { exact: true })).toBeVisible();
+    await expect(member.getByText(/medium/i)).toBeVisible();
     await expect(
       member.getByRole('link', { name: /LeetCode/ }),
     ).toHaveAttribute('href', 'https://leetcode.com/problems/two-sum/');

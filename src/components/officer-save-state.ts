@@ -2,7 +2,7 @@ export type OfficerSaveState = {
   dirty: boolean;
   saving: boolean;
   error?: string;
-  save: () => Promise<void>;
+  save: () => Promise<boolean>;
 };
 
 export type SaveStateReporter = (state: OfficerSaveState | null) => void;
