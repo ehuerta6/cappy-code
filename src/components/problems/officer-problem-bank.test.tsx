@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const api = vi.hoisted(() => ({
   createBankProblem: vi.fn(),
+  deleteBankProblem: vi.fn(),
   getBankProblem: vi.fn(),
   listBankProblemApproachTags: vi.fn(),
   listOfficerBankProblems: vi.fn(),
@@ -105,11 +106,73 @@ beforeEach(() => {
   api.updateBankPublication.mockResolvedValue(undefined);
   api.updateBankSolution.mockResolvedValue(undefined);
   api.updateBankApproach.mockResolvedValue(undefined);
+  api.deleteBankProblem.mockResolvedValue(undefined);
 });
 
 afterEach(() => cleanup());
 
 describe('Officer Problem Bank publication', () => {
+  it('confirms deletion, then removes the row only after persistence succeeds', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const deletion = deferred<void>();
+    api.deleteBankProblem.mockReturnValueOnce(deletion.promise);
+    render(<OfficerProblemBank />);
+    await screen.findByLabelText('Problem title');
+    fireEvent.click(screen.getByRole('button', { name: 'Delete Problem' }));
+
+    expect(confirm).toHaveBeenCalledWith(
+      expect.stringContaining('Existing Session copies and their history'),
+    );
+    expect(api.deleteBankProblem).toHaveBeenCalledWith('two-sum');
+    expect(screen.getByRole('button', { name: 'Deleting…' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Two Sum' })).toBeTruthy();
+    deletion.resolve();
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Two Sum' })).toBeNull(),
+    );
+    confirm.mockRestore();
+  });
+
+  it('keeps Bank data visible on failure and offers a retry', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    api.deleteBankProblem
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockResolvedValueOnce(undefined);
+    render(<OfficerProblemBank />);
+    await screen.findByLabelText('Problem title');
+    fireEvent.click(screen.getByRole('button', { name: 'Delete Problem' }));
+
+    const retry = await screen.findByRole('button', { name: 'Retry delete' });
+    expect(screen.getByRole('button', { name: 'Two Sum' })).toBeTruthy();
+    fireEvent.click(retry);
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Two Sum' })).toBeNull(),
+    );
+    expect(api.deleteBankProblem).toHaveBeenCalledTimes(2);
+    confirm.mockRestore();
+  });
+
+  it('disables and guards deletion when the Bank editor is dirty', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    render(<OfficerProblemBank />);
+    await screen.findByLabelText('Problem title');
+    fireEvent.change(screen.getByLabelText('Problem title'), {
+      target: { value: 'Unsaved title' },
+    });
+
+    expect(
+      (
+        screen.getByRole('button', {
+          name: 'Delete Problem',
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Delete Problem' }));
+    expect(api.deleteBankProblem).not.toHaveBeenCalled();
+    expect(confirm).not.toHaveBeenCalled();
+    confirm.mockRestore();
+  });
+
   it('filters tag and branch results without reloading and presents a clearable empty state', async () => {
     render(<OfficerProblemBank />);
     await screen.findByRole('button', { name: 'Two Sum' });

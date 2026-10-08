@@ -19,6 +19,7 @@ import {
 } from '@/lib/domain';
 import {
   createBankProblem,
+  deleteBankProblem,
   getBankProblem,
   listBankProblemApproachTags,
   listOfficerBankProblems,
@@ -74,6 +75,8 @@ export default function OfficerProblemBank() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [publicationSaving, setPublicationSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState(false);
   const [structuralBusy, setStructuralBusy] = useState(false);
   const [publicationError, setPublicationError] = useState<boolean | null>(
     null,
@@ -341,6 +344,50 @@ export default function OfficerProblemBank() {
     }
   }
 
+  async function removeSelected(retry = false) {
+    if (
+      !selectedId ||
+      dirty ||
+      saving ||
+      deleting ||
+      structuralBusy ||
+      publicationSaving
+    )
+      return;
+    if (
+      !retry &&
+      !window.confirm(
+        'Delete this reusable Problem Bank source and its stored Approaches and Solutions? Existing Session copies and their history will remain unchanged.',
+      )
+    )
+      return;
+    setDeleting(true);
+    setDeleteError(false);
+    try {
+      await deleteBankProblem(selectedId);
+      const remaining = records.filter((item) => item.id !== selectedId);
+      setRecords(remaining);
+      setUsage((current) => {
+        const next = { ...current };
+        delete next[selectedId];
+        return next;
+      });
+      setTagsByProblem((current) => {
+        const next = { ...current };
+        delete next[selectedId];
+        return next;
+      });
+      setSelectedId(remaining[0]?.id ?? null);
+      setContent(null);
+      setSolutions(null);
+      setError(null);
+    } catch {
+      setDeleteError(true);
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   return (
     <section aria-labelledby="problem-bank-heading">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
@@ -359,7 +406,7 @@ export default function OfficerProblemBank() {
         </div>
         <button
           className={buttonClass}
-          disabled={saving || dirty}
+          disabled={saving || dirty || deleting}
           onClick={() => void add()}
         >
           + New Problem
@@ -418,7 +465,7 @@ export default function OfficerProblemBank() {
                             aria-current={
                               selectedId === item.id ? 'true' : undefined
                             }
-                            disabled={saving || dirty}
+                            disabled={saving || dirty || deleting}
                             onClick={() => setSelectedId(item.id)}
                           >
                             {item.title}
@@ -484,7 +531,27 @@ export default function OfficerProblemBank() {
                 >
                   {saving ? 'Saving…' : 'Save changes'}
                 </button>
+                <button
+                  className={buttonClass}
+                  disabled={dirty || saving || deleting || publicationSaving}
+                  onClick={() => void removeSelected()}
+                >
+                  {deleting ? 'Deleting…' : 'Delete Problem'}
+                </button>
               </div>
+              {deleteError && (
+                <p role="alert">
+                  Delete failed. The Problem is still in the Bank; retry when
+                  the connection is available.{' '}
+                  <button
+                    className={buttonClass}
+                    disabled={deleting}
+                    onClick={() => void removeSelected(true)}
+                  >
+                    Retry delete
+                  </button>
+                </p>
+              )}
               {publicationError !== null && (
                 <p role="alert">
                   Publication update failed. Retry to confirm the selected
@@ -511,7 +578,7 @@ export default function OfficerProblemBank() {
                   <input
                     className="min-h-11 rounded border border-border-strong bg-surface px-3 py-2 font-normal"
                     value={content.title}
-                    disabled={saving}
+                    disabled={saving || deleting}
                     onChange={(event) =>
                       setContent({ ...content, title: event.target.value })
                     }
@@ -522,7 +589,7 @@ export default function OfficerProblemBank() {
                   <select
                     className="min-h-11 rounded border border-border-strong bg-surface px-3 py-2 font-normal"
                     value={content.category}
-                    disabled={saving}
+                    disabled={saving || deleting}
                     onChange={(event) =>
                       setContent({
                         ...content,
@@ -543,7 +610,7 @@ export default function OfficerProblemBank() {
                   <select
                     className="min-h-11 rounded border border-border-strong bg-surface px-3 py-2 font-normal"
                     value={content.difficulty ?? ''}
-                    disabled={saving}
+                    disabled={saving || deleting}
                     onChange={(event) =>
                       setContent({
                         ...content,
@@ -565,7 +632,7 @@ export default function OfficerProblemBank() {
                   <input
                     className="min-h-11 rounded border border-border-strong bg-surface px-3 py-2 font-normal"
                     type="url"
-                    disabled={saving}
+                    disabled={saving || deleting}
                     value={content.leetcodeUrl ?? ''}
                     placeholder="https://leetcode.com/problems/two-sum/"
                     onChange={(event) =>
@@ -582,7 +649,7 @@ export default function OfficerProblemBank() {
                 <textarea
                   className="min-h-32 rounded border border-border-strong bg-surface px-3 py-2 font-normal"
                   value={content.description}
-                  disabled={saving}
+                  disabled={saving || deleting}
                   onChange={(event) =>
                     setContent({
                       ...content,
@@ -596,7 +663,7 @@ export default function OfficerProblemBank() {
                 <textarea
                   className="min-h-20 rounded border border-border-strong bg-surface px-3 py-2 font-normal"
                   value={content.constraints}
-                  disabled={saving}
+                  disabled={saving || deleting}
                   onChange={(event) =>
                     setContent({
                       ...content,
@@ -693,6 +760,7 @@ export default function OfficerProblemBank() {
                       Approach name
                       <input
                         className="ml-2 rounded border border-border-strong bg-surface px-2 py-2"
+                        disabled={saving || deleting}
                         value={activeApproach.name}
                         onChange={(event) =>
                           setApproaches((items) =>
@@ -709,6 +777,7 @@ export default function OfficerProblemBank() {
                       Tags
                       <input
                         className="ml-2 rounded border border-border-strong bg-surface px-2 py-2"
+                        disabled={saving || deleting}
                         value={activeApproach.tags.join(', ')}
                         onChange={(event) =>
                           setApproaches((items) =>
@@ -730,7 +799,7 @@ export default function OfficerProblemBank() {
                     <button
                       className={buttonClass}
                       type="button"
-                      disabled={saving}
+                      disabled={saving || deleting}
                       onClick={() => void save()}
                     >
                       Save approach details
@@ -876,7 +945,7 @@ export default function OfficerProblemBank() {
                               : current,
                           )
                         }
-                        disabled={saving}
+                        disabled={saving || deleting}
                       />
                     ))}
                   </div>

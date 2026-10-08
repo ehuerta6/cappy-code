@@ -309,6 +309,49 @@ export async function updateBankPublication(
   });
 }
 
+/** Delete a reusable Bank Problem and every Bank-owned child document. */
+export async function deleteBankProblem(problemId: string): Promise<void> {
+  const db = officerDb();
+  const parentPath = bankProblemPath(problemId);
+  const parentReference = doc(db, parentPath);
+  const [parent, legacySolutions, approaches] = await Promise.all([
+    getDocFromServer(parentReference),
+    getDocsFromServer(collection(db, `${parentPath}/solutions`)),
+    getDocsFromServer(collection(db, `${parentPath}/approaches`)),
+  ]);
+  if (!parent.exists()) throw new Error('This bank Problem no longer exists.');
+
+  const approachSolutions = await Promise.all(
+    approaches.docs.map(({ id }) =>
+      getDocsFromServer(
+        collection(db, `${parentPath}/approaches/${id}/solutions`),
+      ),
+    ),
+  );
+  const writeCount =
+    1 +
+    legacySolutions.docs.length +
+    approaches.docs.length +
+    approachSolutions.reduce(
+      (count, snapshot) => count + snapshot.docs.length,
+      0,
+    );
+  if (writeCount > 500)
+    throw new Error(
+      'This Problem has too much stored content to delete in one operation.',
+    );
+
+  const batch = writeBatch(db);
+  for (const solution of legacySolutions.docs) batch.delete(solution.ref);
+  approaches.docs.forEach((approach, index) => {
+    for (const solution of approachSolutions[index].docs)
+      batch.delete(solution.ref);
+    batch.delete(approach.ref);
+  });
+  batch.delete(parentReference);
+  await batch.commit();
+}
+
 export async function updateBankSolution(
   problemId: string,
   language: (typeof languages)[number],
