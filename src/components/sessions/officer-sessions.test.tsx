@@ -16,6 +16,7 @@ const api = vi.hoisted(() => ({
   updateSession: vi.fn(),
   transitionSession: vi.fn(),
   deleteSession: vi.fn(),
+  duplicateSession: vi.fn(),
   listProblems: vi.fn(),
   updateProblem: vi.fn(),
   getSolutionsForProblem: vi.fn(),
@@ -104,6 +105,7 @@ beforeEach(() => {
   api.updateSession.mockResolvedValue(undefined);
   api.transitionSession.mockResolvedValue(undefined);
   api.deleteSession.mockResolvedValue(undefined);
+  api.duplicateSession.mockResolvedValue('copied-session');
 });
 afterEach(() => {
   cleanup();
@@ -117,6 +119,36 @@ async function openEditor() {
 }
 
 describe('Officer Sessions surface', () => {
+  it('duplicates the persisted Session and shows a useful failure', async () => {
+    await openEditor();
+    api.duplicateSession.mockRejectedValue(
+      new Error('Session changes are awaiting confirmation.'),
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Duplicate session' }));
+
+    expect(api.duplicateSession).toHaveBeenCalledWith('session-id');
+    expect((await screen.findByRole('alert')).textContent).toContain(
+      'Session changes are awaiting confirmation.',
+    );
+  });
+
+  it('disables Session duplication while local metadata edits are unsaved', async () => {
+    await openEditor();
+    const title = screen.getByRole('textbox', { name: 'Session title' });
+    fireEvent.change(title, { target: { value: 'Unsaved title' } });
+
+    expect(
+      (
+        screen.getByRole('button', {
+          name: 'Duplicate session',
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Duplicate session' }));
+    expect(api.duplicateSession).not.toHaveBeenCalled();
+  });
+
   it('shows loading until Firestore responds, then lists persisted metadata', async () => {
     let resolve!: (records: (typeof record)[]) => void;
     api.listSessions.mockReturnValue(
@@ -862,6 +894,12 @@ describe('Officer Sessions surface', () => {
         }) as HTMLButtonElement
       ).disabled,
     ).toBe(true);
+    expect(
+      screen.getByText(
+        'Save or revert Problem and Solution edits before returning to this Session.',
+      ),
+    ).toBeTruthy();
+    expect(api.duplicateSession).not.toHaveBeenCalled();
     expect(api.updateProblem).not.toHaveBeenCalled();
     fireEvent.blur(title);
     expect(api.updateProblem).not.toHaveBeenCalled();
@@ -880,6 +918,14 @@ describe('Officer Sessions surface', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Back to session' }));
     expect(screen.getByLabelText('Session title')).toBeTruthy();
     expect(api.updateSession).not.toHaveBeenCalled();
+    const duplicateButton = screen.getByRole('button', {
+      name: 'Duplicate session',
+    }) as HTMLButtonElement;
+    expect(duplicateButton.disabled).toBe(false);
+    fireEvent.click(duplicateButton);
+    await waitFor(() =>
+      expect(api.duplicateSession).toHaveBeenCalledWith('session-id'),
+    );
   });
 
   it('keeps the Session workspace open until the selected Problem source saves', async () => {
@@ -925,6 +971,75 @@ describe('Officer Sessions surface', () => {
     );
     fireEvent.click(backButton);
     expect(screen.getByLabelText('Session title')).toBeTruthy();
+  });
+
+  it('blocks navigation and duplication while a Solution is saving, then enables both after save', async () => {
+    api.listProblems.mockResolvedValue([
+      {
+        id: 'problem',
+        problem: {
+          title: 'Two Sum',
+          description: 'Find a pair',
+          exampleInput: '1 2',
+          exampleOutput: '3',
+          order: 0,
+          answersVisible: false,
+        },
+      },
+    ]);
+    let finishSave!: () => void;
+    api.updateSolution.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finishSave = resolve;
+        }),
+    );
+    render(<OfficerSessions />);
+    fireEvent.click(await screen.findByRole('button', { name: /Arrays/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Manage problems' }));
+    await screen.findByLabelText('Python Solution, editable');
+
+    fireEvent.change(screen.getByLabelText('Python Solution, editable'), {
+      target: { value: 'unsaved python' },
+    });
+    const backButton = screen.getByRole('button', {
+      name: 'Back to session',
+    }) as HTMLButtonElement;
+    expect(backButton.disabled).toBe(true);
+    expect(
+      screen.getByText(
+        'Save or revert Problem and Solution edits before returning to this Session.',
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole('button', { name: 'Duplicate session' }),
+    ).toBeNull();
+    expect(api.duplicateSession).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    await waitFor(() =>
+      expect(api.updateSolution).toHaveBeenCalledWith(
+        'session-id',
+        'problem',
+        'python',
+        { code: 'unsaved python' },
+        'primary',
+      ),
+    );
+    expect(backButton.disabled).toBe(true);
+    expect(api.duplicateSession).not.toHaveBeenCalled();
+
+    finishSave();
+    await waitFor(() => expect(backButton.disabled).toBe(false));
+    fireEvent.click(backButton);
+    const duplicateButton = screen.getByRole('button', {
+      name: 'Duplicate session',
+    }) as HTMLButtonElement;
+    expect(duplicateButton.disabled).toBe(false);
+    fireEvent.click(duplicateButton);
+    await waitFor(() =>
+      expect(api.duplicateSession).toHaveBeenCalledWith('session-id'),
+    );
   });
 
   it('saves dirty Problem content together and retries only the failed language', async () => {

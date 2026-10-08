@@ -31,6 +31,7 @@ import {
   sessionPath,
   solutionPath,
 } from './paths';
+import { getApproaches } from './solutions';
 
 export interface ProblemRecord {
   id: string;
@@ -148,6 +149,115 @@ export async function createProblem(sessionId: string): Promise<ProblemRecord> {
   batch.set(sessionReference, problemWithBank);
   await batch.commit();
   return { id: sessionReference.id, problem: problemWithBank };
+}
+
+export async function duplicateProblem(
+  sessionId: string,
+  problemId: string,
+): Promise<ProblemRecord> {
+  const db = officerDb();
+  const sessionReference = doc(db, sessionPath(sessionId));
+  const sessionSnapshot = await getDocFromServer(sessionReference);
+  if (!sessionSnapshot.exists())
+    throw new Error('This Session no longer exists.');
+  if (sessionSnapshot.metadata.hasPendingWrites)
+    throw new Error('Session changes are awaiting confirmation.');
+  if (sessionSnapshot.data().status !== 'draft')
+    throw new Error('Problems can only be duplicated in a draft Session.');
+
+  const records = await listProblems(sessionId);
+  const sourceIndex = records.findIndex((record) => record.id === problemId);
+  if (sourceIndex < 0) throw new Error('This Problem no longer exists.');
+  const source = records[sourceIndex];
+  const approaches = await getApproaches(problemPath(sessionId, problemId));
+  const problemReference = doc(
+    collection(db, `${sessionPath(sessionId)}/problems`),
+  );
+  const bankProblemIds: string[] = Array.isArray(
+    sessionSnapshot.data().bankProblemIds,
+  )
+    ? sessionSnapshot
+        .data()
+        .bankProblemIds.filter(
+          (id: unknown): id is string => typeof id === 'string',
+        )
+    : [];
+  const copiedProblem: Problem = {
+    ...source.problem,
+    title: `${source.problem.title} Copy`,
+    order: sourceIndex + 1,
+    answersVisible: false,
+  };
+  for (const field of [
+    'leetcodeUrl',
+    'difficulty',
+    'bankProblemId',
+    'bankOrigin',
+    'bankCopyPending',
+  ] as const) {
+    if (copiedProblem[field] === undefined) delete copiedProblem[field];
+  }
+  if (copiedProblem.bankCopyPending === true) {
+    delete copiedProblem.bankCopyPending;
+    delete copiedProblem.bankProblemId;
+    delete copiedProblem.bankOrigin;
+  }
+  const writeCount = records.length + 2 + approaches.length * 4;
+  if (writeCount > 500)
+    throw new Error(
+      'This Problem is too large to duplicate in one Firestore batch.',
+    );
+
+  const ordered = [...records];
+  ordered.splice(sourceIndex + 1, 0, {
+    id: problemReference.id,
+    problem: copiedProblem,
+  });
+  const batch = writeBatch(db);
+  for (const [order, record] of ordered.entries()) {
+    if (record.id === problemReference.id) continue;
+    batch.update(doc(db, problemPath(sessionId, record.id)), { order });
+  }
+  batch.set(doc(db, problemPath(sessionId, problemReference.id)), {
+    ...copiedProblem,
+    approachesEnabled: true,
+  });
+  for (const [order, approach] of approaches.entries()) {
+    const approachReference = doc(
+      collection(
+        db,
+        approachCollectionPath(problemPath(sessionId, problemReference.id)),
+      ),
+    );
+    batch.set(approachReference, {
+      name: approach.name,
+      tags: approach.tags,
+      order,
+    });
+    for (const language of languages) {
+      batch.set(
+        doc(
+          db,
+          approachSolutionPath(
+            problemPath(sessionId, problemReference.id),
+            approachReference.id,
+            language,
+          ),
+        ),
+        approach.solutions[language],
+      );
+    }
+  }
+  if (
+    copiedProblem.bankProblemId &&
+    !bankProblemIds.includes(copiedProblem.bankProblemId)
+  ) {
+    batch.update(sessionReference, {
+      bankProblemIds: [...bankProblemIds, copiedProblem.bankProblemId],
+    });
+  }
+  await batch.commit();
+  return { id: problemReference.id, problem: copiedProblem };
 }
 
 export async function updateProblem(

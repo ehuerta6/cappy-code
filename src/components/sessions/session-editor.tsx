@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   deleteSession,
+  duplicateSession,
   transitionSession,
   updateSession,
   type ProblemCountState,
@@ -36,9 +37,11 @@ const statusTone = {
 export default function SessionEditor({
   record,
   onClose,
+  onDuplicated,
 }: {
   record: SessionRecord;
   onClose: () => void;
+  onDuplicated: (id: string) => void;
 }) {
   const [problemsOpen, setProblemsOpen] = useState(false);
   const [problemBusy, setProblemBusy] = useState(false);
@@ -56,6 +59,8 @@ export default function SessionEditor({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState(false);
+  const [duplicating, setDuplicating] = useState(false);
+  const [duplicateError, setDuplicateError] = useState<string | null>(null);
   const [status, setStatus] = useState(record.session.status);
   const [problemCount, setProblemCount] = useState<ProblemCountState>(
     record.problemCount === null
@@ -75,6 +80,8 @@ export default function SessionEditor({
   const busy = useRef(false);
   const dirty =
     branch !== saved.branch || title !== saved.title || date !== saved.date;
+  const contentBusy =
+    contentSaveState?.dirty === true || contentSaveState?.saving === true;
 
   useEffect(() => {
     if (!readinessWarnings) return;
@@ -341,6 +348,34 @@ export default function SessionEditor({
     }
   }
 
+  async function duplicate() {
+    if (
+      busy.current ||
+      dirty ||
+      contentBusy ||
+      problemBusy ||
+      duplicating ||
+      deleting ||
+      saving
+    )
+      return;
+    busy.current = true;
+    setDuplicating(true);
+    setDuplicateError(null);
+    try {
+      onDuplicated(await duplicateSession(record.id));
+    } catch (error) {
+      setDuplicateError(
+        error instanceof Error
+          ? error.message
+          : 'Session could not be duplicated. Check your connection and try again.',
+      );
+    } finally {
+      busy.current = false;
+      setDuplicating(false);
+    }
+  }
+
   if (problemsOpen)
     return (
       <section
@@ -349,11 +384,24 @@ export default function SessionEditor({
       >
         <button
           className={`${contextualButtonClass} mb-3`}
-          disabled={problemBusy}
+          disabled={problemBusy || contentBusy}
+          aria-describedby={
+            contentBusy ? 'session-content-save-guard' : undefined
+          }
           onClick={() => setProblemsOpen(false)}
         >
           Back to session
         </button>
+        {contentBusy && (
+          <p
+            id="session-content-save-guard"
+            className="mb-3 text-sm text-muted"
+            role="status"
+          >
+            Save or revert Problem and Solution edits before returning to this
+            Session.
+          </p>
+        )}
         <div className="mb-6 flex items-start justify-between gap-4 max-sm:mb-5 max-sm:flex-col">
           <div>
             <div className="flex flex-wrap items-center gap-3">
@@ -583,6 +631,34 @@ export default function SessionEditor({
         Manage problems
       </button>
       <button
+        className={`${contextualButtonClass} ml-2`}
+        onClick={() => void duplicate()}
+        aria-describedby={
+          contentBusy ? 'session-content-save-guard' : undefined
+        }
+        disabled={
+          dirty ||
+          contentBusy ||
+          problemBusy ||
+          saving ||
+          deleting ||
+          duplicating ||
+          transitionPending
+        }
+      >
+        {duplicating ? 'Duplicating…' : 'Duplicate session'}
+      </button>
+      {contentBusy && (
+        <p
+          id="session-content-save-guard"
+          className="mt-3 text-sm text-muted"
+          role="status"
+        >
+          Save or revert Problem and Solution edits before duplicating this
+          Session.
+        </p>
+      )}
+      <button
         className="ml-2 min-h-11 rounded px-3 py-2 text-sm text-danger hover:bg-danger-surface disabled:cursor-default disabled:text-muted"
         onClick={() => void remove()}
         disabled={saving || deleting || transitionPending || dirty}
@@ -593,6 +669,11 @@ export default function SessionEditor({
         <p role="alert">
           Session could not be deleted. Check your connection and try Delete
           session again.
+        </p>
+      )}
+      {duplicateError && (
+        <p role="alert" className="mt-3 text-danger">
+          {duplicateError}
         </p>
       )}
     </section>

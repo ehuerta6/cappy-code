@@ -82,6 +82,11 @@ export default function OfficerSessions() {
       <SessionEditor
         key={selected.id}
         record={selected}
+        onDuplicated={(id) => {
+          openAfterLoad.current = id;
+          setSelectedId(null);
+          reload();
+        }}
         onClose={() => {
           setSelectedId(null);
           reload();

@@ -216,6 +216,39 @@ describe('officer solution persistence', () => {
     });
   });
 
+  it('refuses to copy pending Approach or Solution data', async () => {
+    sdk.getDocsFromServer.mockResolvedValue({
+      docs: [
+        {
+          id: 'draft-write',
+          data: () => ({ name: 'Hash Map', tags: ['Hash Map'], order: 0 }),
+          metadata: { hasPendingWrites: true },
+        },
+      ],
+    });
+    await expect(getApproaches('sessions/s/problems/p')).rejects.toThrow(
+      'Approach changes are awaiting confirmation.',
+    );
+
+    sdk.getDocsFromServer.mockResolvedValue({
+      docs: [
+        {
+          id: 'saved',
+          data: () => ({ name: 'Hash Map', tags: ['Hash Map'], order: 0 }),
+          metadata: { hasPendingWrites: false },
+        },
+      ],
+    });
+    sdk.getDocFromServer.mockResolvedValue({
+      exists: () => true,
+      metadata: { hasPendingWrites: true },
+      data: () => ({ code: 'unsaved source' }),
+    });
+    await expect(getApproaches('sessions/s/problems/p')).rejects.toThrow(
+      'Solution changes are awaiting confirmation.',
+    );
+  });
+
   it('forward materializes all legacy language documents as the stable primary Approach before adding one', async () => {
     sdk.getDocFromServer.mockImplementation(
       async ({ path }: { path: string }) => ({
