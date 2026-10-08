@@ -21,6 +21,7 @@ const api = vi.hoisted(() => ({
 const bankApi = vi.hoisted(() => ({
   addBankProblemToSession: vi.fn(),
   listOfficerBankProblems: vi.fn(),
+  materializeSessionProblemInBank: vi.fn(),
 }));
 vi.mock('@/lib/firebase/problems', async (original) => ({
   ...(await original<typeof import('@/lib/firebase/problems')>()),
@@ -106,6 +107,9 @@ beforeEach(() => {
       exampleInput: '',
       exampleOutput: '',
       order: 2,
+      bankProblemId: 'reserved-bank',
+      bankOrigin: 'session',
+      bankCopyPending: true,
     },
   });
   api.updateProblem.mockResolvedValue(undefined);
@@ -125,6 +129,9 @@ beforeEach(() => {
   bankApi.listOfficerBankProblems.mockResolvedValue([
     { id: 'bank-source', title: 'Two Sum', category: 'interview-style' },
   ]);
+  bankApi.materializeSessionProblemInBank.mockResolvedValue({
+    bankProblemId: 'reserved-bank',
+  });
 });
 afterEach(() => {
   cleanup();
@@ -138,6 +145,114 @@ function actions() {
   fireEvent.click(screen.getByRole('button', { name: 'Manage Two Sum' }));
 }
 describe('Officer Problem workspace', () => {
+  it('materializes a direct-created Bank copy after the explicit metadata and Solution saves', async () => {
+    const pendingProblem = {
+      ...first,
+      problem: {
+        ...first.problem,
+        title: 'Untitled Problem',
+        bankProblemId: 'reserved-bank',
+        bankOrigin: 'session' as const,
+        bankCopyPending: true,
+      },
+    };
+    api.listProblems.mockResolvedValue([pendingProblem]);
+    api.getSolutionsForProblem.mockResolvedValue({
+      python: { code: '' },
+      java: { code: '' },
+      cpp: { code: '' },
+    });
+    start();
+    await screen.findByRole('tab', { name: 'Untitled Problem' });
+    fireEvent.change(screen.getByLabelText('Problem title'), {
+      target: { value: 'Prepared Two Sum' },
+    });
+    fireEvent.change(screen.getByLabelText('Description'), {
+      target: { value: 'Find the target pair.' },
+    });
+    fireEvent.change(
+      await screen.findByLabelText('Python Solution, editable'),
+      {
+        target: { value: 'python prepared' },
+      },
+    );
+    fireEvent.change(screen.getByLabelText('Java Solution, editable'), {
+      target: { value: 'java prepared' },
+    });
+    fireEvent.change(screen.getByLabelText('C++ Solution, editable'), {
+      target: { value: 'cpp prepared' },
+    });
+    fireEvent.change(screen.getAllByLabelText('Time Complexity')[0], {
+      target: { value: 'O(n)' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    await waitFor(() =>
+      expect(bankApi.materializeSessionProblemInBank).toHaveBeenCalledWith(
+        'session',
+        'first',
+      ),
+    );
+    const materializeOrder =
+      bankApi.materializeSessionProblemInBank.mock.invocationCallOrder[0];
+    expect(api.updateProblem.mock.invocationCallOrder[0]).toBeLessThan(
+      materializeOrder,
+    );
+    for (const language of ['python', 'java', 'cpp']) {
+      const saveIndex = api.updateSolution.mock.calls.findIndex(
+        ([, , savedLanguage]) => savedLanguage === language,
+      );
+      expect(saveIndex).toBeGreaterThanOrEqual(0);
+      const save = api.updateSolution.mock.calls[saveIndex];
+      expect(save[0]).toBe('session');
+      expect(save[1]).toBe('first');
+      expect(save[3].code).toBe(`${language} prepared`);
+      expect(
+        api.updateSolution.mock.invocationCallOrder[saveIndex],
+      ).toBeLessThan(materializeOrder);
+    }
+    expect(api.updateProblem.mock.calls[0][2]).toEqual({
+      title: 'Prepared Two Sum',
+      description: 'Find the target pair.',
+    });
+    expect(screen.queryByText(/Save a titled Problem/)).toBeNull();
+  });
+
+  it('surfaces a failed Bank materialization and retries the same copy', async () => {
+    api.listProblems.mockResolvedValue([
+      {
+        ...first,
+        problem: {
+          ...first.problem,
+          title: 'Untitled Problem',
+          bankProblemId: 'reserved-bank',
+          bankOrigin: 'session',
+          bankCopyPending: true,
+        },
+      },
+    ]);
+    bankApi.materializeSessionProblemInBank
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockResolvedValueOnce({ bankProblemId: 'reserved-bank' });
+    start();
+    await screen.findByRole('tab', { name: 'Untitled Problem' });
+    fireEvent.change(screen.getByLabelText('Problem title'), {
+      target: { value: 'Prepared Two Sum' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    expect(
+      await screen.findByText(
+        'Reusable Bank copy could not be created. Your Session content is saved; retry to create the copy.',
+      ),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    await waitFor(() =>
+      expect(bankApi.materializeSessionProblemInBank).toHaveBeenCalledTimes(2),
+    );
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.queryByText(/Save a titled Problem/)).toBeNull();
+  });
+
   it('keeps the Session list unchanged when adding a Bank copy fails', async () => {
     await loaded();
     fireEvent.click(

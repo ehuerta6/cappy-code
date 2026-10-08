@@ -82,7 +82,7 @@ beforeEach(() => {
   sdk.batchSet.mockReset();
 });
 describe('officer problem persistence', () => {
-  it('creates a Session Problem and a reusable bank copy with empty Solutions', async () => {
+  it('creates a private-to-officers pending Session Problem without publishing an empty Bank entry', async () => {
     sdk.getDocsFromServer.mockResolvedValue({ docs: [document('old', 4)] });
     const result = await createProblem('session');
     const expected = {
@@ -96,25 +96,16 @@ describe('officer problem persistence', () => {
       category: 'custom',
       bankProblemId: 'bank-new',
       bankOrigin: 'session',
+      bankCopyPending: true,
     };
     expect(result).toEqual({ id: 'new', problem: expected });
     expect(sdk.batchSet).toHaveBeenCalledWith(
       { path: 'sessions/session/problems/new', id: 'new' },
       expected,
     );
-    expect(sdk.batchSet).toHaveBeenCalledWith(
-      { path: 'problemBank/bank-new' },
-      {
-        title: 'Untitled Problem',
-        description: '',
-        exampleInput: '',
-        exampleOutput: '',
-        constraints: '',
-        category: 'custom',
-        isPublic: true,
-      },
-    );
-    expect(sdk.batchSet).toHaveBeenCalledTimes(5);
+    expect(sdk.batchSet).toHaveBeenCalledTimes(1);
+    expect(sdk.batchUpdate).not.toHaveBeenCalled();
+    expect(sdk.commit).toHaveBeenCalledOnce();
   });
   it('starts an empty session at order zero', async () => {
     expect((await createProblem('session')).problem.order).toBe(0);
@@ -123,7 +114,7 @@ describe('officer problem persistence', () => {
     const error = new Error('offline');
     sdk.commit.mockRejectedValueOnce(error);
     await expect(createProblem('session')).rejects.toBe(error);
-    expect(sdk.batchSet).toHaveBeenCalledTimes(5);
+    expect(sdk.batchSet).toHaveBeenCalledTimes(1);
   });
   it('edits Problem content without writing Solution fields or reveal state', async () => {
     await updateProblem('session', 'problem', {
@@ -363,6 +354,31 @@ describe('officer problem persistence', () => {
     expect(sdk.batchUpdate).toHaveBeenCalledWith(
       { path: 'sessions/session' },
       { bankProblemIds: [] },
+    );
+  });
+  it('does not include unmaterialized reserved Bank IDs in the live hiding list', async () => {
+    sdk.getDocsFromServer.mockResolvedValue({
+      docs: [
+        document('remove'),
+        document('pending', 1, {
+          ...problem,
+          order: 1,
+          bankProblemId: 'reserved-bank',
+          bankOrigin: 'session',
+          bankCopyPending: true,
+        }),
+        document('materialized', 2, {
+          ...problem,
+          order: 2,
+          bankProblemId: 'saved-bank',
+          bankOrigin: 'session',
+        }),
+      ],
+    });
+    await deleteProblem('session', 'remove');
+    expect(sdk.batchUpdate).toHaveBeenCalledWith(
+      { path: 'sessions/session' },
+      { bankProblemIds: ['saved-bank'] },
     );
   });
   it.each([null, { uid: 'anonymous', isAnonymous: true }])(

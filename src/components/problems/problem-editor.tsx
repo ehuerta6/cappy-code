@@ -46,7 +46,7 @@ export default function ProblemEditor({
     setFieldError(null);
   }
   const save = useCallback(async () => {
-    if (!dirty || busy.current) return;
+    if (!dirty || busy.current) return true;
     let fields;
     try {
       fields = validateProblemContent(content);
@@ -55,7 +55,7 @@ export default function ProblemEditor({
         error instanceof Error ? error.message : 'Check problem content.';
       setError(message);
       setFieldError(message.includes('LeetCode') ? message : null);
-      return;
+      return false;
     }
     busy.current = true;
     setSaving(true);
@@ -70,16 +70,18 @@ export default function ProblemEditor({
         setContent(fields);
         setSaved(fields);
         onSaved(fields);
-        return;
+        return true;
       }
       await updateProblem(sessionId, record.id, updates);
       setContent(fields);
       setSaved(fields);
       onSaved(fields);
+      return true;
     } catch {
       setError(
         'Save failed. Your edits are still here. Check your connection and retry.',
       );
+      return false;
     } finally {
       busy.current = false;
       setSaving(false);

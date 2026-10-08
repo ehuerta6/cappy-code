@@ -109,35 +109,41 @@ test('Officer prepares and presents a Session through its public lifecycle', asy
     ).toBeVisible();
 
     await member.goto('/problem-bank');
-    const bankLink = member.getByRole('link', { name: 'Untitled Problem' });
+    const bankLink = member.getByRole('link', { name: problemTitle });
     await expect(bankLink).toBeVisible();
     await bankLink.click();
     await expect(
-      member.getByRole('heading', { name: 'Untitled Problem' }),
+      member.getByRole('heading', { name: problemTitle }),
     ).toBeVisible();
-    await expect(member.getByText(/answer-secret/)).toHaveCount(0);
+    await expect(
+      member.getByText('Use a map to find the matching pair.'),
+    ).toBeVisible();
+    await expect(
+      member.getByText('2 ≤ values.length ≤ 100,000', { exact: true }),
+    ).toBeVisible();
+    await expect(
+      member.getByText('values = [4, 8, 12], target = 12'),
+    ).toBeVisible();
+    await expect(member.getByText('[0, 1]', { exact: true })).toBeVisible();
+    await expect(member.getByText(/medium/i)).toBeVisible();
+    await expect(
+      member.getByRole('link', { name: /LeetCode/ }),
+    ).toHaveAttribute('href', 'https://leetcode.com/problems/two-sum/');
+    await expect(member.getByText('python-answer-secret')).toBeVisible();
+    await expect(member.getByText('java-answer-secret')).toBeVisible();
+    await expect(member.getByText('cpp-answer-secret')).toBeVisible();
+    await expect(member.getByText('Time: O(n)', { exact: true })).toHaveCount(
+      2,
+    );
+    await expect(member.getByText('Time: O(n log n)')).toBeVisible();
+    await expect(
+      member.getByText('Space: O(n)', { exact: true }),
+    ).toHaveCount(2);
+    await expect(member.getByText('Space: O(1)', { exact: true })).toHaveCount(
+      1,
+    );
     const bankProblemId = new URL(member.url()).pathname.split('/').at(-1);
     expect(bankProblemId).toBeTruthy();
-    const bankRecordResponse = await member.request.get(
-      `http://127.0.0.1:8080/v1/projects/demo-cappycode-local/databases/(default)/documents/problemBank/${bankProblemId}`,
-    );
-    const bankRecord = (await bankRecordResponse.json()) as {
-      fields?: {
-        title?: { stringValue?: string };
-        description?: { stringValue?: string };
-      };
-    };
-    expect(bankRecord.fields?.title?.stringValue).toBe('Untitled Problem');
-    expect(bankRecord.fields?.description?.stringValue).toBe('');
-    for (const language of ['python', 'java', 'cpp']) {
-      const response = await member.request.get(
-        `http://127.0.0.1:8080/v1/projects/demo-cappycode-local/databases/(default)/documents/problemBank/${bankProblemId}/solutions/${language}`,
-      );
-      const payload = (await response.json()) as {
-        fields?: { code?: { stringValue?: string } };
-      };
-      expect(payload.fields?.code?.stringValue).toBe('');
-    }
     await member.goto('/');
 
     await officer.getByRole('button', { name: 'Go Live' }).click();
@@ -158,7 +164,7 @@ test('Officer prepares and presents a Session through its public lifecycle', asy
       member.getByText('values = [4, 8, 12], target = 12'),
     ).toBeVisible();
     await expect(member.getByText('[0, 1]', { exact: true })).toBeVisible();
-    await expect(member.getByText('Medium', { exact: true })).toBeVisible();
+    await expect(member.getByText(/medium/i)).toBeVisible();
     await expect(
       member.getByRole('link', { name: /LeetCode/ }),
     ).toHaveAttribute('href', 'https://leetcode.com/problems/two-sum/');
@@ -170,9 +176,9 @@ test('Officer prepares and presents a Session through its public lifecycle', asy
     expect(sessionId).toBeTruthy();
     const liveSessionUrl = member.url();
     await member.goto('/problem-bank');
-    await expect(
-      member.getByRole('link', { name: 'Untitled Problem' }),
-    ).toHaveCount(0);
+    await expect(member.getByRole('link', { name: problemTitle })).toHaveCount(
+      0,
+    );
     await member.goto(`/problem-bank/${bankProblemId}`);
     await expect(
       member.getByRole('heading', { name: 'Problem unavailable' }),
@@ -234,7 +240,7 @@ test('Officer prepares and presents a Session through its public lifecycle', asy
     ).toBeVisible();
     await member.goto('/problem-bank');
     await expect(
-      member.getByRole('link', { name: 'Untitled Problem' }),
+      member.getByRole('link', { name: problemTitle }),
     ).toBeVisible();
     await member.goto('/');
 
@@ -253,7 +259,7 @@ test('Officer prepares and presents a Session through its public lifecycle', asy
     const endedURL = member.url();
     await member.goto('/problem-bank');
     await expect(
-      member.getByRole('link', { name: 'Untitled Problem' }),
+      member.getByRole('link', { name: problemTitle }),
     ).toBeVisible();
     await member.goto(endedURL);
     await member.reload();

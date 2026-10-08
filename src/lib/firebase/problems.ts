@@ -2,7 +2,6 @@ import 'client-only';
 
 import {
   collection,
-  arrayUnion,
   deleteField,
   doc,
   getDocFromServer,
@@ -24,13 +23,7 @@ import {
 import { validateLeetcodeProblemUrl } from '../problem-metadata';
 import { getOfficerAuth } from './auth';
 import { getFirestoreDb } from './client';
-import {
-  bankProblemPath,
-  bankSolutionPath,
-  problemPath,
-  sessionPath,
-  solutionPath,
-} from './paths';
+import { problemPath, sessionPath, solutionPath } from './paths';
 
 export interface ProblemRecord {
   id: string;
@@ -142,29 +135,12 @@ export async function createProblem(sessionId: string): Promise<ProblemRecord> {
     ...problem,
     bankProblemId: bankReference.id,
     bankOrigin: 'session',
+    bankCopyPending: true,
   };
   const batch = writeBatch(db);
   batch.set(sessionReference, problemWithBank);
-  batch.update(doc(db, sessionPath(sessionId)), {
-    bankProblemIds: arrayUnion(bankReference.id),
-  });
-  batch.set(doc(db, bankProblemPath(bankReference.id)), {
-    ...bankContent(problem),
-    category: problem.category,
-    isPublic: true,
-  });
-  for (const language of languages)
-    batch.set(doc(db, bankSolutionPath(bankReference.id, language)), {
-      code: '',
-    });
   await batch.commit();
   return { id: sessionReference.id, problem: problemWithBank };
-}
-
-function bankContent(problem: Problem) {
-  const { title, description, exampleInput, exampleOutput, constraints } =
-    problem;
-  return { title, description, exampleInput, exampleOutput, constraints };
 }
 
 export async function updateProblem(
@@ -268,6 +244,7 @@ export async function deleteProblem(
     ...new Set(
       sessionProblems
         .filter((record) => record.id !== problemId)
+        .filter((record) => record.problem.bankCopyPending !== true)
         .map((record) => record.problem.bankProblemId)
         .filter((id): id is string => Boolean(id)),
     ),

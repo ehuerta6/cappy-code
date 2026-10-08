@@ -61,6 +61,7 @@ export const problemSchema = z.object({
   category: problemCategorySchema.optional().default('custom'),
   bankProblemId: z.string().optional(),
   bankOrigin: z.enum(['session', 'bank']).optional(),
+  bankCopyPending: z.boolean().optional(),
 });
 
 export const solutionSchema = z
@@ -128,6 +129,7 @@ export interface Problem {
   category?: ProblemCategory;
   bankProblemId?: string;
   bankOrigin?: 'session' | 'bank';
+  bankCopyPending?: boolean;
 }
 
 export interface Solution {

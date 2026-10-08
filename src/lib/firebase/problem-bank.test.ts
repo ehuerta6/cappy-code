@@ -8,6 +8,7 @@ const sdk = vi.hoisted(() => ({
   updateDoc: vi.fn(),
   setDoc: vi.fn(),
   arrayUnion: vi.fn((value: string) => ({ arrayUnion: value })),
+  deleteField: vi.fn(() => ({ deleteField: true })),
   batchSet: vi.fn(),
   batchUpdate: vi.fn(),
   batchDelete: vi.fn(),
@@ -30,6 +31,7 @@ vi.mock('firebase/firestore', async (importOriginal) => ({
   updateDoc: sdk.updateDoc,
   setDoc: sdk.setDoc,
   arrayUnion: sdk.arrayUnion,
+  deleteField: sdk.deleteField,
   writeBatch: () => ({
     set: sdk.batchSet,
     update: sdk.batchUpdate,
@@ -40,6 +42,7 @@ vi.mock('firebase/firestore', async (importOriginal) => ({
 
 import {
   addBankProblemToSession,
+  materializeSessionProblemInBank,
   updateBankProblem,
   updateBankSolution,
 } from './problem-bank';
@@ -59,22 +62,33 @@ const solutions = {
   java: { code: 'java', spaceComplexity: 'O(n)' },
   cpp: { code: 'cpp', timeComplexityReason: 'One pass.' },
 };
+const pendingSessionProblem = {
+  ...metadata,
+  order: 0,
+  answersVisible: false,
+  bankProblemId: 'reserved-bank',
+  bankOrigin: 'session',
+  bankCopyPending: true,
+};
 
 beforeEach(() => {
   vi.clearAllMocks();
+  pendingSessionProblem.bankCopyPending = true;
   sdk.getDocsFromServer.mockResolvedValue({ docs: [] });
   sdk.getDocFromServer.mockImplementation(
     async ({ path }: { path: string }) => {
       const value =
-        path === 'problemBank/source'
-          ? metadata
-          : path.endsWith('/python')
-            ? solutions.python
-            : path.endsWith('/java')
-              ? solutions.java
-              : path.endsWith('/cpp')
-                ? solutions.cpp
-                : null;
+        path === 'sessions/session/problems/problem'
+          ? pendingSessionProblem
+          : path === 'problemBank/source'
+            ? metadata
+            : path.endsWith('/python')
+              ? solutions.python
+              : path.endsWith('/java')
+                ? solutions.java
+                : path.endsWith('/cpp')
+                  ? solutions.cpp
+                  : null;
       return {
         exists: () => value !== null,
         data: () => value,
@@ -115,6 +129,134 @@ describe('Problem Bank snapshots', () => {
       { bankProblemIds: { arrayUnion: 'source' } },
     );
     expect(sdk.commit).toHaveBeenCalledOnce();
+  });
+
+  it('atomically materializes a prepared Session Problem and all three Solutions', async () => {
+    await expect(
+      materializeSessionProblemInBank('session', 'problem'),
+    ).resolves.toEqual({ bankProblemId: 'reserved-bank' });
+    expect(sdk.batchSet).toHaveBeenCalledWith(
+      { path: 'problemBank/reserved-bank' },
+      { ...metadata, isPublic: true },
+    );
+    for (const language of ['python', 'java', 'cpp'] as const) {
+      expect(sdk.batchSet).toHaveBeenCalledWith(
+        { path: `problemBank/reserved-bank/solutions/${language}` },
+        solutions[language],
+      );
+    }
+    expect(sdk.batchUpdate).toHaveBeenCalledWith(
+      { path: 'sessions/session/problems/problem' },
+      {
+        bankProblemId: 'reserved-bank',
+        bankOrigin: 'session',
+        bankCopyPending: { deleteField: true },
+      },
+    );
+    expect(sdk.batchUpdate).toHaveBeenCalledWith(
+      { path: 'sessions/session' },
+      { bankProblemIds: { arrayUnion: 'reserved-bank' } },
+    );
+    expect(sdk.commit).toHaveBeenCalledOnce();
+  });
+
+  it('does not publish a new direct Session Problem while it is still Untitled', async () => {
+    sdk.getDocFromServer.mockImplementation(
+      async ({ path }: { path: string }) => ({
+        exists: () => true,
+        data: () =>
+          path === 'sessions/session/problems/problem'
+            ? { ...pendingSessionProblem, title: 'Untitled Problem' }
+            : null,
+        metadata: { hasPendingWrites: false },
+      }),
+    );
+    await expect(
+      materializeSessionProblemInBank('session', 'problem'),
+    ).resolves.toBeNull();
+    expect(sdk.getDocFromServer).toHaveBeenCalledOnce();
+    expect(sdk.commit).not.toHaveBeenCalled();
+  });
+
+  it('does not report success or partially publish when a Solution read fails', async () => {
+    const error = new Error('offline');
+    sdk.getDocFromServer.mockImplementation(
+      async ({ path }: { path: string }) => {
+        if (path.endsWith('/cpp')) throw error;
+        const value =
+          path === 'sessions/session/problems/problem'
+            ? pendingSessionProblem
+            : path.endsWith('/python')
+              ? solutions.python
+              : solutions.java;
+        return {
+          exists: () => true,
+          data: () => value,
+          metadata: { hasPendingWrites: false },
+        };
+      },
+    );
+    await expect(
+      materializeSessionProblemInBank('session', 'problem'),
+    ).rejects.toBe(error);
+    expect(sdk.batchSet).not.toHaveBeenCalled();
+    expect(sdk.commit).not.toHaveBeenCalled();
+  });
+
+  it('retries failed materialization against the same Bank ID without creating duplicates', async () => {
+    sdk.commit.mockRejectedValueOnce(new Error('offline'));
+    await expect(
+      materializeSessionProblemInBank('session', 'problem'),
+    ).rejects.toThrow('offline');
+    await expect(
+      materializeSessionProblemInBank('session', 'problem'),
+    ).resolves.toEqual({ bankProblemId: 'reserved-bank' });
+    const bankWrites = sdk.batchSet.mock.calls.map(
+      ([reference]) => reference.path,
+    );
+    expect(bankWrites).toEqual([
+      'problemBank/reserved-bank',
+      'problemBank/reserved-bank/solutions/python',
+      'problemBank/reserved-bank/solutions/java',
+      'problemBank/reserved-bank/solutions/cpp',
+      'problemBank/reserved-bank',
+      'problemBank/reserved-bank/solutions/python',
+      'problemBank/reserved-bank/solutions/java',
+      'problemBank/reserved-bank/solutions/cpp',
+    ]);
+    expect(sdk.commit).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not create another Bank entry after the copy has materialized', async () => {
+    await materializeSessionProblemInBank('session', 'problem');
+    const writeCount = sdk.batchSet.mock.calls.length;
+    pendingSessionProblem.bankCopyPending = false;
+    await expect(
+      materializeSessionProblemInBank('session', 'problem'),
+    ).resolves.toBeNull();
+    expect(sdk.batchSet).toHaveBeenCalledTimes(writeCount);
+    expect(sdk.commit).toHaveBeenCalledOnce();
+  });
+
+  it('does not materialize legacy Session-origin links or synchronize later edits', async () => {
+    sdk.getDocFromServer.mockImplementation(
+      async ({ path }: { path: string }) => ({
+        exists: () => true,
+        data: () =>
+          path === 'sessions/session/problems/problem'
+            ? {
+                ...pendingSessionProblem,
+                bankCopyPending: undefined,
+                bankProblemId: 'legacy-bank',
+              }
+            : null,
+        metadata: { hasPendingWrites: false },
+      }),
+    );
+    await expect(
+      materializeSessionProblemInBank('session', 'problem'),
+    ).resolves.toBeNull();
+    expect(sdk.commit).not.toHaveBeenCalled();
   });
 
   it('does not report success when a copied Solution cannot be read', async () => {

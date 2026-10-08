@@ -97,9 +97,12 @@ function ProblemSolutionsEditor({
         saving: languages.some((language) => saveStates[language]?.saving),
         error: saveStates[failed]?.error,
         save: async () => {
-          await Promise.all(
-            languages.map((language) => saveStates[language]?.save?.()),
+          const results = await Promise.all(
+            languages.map((language) =>
+              saveStates[language] ? saveStates[language]?.save() : true,
+            ),
           );
+          return results.every(Boolean);
         },
       });
       return;
@@ -110,9 +113,12 @@ function ProblemSolutionsEditor({
             dirty: true,
             saving: languages.some((language) => saveStates[language]?.saving),
             save: async () => {
-              await Promise.all(
-                languages.map((language) => saveStates[language]?.save?.()),
+              const results = await Promise.all(
+                languages.map((language) =>
+                  saveStates[language] ? saveStates[language]?.save() : true,
+                ),
               );
+              return results.every(Boolean);
             },
           }
         : null,
@@ -233,7 +239,7 @@ function EditableSolution({
     draft.spaceComplexity !== saved.spaceComplexity ||
     draft.spaceComplexityReason !== saved.spaceComplexityReason;
   const save = useCallback(async () => {
-    if (!dirty || busy.current) return;
+    if (!dirty || busy.current) return true;
     const submitted = draft;
     busy.current = true;
     setSaving(true);
@@ -241,8 +247,10 @@ function EditableSolution({
     try {
       await updateSolution(sessionId, problemId, language, submitted);
       setSaved(submitted);
+      return true;
     } catch {
       setError(true);
+      return false;
     } finally {
       busy.current = false;
       setSaving(false);
