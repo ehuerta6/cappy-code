@@ -51,8 +51,15 @@ test('Officer prepares and presents a Session through its public lifecycle', asy
     await officer.getByLabel('Session title').fill(sessionTitle);
     await officer.getByLabel('Session date').fill('2026-10-20');
     await officer.getByLabel('Session branch').selectOption('general');
-    await officer.getByRole('button', { name: 'Save changes' }).click();
+    await officer
+      .getByRole('button', { name: 'Save Changes', exact: true })
+      .click();
     await expect(officer.getByText('Saved ✓')).toBeVisible();
+    const officerSessionURL = officer.url();
+    await expect(officer).toHaveURL(/\/officer\/sessions\/[^/]+$/);
+    await officer.reload();
+    await expect(officer).toHaveURL(officerSessionURL);
+    await expect(officer.getByLabel('Session title')).toHaveValue(sessionTitle);
 
     await officer.getByRole('button', { name: 'Manage problems' }).click();
     await officer.getByRole('button', { name: 'Add problem' }).click();
@@ -109,7 +116,9 @@ test('Officer prepares and presents a Session through its public lifecycle', asy
         .nth(index)
         .fill(`${['Python', 'Java', 'C++'][index]} space analysis.`);
     }
-    await officer.getByRole('button', { name: 'Save changes' }).click();
+    await officer
+      .getByRole('button', { name: 'Save Changes', exact: true })
+      .click();
     await expect(officer.getByText('Saved ✓')).toBeVisible();
     await officer.getByRole('button', { name: 'Add Approach' }).click();
     await expect(
@@ -127,7 +136,9 @@ test('Officer prepares and presents a Session through its public lifecycle', asy
         ],
       );
     }
-    await officer.getByRole('button', { name: 'Save changes' }).click();
+    await officer
+      .getByRole('button', { name: 'Save Changes', exact: true })
+      .click();
     await expect(officer.getByText('Saved ✓')).toBeVisible();
     await expect(
       officer.getByRole('button', { name: 'New Approach' }),
@@ -202,6 +213,13 @@ test('Officer prepares and presents a Session through its public lifecycle', asy
 
     await officer.getByRole('button', { name: 'Go Live' }).click();
     await expect(officer.getByText('live', { exact: true })).toBeVisible();
+    await officer.getByRole('link', { name: 'View as Member' }).click();
+    await expect(officer).toHaveURL(/\/sessions\/[^/]+$/);
+    await expect(
+      officer.getByText('Waiting for the officer to reveal the solution…'),
+    ).toBeVisible();
+    await officer.goto(officerSessionURL);
+    await officer.getByRole('button', { name: 'Manage problems' }).click();
     await expect(
       officer.getByText(
         'You can correct existing Problem and Solution content while live. Problems cannot be added, removed, or reordered.',
@@ -243,7 +261,9 @@ test('Officer prepares and presents a Session through its public lifecycle', asy
       officer.getByRole('region', { name: 'Python' }).locator('.view-lines'),
     ).toContainText('python-corrected-answer-secret');
     await officer.getByLabel('Time Complexity').nth(0).fill('O(n log n)');
-    await officer.getByRole('button', { name: 'Save changes' }).click();
+    await officer
+      .getByRole('button', { name: 'Save Changes', exact: true })
+      .click();
     await expect(officer.getByText('Saved ✓')).toBeVisible();
     await expect(
       officer.getByRole('region', { name: 'Python' }).locator('.view-lines'),
@@ -393,7 +413,9 @@ test('Officer prepares and presents a Session through its public lifecycle', asy
       0,
     );
     await officer.getByLabel('Problem title').fill('Corrected ended Problem');
-    await officer.getByRole('button', { name: 'Save changes' }).click();
+    await officer
+      .getByRole('button', { name: 'Save Changes', exact: true })
+      .click();
     await expect(officer.getByText('Saved ✓')).toBeVisible();
     await expect(officer.getByText('ended', { exact: true })).toBeVisible();
     await expect(officer.getByRole('button', { name: 'Go Live' })).toHaveCount(
@@ -427,6 +449,11 @@ test('Officer prepares and presents a Session through its public lifecycle', asy
     ).toBeVisible();
     await member.goto(endedURL);
     await expect(member.getByText('Ended', { exact: true })).toBeVisible();
+    await officer.getByRole('link', { name: 'View as Member' }).click();
+    await expect(officer).toHaveURL(/\/sessions\/[^/]+$/);
+    await expect(
+      officer.getByText('python-corrected-answer-secret'),
+    ).toBeVisible();
   } finally {
     await officerContext.close();
     await memberContext.close();

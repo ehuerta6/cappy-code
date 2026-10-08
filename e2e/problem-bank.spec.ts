@@ -73,7 +73,9 @@ test('Officer edits and reuses a bank Problem as an independent Session snapshot
     await officer.getByRole('button', { name: '+ New session' }).click();
     await officer.getByLabel('Session title').fill(sessionTitle);
     await officer.getByLabel('Session date').fill('2026-10-21');
-    await officer.getByRole('button', { name: 'Save changes' }).click();
+    await officer
+      .getByRole('button', { name: 'Save Changes', exact: true })
+      .click();
     await officer.getByRole('button', { name: 'Manage problems' }).click();
     await officer
       .getByRole('button', { name: 'Add from Problem Bank' })

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import {
   deleteSession,
   duplicateSession,
@@ -82,6 +83,56 @@ export default function SessionEditor({
     branch !== saved.branch || title !== saved.title || date !== saved.date;
   const contentBusy =
     contentSaveState?.dirty === true || contentSaveState?.saving === true;
+  const workspaceDirty = dirty || contentSaveState?.dirty === true;
+  const workspaceSaving = saving || contentSaveState?.saving === true;
+
+  useEffect(() => {
+    if (!workspaceDirty) return;
+    const workspaceUrl = window.location.href;
+    const workspaceHistoryState = window.history.state;
+    const beforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    const guardHistoryNavigation = () => {
+      if (window.location.href === workspaceUrl) return;
+      if (!window.confirm('Leave this Session and discard unsaved changes?')) {
+        window.history.pushState(workspaceHistoryState, '', workspaceUrl);
+      }
+    };
+    const guardNavigation = (event: MouseEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const link = target.closest('a[href]');
+      if (!(link instanceof HTMLAnchorElement)) return;
+      if (
+        link.origin !== window.location.origin ||
+        link.pathname === window.location.pathname
+      )
+        return;
+      if (!window.confirm('Leave this Session and discard unsaved changes?')) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    };
+    window.addEventListener('beforeunload', beforeUnload);
+    window.addEventListener('popstate', guardHistoryNavigation);
+    document.addEventListener('click', guardNavigation, true);
+    return () => {
+      window.removeEventListener('beforeunload', beforeUnload);
+      window.removeEventListener('popstate', guardHistoryNavigation);
+      document.removeEventListener('click', guardNavigation, true);
+    };
+  }, [workspaceDirty]);
+
+  async function saveWorkspace() {
+    if (workspaceSaving) return;
+    const outcomes = await Promise.all([
+      dirty ? save() : Promise.resolve(true),
+      contentSaveState?.dirty ? contentSaveState.save() : Promise.resolve(true),
+    ]);
+    return outcomes.every(Boolean);
+  }
 
   useEffect(() => {
     if (!readinessWarnings) return;
@@ -178,7 +229,7 @@ export default function SessionEditor({
 
   function saveStatus() {
     const failed = saveError || contentSaveState?.error;
-    const isSaving = saving || contentSaveState?.saving;
+    const isSaving = workspaceSaving;
     return (
       <div
         className="flex items-center gap-2 text-sm leading-5"
@@ -189,7 +240,7 @@ export default function SessionEditor({
           <span className="text-danger">Save failed — Retry</span>
         ) : isSaving ? (
           <span className="text-muted">Saving…</span>
-        ) : dirty || contentSaveState?.dirty ? (
+        ) : workspaceDirty ? (
           <span className="text-muted">Unsaved changes</span>
         ) : (
           <span className="text-muted">Saved ✓</span>
@@ -284,8 +335,9 @@ export default function SessionEditor({
     await transition('live');
   }
 
-  async function save() {
-    if (!dirty || busy.current) return;
+  async function save(): Promise<boolean> {
+    if (!dirty) return true;
+    if (busy.current) return false;
     let metadata;
     try {
       metadata = validateSessionMetadata({ branch, title, date });
@@ -293,7 +345,7 @@ export default function SessionEditor({
       setSaveError(
         error instanceof Error ? error.message : 'Check the title and date.',
       );
-      return;
+      return false;
     }
     if (
       metadata.branch === saved.branch &&
@@ -304,7 +356,7 @@ export default function SessionEditor({
       setTitle(metadata.title);
       setDate(metadata.date);
       setSaveError(null);
-      return;
+      return true;
     }
     busy.current = true;
     setSaving(true);
@@ -314,12 +366,14 @@ export default function SessionEditor({
       setBranch(metadata.branch);
       setTitle(metadata.title);
       setSaved(metadata);
+      return true;
     } catch (error) {
       setSaveError(
         isPermissionDenied(error)
           ? 'Permission denied. Your edits are still here; sign in to Officer Mode and retry.'
           : 'Save failed. Your edits are still here. Check your connection and retry.',
       );
+      return false;
     } finally {
       busy.current = false;
       setSaving(false);
@@ -422,6 +476,37 @@ export default function SessionEditor({
           </div>
           <div className="flex flex-wrap items-center justify-start gap-x-3 gap-y-2">
             {saveStatus()}
+            <button
+              className={primaryButtonClass}
+              disabled={
+                !workspaceDirty ||
+                workspaceSaving ||
+                deleting ||
+                transitionPending
+              }
+              onClick={() => void saveWorkspace()}
+            >
+              {workspaceSaving
+                ? 'Saving…'
+                : saveError || contentSaveState?.error
+                  ? 'Retry Save'
+                  : 'Save Changes'}
+            </button>
+            <button
+              className={contextualButtonClass}
+              disabled={!dirty || saving || deleting || transitionPending}
+              onClick={() => void save()}
+            >
+              {saving ? 'Saving…' : saveError ? 'Retry' : 'Save changes'}
+            </button>
+            {(status === 'live' || status === 'ended') && (
+              <Link
+                className={contextualButtonClass}
+                href={`/sessions/${encodeURIComponent(record.id)}`}
+              >
+                View as Member
+              </Link>
+            )}
             {lifecycleActions()}
           </div>
         </div>
@@ -514,11 +599,35 @@ export default function SessionEditor({
           {saveStatus()}
           <button
             className={primaryButtonClass}
+            disabled={
+              !workspaceDirty ||
+              workspaceSaving ||
+              deleting ||
+              transitionPending
+            }
+            onClick={() => void saveWorkspace()}
+          >
+            {workspaceSaving
+              ? 'Saving…'
+              : saveError || contentSaveState?.error
+                ? 'Retry Save'
+                : 'Save Changes'}
+          </button>
+          <button
+            className={contextualButtonClass}
             disabled={!dirty || saving || deleting || transitionPending}
             onClick={() => void save()}
           >
             {saving ? 'Saving…' : saveError ? 'Retry' : 'Save changes'}
           </button>
+          {(status === 'live' || status === 'ended') && (
+            <Link
+              className={contextualButtonClass}
+              href={`/sessions/${encodeURIComponent(record.id)}`}
+            >
+              View as Member
+            </Link>
+          )}
           {lifecycleActions()}
         </div>
       </div>
@@ -625,7 +734,7 @@ export default function SessionEditor({
       </label>
       <button
         className={primaryButtonClass}
-        disabled={dirty || saving || deleting || transitionPending}
+        disabled={saving || deleting || transitionPending}
         onClick={() => setProblemsOpen(true)}
       >
         Manage problems

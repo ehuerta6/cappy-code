@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   createSession,
   listSessions,
@@ -15,7 +16,8 @@ import {
 import { todayCalendarDate } from '@/lib/calendar-date';
 import SessionEditor from './session-editor';
 
-export default function OfficerSessions() {
+export default function OfficerSessions({ sessionId }: { sessionId?: string }) {
+  const router = useRouter();
   const [records, setRecords] = useState<SessionRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -23,6 +25,7 @@ export default function OfficerSessions() {
   const [createError, setCreateError] = useState(false);
   const [createBranch, setCreateBranch] = useState<SessionBranch>('intro');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [dismissedRoute, setDismissedRoute] = useState(false);
   const [revision, setRevision] = useState(0);
   const openAfterLoad = useRef<string | null>(null);
 
@@ -68,6 +71,7 @@ export default function OfficerSessions() {
         date: todayCalendarDate(),
       });
       openAfterLoad.current = id;
+      router.push(`/officer/sessions/${encodeURIComponent(id)}`);
       reload();
     } catch {
       setCreateError(true);
@@ -76,7 +80,8 @@ export default function OfficerSessions() {
     }
   }
 
-  const selected = records.find((record) => record.id === selectedId);
+  const activeId = sessionId && !dismissedRoute ? sessionId : selectedId;
+  const selected = records.find((record) => record.id === activeId);
   if (selected) {
     return (
       <SessionEditor
@@ -85,13 +90,36 @@ export default function OfficerSessions() {
         onDuplicated={(id) => {
           openAfterLoad.current = id;
           setSelectedId(null);
+          router.push(`/officer/sessions/${encodeURIComponent(id)}`);
           reload();
         }}
         onClose={() => {
           setSelectedId(null);
+          setDismissedRoute(true);
+          router.push('/officer');
           reload();
         }}
       />
+    );
+  }
+
+  if (sessionId && !loading && !loadError) {
+    return (
+      <section
+        className="mx-auto w-full max-w-[1440px]"
+        aria-label="Session unavailable"
+      >
+        <h1 className="text-2xl font-semibold">Session unavailable</h1>
+        <p>
+          This Session may have been deleted or you may not have access to it.
+        </p>
+        <button
+          className="min-h-11 rounded border border-border-strong bg-surface px-3 py-2"
+          onClick={() => router.push('/officer')}
+        >
+          Back to Sessions
+        </button>
+      </section>
     );
   }
 
@@ -190,7 +218,13 @@ export default function OfficerSessions() {
                             >
                               <button
                                 className="flex min-h-14 w-full flex-wrap items-center justify-start gap-x-3 gap-y-1 rounded px-2 py-3 text-left text-ink hover:bg-hover focus-visible:relative focus-visible:z-10 disabled:cursor-default disabled:bg-raised disabled:text-muted max-sm:items-start max-sm:flex-col"
-                                onClick={() => setSelectedId(record.id)}
+                                onClick={() => {
+                                  setDismissedRoute(false);
+                                  setSelectedId(record.id);
+                                  router.push(
+                                    `/officer/sessions/${encodeURIComponent(record.id)}`,
+                                  );
+                                }}
                                 disabled={creating}
                               >
                                 <time
