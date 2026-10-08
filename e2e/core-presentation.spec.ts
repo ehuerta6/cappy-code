@@ -136,9 +136,9 @@ test('Officer prepares and presents a Session through its public lifecycle', asy
       2,
     );
     await expect(member.getByText('Time: O(n log n)')).toBeVisible();
-    await expect(
-      member.getByText('Space: O(n)', { exact: true }),
-    ).toHaveCount(2);
+    await expect(member.getByText('Space: O(n)', { exact: true })).toHaveCount(
+      2,
+    );
     await expect(member.getByText('Space: O(1)', { exact: true })).toHaveCount(
       1,
     );
