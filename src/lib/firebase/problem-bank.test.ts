@@ -48,6 +48,7 @@ import {
   addBankProblemToSession,
   createBankProblem,
   listMemberBankProblems,
+  listBankProblemApproachTags,
   materializeSessionProblemInBank,
   updateBankPublication,
   updateBankProblem,
@@ -107,6 +108,31 @@ beforeEach(() => {
 });
 
 describe('Problem Bank snapshots', () => {
+  it('derives tag options from every Bank Approach using the supported taxonomy', async () => {
+    sdk.getDocsFromServer.mockResolvedValueOnce({
+      docs: [
+        {
+          id: 'first',
+          data: () => ({ tags: ['Arrays', 'Hash Map'] }),
+          metadata: { hasPendingWrites: false },
+        },
+        {
+          id: 'second',
+          data: () => ({ tags: ['Arrays', 'Two Pointers', 'Custom tag'] }),
+          metadata: { hasPendingWrites: false },
+        },
+      ],
+    });
+    await expect(
+      listBankProblemApproachTags(['source'], true),
+    ).resolves.toEqual({
+      source: ['Arrays', 'Hash Map', 'Two Pointers'],
+    });
+    expect(sdk.getDocsFromServer).toHaveBeenCalledWith({
+      path: 'problemBank/source/approaches',
+    });
+  });
+
   it('copies metadata and all prepared language Solutions in one batch', async () => {
     const result = await addBankProblemToSession('session', 'source');
     expect(result).toEqual({

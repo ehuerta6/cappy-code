@@ -20,6 +20,7 @@ import {
 import {
   createBankProblem,
   getBankProblem,
+  listBankProblemApproachTags,
   listOfficerBankProblems,
   updateBankPublication,
   updateBankProblem,
@@ -31,6 +32,12 @@ import {
 } from '@/lib/firebase/problem-bank';
 import { listProblemUsageSummaries } from '@/lib/firebase/problem-usage';
 import type { ProblemUsageSummary } from '@/lib/problem-usage';
+import ProblemBankFilters from './problem-bank-filters';
+import {
+  emptyProblemBankFilters,
+  filterProblemBank,
+  type ProblemBankFilters as Filters,
+} from '@/lib/problem-bank-filters';
 
 const labels = {
   custom: 'Custom',
@@ -44,6 +51,10 @@ export default function OfficerProblemBank() {
   const [records, setRecords] = useState<BankProblemRecord[]>([]);
   const [usage, setUsage] = useState<Record<string, ProblemUsageSummary>>({});
   const [usageFailed, setUsageFailed] = useState(false);
+  const [tagsByProblem, setTagsByProblem] = useState<Record<string, string[]>>(
+    {},
+  );
+  const [filters, setFilters] = useState<Filters>(emptyProblemBankFilters);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [content, setContent] = useState<BankProblemContent | null>(null);
   const [savedContent, setSavedContent] = useState<BankProblemContent | null>(
@@ -69,6 +80,12 @@ export default function OfficerProblemBank() {
   );
   const [revision, setRevision] = useState(0);
   const selected = records.find(({ id }) => id === selectedId);
+  const filteredRecords = filterProblemBank(
+    records,
+    filters,
+    tagsByProblem,
+    usage,
+  );
   const dirty =
     Boolean(
       content &&
@@ -121,14 +138,17 @@ export default function OfficerProblemBank() {
     setLoading(true);
     setError(null);
     setUsage({});
+    setTagsByProblem({});
     setUsageFailed(false);
     listOfficerBankProblems().then(
       (items) => {
         if (!active) return;
         setRecords(items);
+        setFilters(emptyProblemBankFilters);
         setUsageFailed(false);
         if (items.length === 0) {
           setUsage({});
+          setTagsByProblem({});
         } else {
           listProblemUsageSummaries(
             items.map(({ id }) => id),
@@ -142,6 +162,20 @@ export default function OfficerProblemBank() {
                 setUsage({});
                 setUsageFailed(true);
               }
+            },
+          );
+          listBankProblemApproachTags(
+            items.map(({ id }) => id),
+            true,
+          ).then(
+            (tags) => {
+              if (active) setTagsByProblem(tags);
+            },
+            () => {
+              if (active)
+                setError(
+                  'Problem filter data could not be loaded. Reload the Problem Bank.',
+                );
             },
           );
         }
@@ -348,9 +382,23 @@ export default function OfficerProblemBank() {
         <p>No reusable Problems yet. Create one here or from a Session.</p>
       ) : (
         <div className="grid gap-6 lg:grid-cols-[minmax(220px,300px)_minmax(0,1fr)]">
+          <div className="lg:col-span-2">
+            <ProblemBankFilters value={filters} onChange={setFilters} />
+            {filteredRecords.length === 0 && (
+              <p role="status">
+                No Problems match these filters.{' '}
+                <button
+                  className={buttonClass}
+                  onClick={() => setFilters(emptyProblemBankFilters)}
+                >
+                  Clear filters
+                </button>
+              </p>
+            )}
+          </div>
           <nav aria-label="Bank Problems" className="space-y-5">
             {problemCategories.map((category) => {
-              const items = records.filter(
+              const items = filteredRecords.filter(
                 (item) => item.category === category,
               );
               return (
@@ -379,6 +427,25 @@ export default function OfficerProblemBank() {
                             summary={usage[item.id]}
                             failed={usageFailed}
                           />
+                          <p className="mb-2 px-3 text-xs text-muted">
+                            {item.difficulty
+                              ? `${item.difficulty[0].toUpperCase()}${item.difficulty.slice(1)}`
+                              : ''}
+                            {tagsByProblem[item.id]?.length
+                              ? ` · ${tagsByProblem[item.id].join(' · ')}`
+                              : ''}
+                            {usage[item.id]?.branches.length
+                              ? ` · ${usage[item.id].branches
+                                  .map((branch) =>
+                                    branch === 'intro'
+                                      ? 'Intro'
+                                      : branch === 'general'
+                                        ? 'General'
+                                        : 'ICPC',
+                                  )
+                                  .join(', ')}`
+                              : ''}
+                          </p>
                         </li>
                       ))}
                     </ul>
@@ -389,7 +456,7 @@ export default function OfficerProblemBank() {
               );
             })}
           </nav>
-          {selected && content && solutions ? (
+          {filteredRecords.length > 0 && selected && content && solutions ? (
             <section className="min-w-0" aria-label={`Edit ${selected.title}`}>
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <p className="m-0 text-sm text-muted" role="status">
@@ -825,7 +892,7 @@ export default function OfficerProblemBank() {
                 failed={usageFailed}
               />
             </section>
-          ) : error ? null : (
+          ) : filteredRecords.length === 0 || error ? null : (
             <p role="status">Loading selected Problem…</p>
           )}
         </div>
