@@ -18,6 +18,10 @@ const api = vi.hoisted(() => ({
   getSolutionsForProblem: vi.fn(),
   updateSolution: vi.fn(),
 }));
+const bankApi = vi.hoisted(() => ({
+  addBankProblemToSession: vi.fn(),
+  listOfficerBankProblems: vi.fn(),
+}));
 vi.mock('@/lib/firebase/problems', async (original) => ({
   ...(await original<typeof import('@/lib/firebase/problems')>()),
   ...api,
@@ -27,6 +31,7 @@ vi.mock('@/lib/firebase/solutions', () => ({
   getSolutionsForProblem: api.getSolutionsForProblem,
   updateSolution: api.updateSolution,
 }));
+vi.mock('@/lib/firebase/problem-bank', () => bankApi);
 vi.mock('@monaco-editor/react', () => ({
   default: ({
     value,
@@ -113,6 +118,13 @@ beforeEach(() => {
     cpp: { code: 'cpp source' },
   });
   api.updateSolution.mockResolvedValue(undefined);
+  bankApi.addBankProblemToSession.mockResolvedValue({
+    id: 'bank-copy',
+    problem: first.problem,
+  });
+  bankApi.listOfficerBankProblems.mockResolvedValue([
+    { id: 'bank-source', title: 'Two Sum', category: 'interview-style' },
+  ]);
 });
 afterEach(() => {
   cleanup();
@@ -126,6 +138,23 @@ function actions() {
   fireEvent.click(screen.getByRole('button', { name: 'Manage Two Sum' }));
 }
 describe('Officer Problem workspace', () => {
+  it('keeps the Session list unchanged when adding a Bank copy fails', async () => {
+    await loaded();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Add from Problem Bank' }),
+    );
+    bankApi.addBankProblemToSession.mockRejectedValueOnce(new Error('offline'));
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Add to Session' }),
+    );
+    expect(
+      await screen.findByText(
+        'Adding Problem from bank failed. Check your connection and try again.',
+      ),
+    ).toBeTruthy();
+    expect(screen.getAllByRole('tab')).toHaveLength(2);
+  });
+
   it('distinguishes loading, failed reads with retry and empty state', async () => {
     api.listProblems
       .mockRejectedValueOnce(new Error('offline'))

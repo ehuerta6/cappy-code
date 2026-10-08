@@ -296,7 +296,12 @@ export default function OfficerProblems({
       aria-label="Session problems"
     >
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="m-0 text-lg font-semibold leading-[26px]">Problems</h2>
+        <div>
+          <h2 className="m-0 text-lg font-semibold leading-[26px]">Problems</h2>
+          <p className="mb-0 mt-1 text-sm text-muted">
+            Changes here apply to this Session only.
+          </p>
+        </div>
         <div className="flex flex-wrap gap-2">
           <button
             className={buttonClass}
@@ -336,6 +341,10 @@ export default function OfficerProblems({
               Close
             </button>
           </div>
+          <p className="my-2 text-sm text-muted">
+            Adding a Problem copies its current content and Solutions into this
+            Session.
+          </p>
           {bankPicker.status === 'loading' ? (
             <p role="status">Loading bank Problems…</p>
           ) : null}

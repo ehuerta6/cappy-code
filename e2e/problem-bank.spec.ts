@@ -4,6 +4,7 @@ import { expect, test } from '@playwright/test';
 const bankTitle = 'Contest Room Route';
 const sessionTitle = 'Problem Bank Snapshot Session';
 const originalStatement = 'Original statement remains in the Session snapshot.';
+const updatedBankPython = 'BANK_PYTHON_UPDATED_AFTER_REUSE';
 
 test('Officer edits and reuses a bank Problem as an independent Session snapshot', async ({
   browser,
@@ -67,7 +68,6 @@ test('Officer edits and reuses a bank Problem as an independent Session snapshot
     await expect(
       officer.getByRole('button', { name: 'Save changes' }),
     ).toBeDisabled();
-
     await officer.goto('/officer');
     await officer.getByLabel('Branch for new session').selectOption('general');
     await officer.getByRole('button', { name: '+ New session' }).click();
@@ -101,6 +101,16 @@ test('Officer edits and reuses a bank Problem as an independent Session snapshot
     await expect(
       officer.getByRole('button', { name: 'Save changes' }),
     ).toBeDisabled();
+    const pythonEditor = officer
+      .getByRole('region', { name: 'Python' })
+      .locator('.monaco-editor');
+    await pythonEditor.click();
+    await officer.keyboard.press('ControlOrMeta+A');
+    await officer.keyboard.insertText(updatedBankPython);
+    await officer.getByRole('button', { name: 'Save changes' }).click();
+    await expect(
+      officer.getByRole('button', { name: 'Save changes' }),
+    ).toBeDisabled();
 
     await officer.goto('/officer');
     await officer.getByRole('button', { name: sessionTitle }).click();
@@ -108,6 +118,12 @@ test('Officer edits and reuses a bank Problem as an independent Session snapshot
     await expect(officer.getByLabel('Description')).toHaveValue(
       originalStatement,
     );
+    await expect(
+      officer.getByRole('region', { name: 'Python' }).locator('.view-lines'),
+    ).toContainText(secrets[0]);
+    await expect(
+      officer.getByRole('region', { name: 'Python' }).locator('.view-lines'),
+    ).not.toContainText(updatedBankPython);
 
     await member.goto('/problem-bank');
     await member.getByRole('link', { name: bankTitle }).click();
@@ -127,7 +143,9 @@ test('Officer edits and reuses a bank Problem as an independent Session snapshot
         fields?: { code?: { stringValue?: string } };
       };
       expect(response.status()).toBe(200);
-      expect(payload.fields?.code?.stringValue).toBe(secrets[index]);
+      expect(payload.fields?.code?.stringValue).toBe(
+        language === 'python' ? updatedBankPython : secrets[index],
+      );
     }
     await expect(member.getByText('Time: O(n)', { exact: true })).toHaveCount(
       3,

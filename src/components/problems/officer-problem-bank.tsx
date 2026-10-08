@@ -216,6 +216,8 @@ export default function OfficerProblemBank() {
           </h1>
           <p className="mb-0 mt-1 text-muted">
             Prepare reusable Problems and their Python, Java, and C++ Solutions.
+            Changes apply to future Session copies; existing Sessions keep their
+            snapshots.
           </p>
         </div>
         <button

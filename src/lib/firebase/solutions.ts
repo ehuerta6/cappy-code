@@ -1,6 +1,6 @@
 import 'client-only';
 
-import { doc, getDocFromServer, setDoc, writeBatch } from 'firebase/firestore';
+import { doc, getDocFromServer, setDoc } from 'firebase/firestore';
 import {
   languages,
   solutionSchema,
@@ -9,7 +9,7 @@ import {
 } from '../domain';
 import { getOfficerAuth } from './auth';
 import { getFirestoreDb } from './client';
-import { bankSolutionPath, problemPath, solutionPath } from './paths';
+import { problemPath, solutionPath } from './paths';
 
 export type ProblemSolutions = Record<Language, Solution>;
 
@@ -83,13 +83,5 @@ export async function updateSolution(
     doc(db, problemPath(sessionId, problemId)),
   );
   if (!problem.exists()) throw new Error('This Problem no longer exists.');
-  const data = problem.data();
-  if (data.bankOrigin === 'session' && typeof data.bankProblemId === 'string') {
-    const batch = writeBatch(db);
-    batch.set(doc(db, solutionPath(sessionId, problemId, language)), saved);
-    batch.set(doc(db, bankSolutionPath(data.bankProblemId, language)), saved);
-    await batch.commit();
-    return;
-  }
   await setDoc(doc(db, solutionPath(sessionId, problemId, language)), saved);
 }

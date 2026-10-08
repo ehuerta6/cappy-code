@@ -211,15 +211,8 @@ export async function updateProblem(
   const reference = doc(db, problemPath(sessionId, problemId));
   const snapshot = await getDocFromServer(reference);
   if (!snapshot.exists()) throw new Error('This Problem no longer exists.');
-  const current = problemSchema.parse(snapshot.data());
-  if (current.bankOrigin === 'session' && current.bankProblemId) {
-    const batch = writeBatch(db);
-    batch.update(reference, updates);
-    batch.update(doc(db, bankProblemPath(current.bankProblemId)), updates);
-    await batch.commit();
-  } else {
-    await updateDoc(reference, updates);
-  }
+  problemSchema.parse(snapshot.data());
+  await updateDoc(reference, updates);
 }
 
 export async function setAnswersVisible(

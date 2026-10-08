@@ -119,6 +119,12 @@ describe('officer problem persistence', () => {
   it('starts an empty session at order zero', async () => {
     expect((await createProblem('session')).problem.order).toBe(0);
   });
+  it('does not report direct creation success when its atomic snapshot batch fails', async () => {
+    const error = new Error('offline');
+    sdk.commit.mockRejectedValueOnce(error);
+    await expect(createProblem('session')).rejects.toBe(error);
+    expect(sdk.batchSet).toHaveBeenCalledTimes(5);
+  });
   it('edits Problem content without writing Solution fields or reveal state', async () => {
     await updateProblem('session', 'problem', {
       ...content,
@@ -137,6 +143,23 @@ describe('officer problem persistence', () => {
       { path: 'sessions/session/problems/problem' },
       { description: 'New statement' },
     );
+  });
+  it('does not synchronize edits from legacy origin-linked Session Problems', async () => {
+    sdk.getDocFromServer.mockResolvedValue({
+      exists: () => true,
+      data: () => ({
+        ...problem,
+        bankProblemId: 'legacy-bank',
+        bankOrigin: 'session',
+      }),
+    });
+    await updateProblem('session', 'problem', { description: 'Session edit' });
+    expect(sdk.updateDoc).toHaveBeenCalledExactlyOnceWith(
+      { path: 'sessions/session/problems/problem' },
+      { description: 'Session edit' },
+    );
+    expect(sdk.batchUpdate).not.toHaveBeenCalled();
+    expect(sdk.batchSet).not.toHaveBeenCalled();
   });
   it('writes constraints as plain Problem metadata', async () => {
     await updateProblem('session', 'problem', {
@@ -323,14 +346,18 @@ describe('officer problem persistence', () => {
   );
   it('atomically removes all fixed solution paths including missing children then problem metadata', async () => {
     await deleteProblem('session', 'problem');
-    expect(
-      sdk.batchDelete.mock.calls.map(([reference]) => reference.path),
-    ).toEqual([
+    const deletedPaths = sdk.batchDelete.mock.calls.map(
+      ([reference]) => reference.path,
+    );
+    expect(deletedPaths).toEqual([
       'sessions/session/problems/problem/solutions/python',
       'sessions/session/problems/problem/solutions/java',
       'sessions/session/problems/problem/solutions/cpp',
       'sessions/session/problems/problem',
     ]);
+    expect(
+      deletedPaths.every((path: string) => !path.startsWith('problemBank/')),
+    ).toBe(true);
     expect(sdk.commit).toHaveBeenCalledTimes(1);
     expect(sdk.getDocsFromServer).toHaveBeenCalledOnce();
     expect(sdk.batchUpdate).toHaveBeenCalledWith(

@@ -46,6 +46,23 @@ describe('officer solution persistence', () => {
       );
     },
   );
+  it('does not synchronize Solution edits from legacy origin-linked Problems', async () => {
+    sdk.getDocFromServer.mockResolvedValue({
+      exists: () => true,
+      data: () => ({
+        bankOrigin: 'session',
+        bankProblemId: 'legacy-bank',
+      }),
+    });
+    await updateSolution('session', 'problem', 'python', {
+      code: 'Session copy',
+      timeComplexity: 'O(n)',
+    });
+    expect(sdk.setDoc).toHaveBeenCalledExactlyOnceWith(
+      { path: 'sessions/session/problems/problem/solutions/python' },
+      { code: 'Session copy', timeComplexity: 'O(n)' },
+    );
+  });
   it('strips extra fields and never writes Problem metadata', async () => {
     await updateSolution('s', 'p', 'python', {
       code: 'code',

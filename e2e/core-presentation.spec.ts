@@ -109,15 +109,35 @@ test('Officer prepares and presents a Session through its public lifecycle', asy
     ).toBeVisible();
 
     await member.goto('/problem-bank');
-    const bankLink = member.getByRole('link', { name: problemTitle });
+    const bankLink = member.getByRole('link', { name: 'Untitled Problem' });
     await expect(bankLink).toBeVisible();
     await bankLink.click();
-    await expect(member.getByText('python-answer-secret')).toBeVisible();
-    await expect(member.getByText('java-answer-secret')).toBeVisible();
-    await expect(member.getByText('cpp-answer-secret')).toBeVisible();
-    await expect(member.getByText('Time: O(n log n)')).toBeVisible();
+    await expect(
+      member.getByRole('heading', { name: 'Untitled Problem' }),
+    ).toBeVisible();
+    await expect(member.getByText(/answer-secret/)).toHaveCount(0);
     const bankProblemId = new URL(member.url()).pathname.split('/').at(-1);
     expect(bankProblemId).toBeTruthy();
+    const bankRecordResponse = await member.request.get(
+      `http://127.0.0.1:8080/v1/projects/demo-cappycode-local/databases/(default)/documents/problemBank/${bankProblemId}`,
+    );
+    const bankRecord = (await bankRecordResponse.json()) as {
+      fields?: {
+        title?: { stringValue?: string };
+        description?: { stringValue?: string };
+      };
+    };
+    expect(bankRecord.fields?.title?.stringValue).toBe('Untitled Problem');
+    expect(bankRecord.fields?.description?.stringValue).toBe('');
+    for (const language of ['python', 'java', 'cpp']) {
+      const response = await member.request.get(
+        `http://127.0.0.1:8080/v1/projects/demo-cappycode-local/databases/(default)/documents/problemBank/${bankProblemId}/solutions/${language}`,
+      );
+      const payload = (await response.json()) as {
+        fields?: { code?: { stringValue?: string } };
+      };
+      expect(payload.fields?.code?.stringValue).toBe('');
+    }
     await member.goto('/');
 
     await officer.getByRole('button', { name: 'Go Live' }).click();
@@ -150,9 +170,9 @@ test('Officer prepares and presents a Session through its public lifecycle', asy
     expect(sessionId).toBeTruthy();
     const liveSessionUrl = member.url();
     await member.goto('/problem-bank');
-    await expect(member.getByRole('link', { name: problemTitle })).toHaveCount(
-      0,
-    );
+    await expect(
+      member.getByRole('link', { name: 'Untitled Problem' }),
+    ).toHaveCount(0);
     await member.goto(`/problem-bank/${bankProblemId}`);
     await expect(
       member.getByRole('heading', { name: 'Problem unavailable' }),
@@ -214,7 +234,7 @@ test('Officer prepares and presents a Session through its public lifecycle', asy
     ).toBeVisible();
     await member.goto('/problem-bank');
     await expect(
-      member.getByRole('link', { name: problemTitle }),
+      member.getByRole('link', { name: 'Untitled Problem' }),
     ).toBeVisible();
     await member.goto('/');
 
@@ -233,7 +253,7 @@ test('Officer prepares and presents a Session through its public lifecycle', asy
     const endedURL = member.url();
     await member.goto('/problem-bank');
     await expect(
-      member.getByRole('link', { name: problemTitle }),
+      member.getByRole('link', { name: 'Untitled Problem' }),
     ).toBeVisible();
     await member.goto(endedURL);
     await member.reload();
