@@ -365,17 +365,31 @@ describe('officer session persistence', () => {
   });
 
   it('atomically deletes known solutions, child problems and the session without changing status', async () => {
-    sdk.getDocsFromServer.mockResolvedValue({
-      docs: [document('first'), document('second')],
-    });
+    sdk.getDocsFromServer.mockImplementation(async (reference) =>
+      reference.path === 'sessions/session-id/problems'
+        ? { docs: [document('first'), document('second')] }
+        : reference.path === 'sessions/session-id/problems/first/approaches'
+          ? { docs: [document('primary')] }
+          : reference.path === 'sessions/session-id/problems/second/approaches'
+            ? { docs: [document('alternate')] }
+            : { docs: [] },
+    );
     await deleteSession('session-id');
     expect(
       sdk.batchDelete.mock.calls.map(([reference]) => reference.path),
     ).toEqual([
+      'sessions/session-id/problems/first/approaches/primary/solutions/python',
+      'sessions/session-id/problems/first/approaches/primary/solutions/java',
+      'sessions/session-id/problems/first/approaches/primary/solutions/cpp',
+      'sessions/session-id/problems/first/approaches/primary',
       'sessions/session-id/problems/first/solutions/python',
       'sessions/session-id/problems/first/solutions/java',
       'sessions/session-id/problems/first/solutions/cpp',
       'sessions/session-id/problems/first',
+      'sessions/session-id/problems/second/approaches/alternate/solutions/python',
+      'sessions/session-id/problems/second/approaches/alternate/solutions/java',
+      'sessions/session-id/problems/second/approaches/alternate/solutions/cpp',
+      'sessions/session-id/problems/second/approaches/alternate',
       'sessions/session-id/problems/second/solutions/python',
       'sessions/session-id/problems/second/solutions/java',
       'sessions/session-id/problems/second/solutions/cpp',
@@ -403,13 +417,39 @@ describe('officer session persistence', () => {
   });
 
   it('deletes an empty session in one batch and rejects oversized cascades before writing', async () => {
-    sdk.getDocsFromServer.mockResolvedValue({ docs: [] });
+    sdk.getDocsFromServer.mockImplementation(async (reference) =>
+      reference.path === 'sessions/empty/problems'
+        ? { docs: [] }
+        : { docs: [] },
+    );
     await deleteSession('empty');
     expect(sdk.batchDelete).toHaveBeenCalledWith({ path: 'sessions/empty' });
     sdk.batchDelete.mockClear();
-    sdk.getDocsFromServer.mockResolvedValue({
-      docs: Array.from({ length: 125 }, (_, index) => document(String(index))),
-    });
+    sdk.getDocsFromServer.mockImplementation(async (reference) =>
+      reference.path === 'sessions/large/problems'
+        ? {
+            docs: Array.from({ length: 125 }, (_, index) =>
+              document(String(index)),
+            ),
+          }
+        : { docs: [] },
+    );
+    await expect(deleteSession('large')).rejects.toThrow('Too many problems');
+    expect(sdk.batchDelete).not.toHaveBeenCalled();
+  });
+
+  it('counts each Approach and its three Solutions toward the Session batch limit', async () => {
+    sdk.getDocsFromServer.mockImplementation(async (reference) =>
+      reference.path === 'sessions/large/problems'
+        ? {
+            docs: Array.from({ length: 63 }, (_, index) =>
+              document(String(index)),
+            ),
+          }
+        : reference.path.startsWith('sessions/large/problems/')
+          ? { docs: [document('primary')] }
+          : { docs: [] },
+    );
     await expect(deleteSession('large')).rejects.toThrow('Too many problems');
     expect(sdk.batchDelete).not.toHaveBeenCalled();
   });

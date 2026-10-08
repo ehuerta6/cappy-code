@@ -9,6 +9,7 @@ import {
 } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ProblemSolutions } from '@/lib/firebase/solutions';
+import { createApproach, getApproaches } from '@/lib/firebase/solutions';
 
 const persistence = vi.hoisted(() => ({ load: vi.fn(), save: vi.fn() }));
 vi.mock('@/lib/firebase/solutions', () => ({
@@ -72,6 +73,18 @@ beforeEach(() => {
   }));
   persistence.load.mockResolvedValue(solutions);
   persistence.save.mockResolvedValue(undefined);
+  vi.mocked(getApproaches).mockImplementation(async (parentPath) => {
+    const [, sessionId, , problemId] = parentPath.split('/');
+    return [
+      {
+        id: 'primary',
+        name: 'Primary Approach',
+        tags: [],
+        order: 0,
+        solutions: await persistence.load(sessionId, problemId),
+      },
+    ];
+  });
 });
 afterEach(() => {
   cleanup();
@@ -96,6 +109,139 @@ async function openOfficer(
 }
 
 describe('solution workspace', () => {
+  it('allows deleting the final draft Approach and adding one again', async () => {
+    const newApproach = {
+      id: 'next',
+      name: 'New Approach',
+      tags: [],
+      order: 0,
+      solutions: {
+        python: { code: '' },
+        java: { code: '' },
+        cpp: { code: '' },
+      },
+    };
+    vi.mocked(createApproach).mockResolvedValue(newApproach);
+    await openOfficer();
+    const deleteButton = screen.getByRole('button', {
+      name: 'Delete Approach',
+    });
+    expect((deleteButton as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(deleteButton);
+    await screen.findByText(
+      'No solution approaches yet. Add an Approach to prepare solutions.',
+    );
+    expect(
+      screen.queryByRole('button', { name: 'Delete Approach' }),
+    ).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Add Approach' }));
+    await screen.findByLabelText('Python Solution, editable');
+    expect(
+      (
+        screen.getByLabelText(
+          'Python Solution, editable',
+        ) as HTMLTextAreaElement
+      ).value,
+    ).toBe('');
+    expect(createApproach).toHaveBeenCalledOnce();
+  });
+
+  it('keeps confirmed state and reports failed structural actions', async () => {
+    vi.mocked(createApproach).mockRejectedValueOnce(new Error('offline'));
+    await openOfficer();
+    fireEvent.click(screen.getByRole('button', { name: 'Add Approach' }));
+    expect((await screen.findByRole('alert')).textContent).toContain(
+      'Approach could not be added. Retry.',
+    );
+    expect(
+      (
+        screen.getByLabelText(
+          'Python Solution, editable',
+        ) as HTMLTextAreaElement
+      ).value,
+    ).toBe('python source');
+  });
+
+  it('blocks switching and structural actions while Solution or metadata edits are unsaved', async () => {
+    vi.mocked(getApproaches).mockResolvedValue([
+      {
+        id: 'primary',
+        name: 'Primary Approach',
+        tags: [],
+        order: 0,
+        solutions,
+      },
+      {
+        id: 'alternate',
+        name: 'Alternate Approach',
+        tags: [],
+        order: 1,
+        solutions,
+      },
+    ]);
+    const saveState = vi.fn();
+    await openOfficer(vi.fn(), saveState);
+    const alternate = screen.getByRole('button', {
+      name: 'Alternate Approach',
+    });
+    const add = screen.getByRole('button', { name: 'Add Approach' });
+    const remove = screen.getByRole('button', { name: 'Delete Approach' });
+    const earlier = screen.getByRole('button', {
+      name: 'Move Approach earlier',
+    });
+    const later = screen.getByRole('button', { name: 'Move Approach later' });
+    fireEvent.change(screen.getByLabelText('Python Solution, editable'), {
+      target: { value: 'unsaved Python' },
+    });
+    for (const button of [alternate, add, remove, earlier, later])
+      expect((button as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(alternate);
+    expect(
+      (
+        screen.getByLabelText(
+          'Python Solution, editable',
+        ) as HTMLTextAreaElement
+      ).value,
+    ).toBe('unsaved Python');
+    await act(async () => saveState.mock.calls.at(-1)?.[0].save());
+    await waitFor(() =>
+      expect((alternate as HTMLButtonElement).disabled).toBe(false),
+    );
+    fireEvent.click(alternate);
+    expect(
+      (
+        screen.getByLabelText(
+          'Python Solution, editable',
+        ) as HTMLTextAreaElement
+      ).value,
+    ).toBe('python source');
+
+    fireEvent.change(screen.getByLabelText('Approach name'), {
+      target: { value: 'Unsaved name' },
+    });
+    const primary = screen.getByRole('button', { name: 'Primary Approach' });
+    expect((primary as HTMLButtonElement).disabled).toBe(true);
+    expect((add as HTMLButtonElement).disabled).toBe(true);
+    expect((remove as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(primary);
+    expect(
+      (screen.getByLabelText('Approach name') as HTMLTextAreaElement).value,
+    ).toBe('Unsaved name');
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Save approach details' }),
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Primary Approach' }),
+      ).toHaveProperty('disabled', false),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Primary Approach' }));
+    expect(
+      (screen.getByLabelText('Approach name') as HTMLTextAreaElement).value,
+    ).toBe('Primary Approach');
+    expect(createApproach).not.toHaveBeenCalled();
+  });
+
   it('renders all three read-only source panels without output or execution controls', () => {
     render(<SolutionWorkspace solutions={solutions} modelPath="member/s/p" />);
     for (const [language, name] of [

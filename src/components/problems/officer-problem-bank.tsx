@@ -58,6 +58,7 @@ export default function OfficerProblemBank() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [publicationSaving, setPublicationSaving] = useState(false);
+  const [structuralBusy, setStructuralBusy] = useState(false);
   const [publicationError, setPublicationError] = useState<boolean | null>(
     null,
   );
@@ -79,6 +80,7 @@ export default function OfficerProblemBank() {
       ),
     ) ||
     JSON.stringify(approaches) !== JSON.stringify(savedApproaches);
+  const approachActionsDisabled = dirty || saving || structuralBusy;
 
   useEffect(() => {
     if (!dirty && !saving) return;
@@ -208,14 +210,21 @@ export default function OfficerProblemBank() {
             ),
           );
       }
-      if (activeApproach)
-        work.push(
-          updateBankApproach(selectedId, { ...activeApproach, solutions }),
-        );
+      // Persist language values before legacy-primary conversion reads the old
+      // flat documents. Once conversion completes, nested data is canonical.
       await Promise.all(work);
+      if (activeApproach)
+        await updateBankApproach(selectedId, {
+          ...activeApproach,
+          solutions,
+        });
+      const savedApproachList = approaches.map((approach) =>
+        approach.id === approachId ? { ...approach, solutions } : approach,
+      );
       setSavedContent(content);
       setSavedSolutions(solutions);
-      setSavedApproaches(approaches);
+      setApproaches(savedApproachList);
+      setSavedApproaches(savedApproachList);
       setRecords((items) =>
         items.map((item) =>
           item.id === selectedId ? { ...item, ...content } : item,
@@ -539,6 +548,7 @@ export default function OfficerProblemBank() {
                       key={approach.id}
                       type="button"
                       className={buttonClass}
+                      disabled={approachActionsDisabled}
                       aria-pressed={approach.id === approachId}
                       onClick={() => {
                         setApproachId(approach.id);
@@ -555,17 +565,27 @@ export default function OfficerProblemBank() {
                 <button
                   className={buttonClass}
                   type="button"
+                  disabled={approachActionsDisabled}
                   onClick={async () => {
-                    const added = await createApproach(
-                      bankProblemPath(selected.id),
-                    );
-                    const items = await getBankProblem(selected.id, true);
-                    const next = items?.approaches ?? [added];
-                    setApproaches(next);
-                    setSavedApproaches(next);
-                    setApproachId(added.id);
-                    setSolutions(added.solutions);
-                    setSavedSolutions(added.solutions);
+                    setError(null);
+                    setStructuralBusy(true);
+                    try {
+                      const added = await createApproach(
+                        bankProblemPath(selected.id),
+                      );
+                      const next = [...approaches, added].map(
+                        (approach, order) => ({ ...approach, order }),
+                      );
+                      setApproaches(next);
+                      setSavedApproaches(next);
+                      setApproachId(added.id);
+                      setSolutions(added.solutions);
+                      setSavedSolutions(added.solutions);
+                    } catch {
+                      setError('Approach could not be added. Retry.');
+                    } finally {
+                      setStructuralBusy(false);
+                    }
                   }}
                 >
                   Add Approach
@@ -621,24 +641,33 @@ export default function OfficerProblemBank() {
                     <button
                       className={buttonClass}
                       type="button"
-                      disabled={saving}
+                      disabled={approachActionsDisabled}
                       onClick={async () => {
-                        await deleteApproach(
-                          bankProblemPath(selected.id),
-                          approachId,
-                        );
-                        const items = await getBankProblem(selected.id, true);
-                        const next = items?.approaches ?? [];
-                        setApproaches(next);
-                        setSavedApproaches(next);
-                        setApproachId(next[0]?.id ?? '');
-                        setSolutions(
-                          next[0]?.solutions ?? {
+                        setError(null);
+                        setStructuralBusy(true);
+                        try {
+                          await deleteApproach(
+                            bankProblemPath(selected.id),
+                            approachId,
+                          );
+                          const next = approaches
+                            .filter((approach) => approach.id !== approachId)
+                            .map((approach, order) => ({ ...approach, order }));
+                          const empty = {
                             python: { code: '' },
                             java: { code: '' },
                             cpp: { code: '' },
-                          },
-                        );
+                          };
+                          setApproaches(next);
+                          setSavedApproaches(next);
+                          setApproachId(next[0]?.id ?? '');
+                          setSolutions(next[0]?.solutions ?? empty);
+                          setSavedSolutions(next[0]?.solutions ?? empty);
+                        } catch {
+                          setError('Approach could not be deleted. Retry.');
+                        } finally {
+                          setStructuralBusy(false);
+                        }
                       }}
                     >
                       Delete Approach
@@ -646,7 +675,7 @@ export default function OfficerProblemBank() {
                     <button
                       className={buttonClass}
                       type="button"
-                      disabled={saving}
+                      disabled={approachActionsDisabled}
                       onClick={async () => {
                         const index = approaches.findIndex(
                           (item) => item.id === approachId,
@@ -657,16 +686,26 @@ export default function OfficerProblemBank() {
                             order[index],
                             order[index - 1],
                           ];
-                          await reorderApproaches(
-                            bankProblemPath(selected.id),
-                            order,
-                          );
-                          const next = order.map((item, i) => ({
-                            ...item,
-                            order: i,
-                          }));
-                          setApproaches(next);
-                          setSavedApproaches(next);
+                          setError(null);
+                          setStructuralBusy(true);
+                          try {
+                            await reorderApproaches(
+                              bankProblemPath(selected.id),
+                              order,
+                            );
+                            const next = order.map((item, i) => ({
+                              ...item,
+                              order: i,
+                            }));
+                            setApproaches(next);
+                            setSavedApproaches(next);
+                          } catch {
+                            setError(
+                              'Approaches could not be reordered. Retry.',
+                            );
+                          } finally {
+                            setStructuralBusy(false);
+                          }
                         }
                       }}
                     >
@@ -675,7 +714,7 @@ export default function OfficerProblemBank() {
                     <button
                       className={buttonClass}
                       type="button"
-                      disabled={saving}
+                      disabled={approachActionsDisabled}
                       onClick={async () => {
                         const index = approaches.findIndex(
                           (item) => item.id === approachId,
@@ -686,16 +725,26 @@ export default function OfficerProblemBank() {
                             order[index + 1],
                             order[index],
                           ];
-                          await reorderApproaches(
-                            bankProblemPath(selected.id),
-                            order,
-                          );
-                          const next = order.map((item, i) => ({
-                            ...item,
-                            order: i,
-                          }));
-                          setApproaches(next);
-                          setSavedApproaches(next);
+                          setError(null);
+                          setStructuralBusy(true);
+                          try {
+                            await reorderApproaches(
+                              bankProblemPath(selected.id),
+                              order,
+                            );
+                            const next = order.map((item, i) => ({
+                              ...item,
+                              order: i,
+                            }));
+                            setApproaches(next);
+                            setSavedApproaches(next);
+                          } catch {
+                            setError(
+                              'Approaches could not be reordered. Retry.',
+                            );
+                          } finally {
+                            setStructuralBusy(false);
+                          }
                         }
                       }}
                     >

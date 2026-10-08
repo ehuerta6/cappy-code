@@ -40,6 +40,7 @@ vi.mock('firebase/firestore', async (importOriginal) => ({
 }));
 import {
   createApproach,
+  deleteApproach,
   getApproaches,
   getSolutionsForProblem,
   updateSolution,
@@ -238,6 +239,33 @@ describe('officer solution persistence', () => {
     expect(sdk.batchUpdate).toHaveBeenCalledWith(
       { path: 'sessions/s/problems/p' },
       { approachesEnabled: true },
+    );
+  });
+
+  it('keeps the intentional empty Session Approach state after deleting the final primary', async () => {
+    sdk.getDocsFromServer.mockResolvedValue({ docs: [] });
+    sdk.getDocFromServer.mockImplementation(async ({ path }) => ({
+      exists: () => path === 'sessions/s/problems/p',
+      metadata: { hasPendingWrites: false },
+      data: () => ({ approachesEnabled: true }),
+    }));
+    await deleteApproach('sessions/s/problems/p', 'primary');
+    expect(sdk.batchDelete).toHaveBeenCalledWith({
+      path: 'sessions/s/problems/p/approaches/primary',
+    });
+    for (const language of languages)
+      expect(sdk.batchDelete).toHaveBeenCalledWith({
+        path: `sessions/s/problems/p/solutions/${language}`,
+      });
+    expect(await getApproaches('sessions/s/problems/p')).toEqual([]);
+    const added = await createApproach('sessions/s/problems/p');
+    expect(added.id).toBe('new-approach');
+    expect(sdk.batchSet).toHaveBeenCalledWith(
+      {
+        id: 'new-approach',
+        path: 'sessions/s/problems/p/approaches/new-approach',
+      },
+      { name: 'New Approach', tags: [], order: 0 },
     );
   });
 });

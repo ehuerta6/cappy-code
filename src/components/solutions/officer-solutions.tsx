@@ -68,6 +68,8 @@ function ProblemSolutionsEditor({
   const [error, setError] = useState(false);
   const [metadataSaving, setMetadataSaving] = useState(false);
   const [metadataError, setMetadataError] = useState<string | undefined>();
+  const [actionError, setActionError] = useState<string | undefined>();
+  const [structuralBusy, setStructuralBusy] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [saveStates, setSaveStates] = useState<
     Record<Language, OfficerSaveState | null>
@@ -114,6 +116,7 @@ function ProblemSolutionsEditor({
     languages.some(
       (language) => saveStates[language]?.dirty || saveStates[language]?.saving,
     );
+  const actionLocked = hasUnsavedContent || structuralBusy || metadataSaving;
   const saveApproachMetadata = useCallback(async () => {
     if (!updatedApproach || !metadataDirty) return true;
     setMetadataSaving(true);
@@ -238,6 +241,7 @@ function ProblemSolutionsEditor({
               key={approach.id}
               className={buttonClass}
               type="button"
+              disabled={actionLocked}
               aria-pressed={approach.id === approachId}
               onClick={() => {
                 setApproachId(approach.id);
@@ -258,19 +262,32 @@ function ProblemSolutionsEditor({
       )}
       {approachesLoaded && (
         <div className="mb-4 flex flex-wrap items-end gap-2">
+          {actionError && <p role="alert">{actionError}</p>}
           {structuralChangesAllowed && (
             <button
               className={buttonClass}
               type="button"
+              disabled={disabled || actionLocked}
               onClick={async () => {
-                const added = await createApproach(parentPath);
-                const refreshed = await getApproaches(parentPath);
-                setApproaches(refreshed);
-                setApproachId(added.id);
-                setApproachName(added.name);
-                setApproachTags('');
-                setSolutions(added.solutions);
-                setCurrentCode({ python: '', java: '', cpp: '' });
+                setActionError(undefined);
+                setStructuralBusy(true);
+                try {
+                  const added = await createApproach(parentPath);
+                  const next = [...approaches, added].map((item, order) => ({
+                    ...item,
+                    order,
+                  }));
+                  setApproaches(next);
+                  setApproachId(added.id);
+                  setApproachName(added.name);
+                  setApproachTags('');
+                  setSolutions(added.solutions);
+                  setCurrentCode({ python: '', java: '', cpp: '' });
+                } catch {
+                  setActionError('Approach could not be added. Retry.');
+                } finally {
+                  setStructuralBusy(false);
+                }
               }}
             >
               Add Approach
@@ -303,21 +320,40 @@ function ProblemSolutionsEditor({
               </button>
             </>
           )}
-          {structuralChangesAllowed && (
+          {selectedApproach && structuralChangesAllowed && (
             <>
               <button
                 className={buttonClass}
                 type="button"
-                disabled={approaches.length < 2}
+                disabled={disabled || actionLocked}
                 onClick={async () => {
-                  await deleteApproach(parentPath, approachId);
-                  const refreshed = await getApproaches(parentPath);
-                  setApproaches(refreshed);
-                  const next = refreshed[0];
-                  setApproachId(next?.id ?? 'primary');
-                  setApproachName(next?.name ?? 'Primary Approach');
-                  setApproachTags(next?.tags.join(', ') ?? '');
-                  setSolutions(next?.solutions ?? null);
+                  setActionError(undefined);
+                  setStructuralBusy(true);
+                  try {
+                    await deleteApproach(parentPath, approachId);
+                    const nextApproaches = approaches
+                      .filter(({ id }) => id !== approachId)
+                      .map((item, order) => ({ ...item, order }));
+                    const next = nextApproaches[0];
+                    setApproaches(nextApproaches);
+                    setApproachId(next?.id ?? 'primary');
+                    setApproachName(next?.name ?? '');
+                    setApproachTags(next?.tags.join(', ') ?? '');
+                    setSolutions(next?.solutions ?? null);
+                    setCurrentCode(
+                      next
+                        ? {
+                            python: next.solutions.python.code,
+                            java: next.solutions.java.code,
+                            cpp: next.solutions.cpp.code,
+                          }
+                        : null,
+                    );
+                  } catch {
+                    setActionError('Approach could not be deleted. Retry.');
+                  } finally {
+                    setStructuralBusy(false);
+                  }
                 }}
               >
                 Delete Approach
@@ -325,6 +361,7 @@ function ProblemSolutionsEditor({
               <button
                 className={buttonClass}
                 type="button"
+                disabled={disabled || actionLocked}
                 onClick={async () => {
                   const index = approaches.findIndex(
                     ({ id }) => id === approachId,
@@ -335,10 +372,20 @@ function ProblemSolutionsEditor({
                       next[index],
                       next[index - 1],
                     ];
-                    await reorderApproaches(parentPath, next);
-                    setApproaches(
-                      next.map((item, order) => ({ ...item, order })),
-                    );
+                    setActionError(undefined);
+                    setStructuralBusy(true);
+                    try {
+                      await reorderApproaches(parentPath, next);
+                      setApproaches(
+                        next.map((item, order) => ({ ...item, order })),
+                      );
+                    } catch {
+                      setActionError(
+                        'Approaches could not be reordered. Retry.',
+                      );
+                    } finally {
+                      setStructuralBusy(false);
+                    }
                   }
                 }}
               >
@@ -347,6 +394,7 @@ function ProblemSolutionsEditor({
               <button
                 className={buttonClass}
                 type="button"
+                disabled={disabled || actionLocked}
                 onClick={async () => {
                   const index = approaches.findIndex(
                     ({ id }) => id === approachId,
@@ -357,10 +405,20 @@ function ProblemSolutionsEditor({
                       next[index + 1],
                       next[index],
                     ];
-                    await reorderApproaches(parentPath, next);
-                    setApproaches(
-                      next.map((item, order) => ({ ...item, order })),
-                    );
+                    setActionError(undefined);
+                    setStructuralBusy(true);
+                    try {
+                      await reorderApproaches(parentPath, next);
+                      setApproaches(
+                        next.map((item, order) => ({ ...item, order })),
+                      );
+                    } catch {
+                      setActionError(
+                        'Approaches could not be reordered. Retry.',
+                      );
+                    } finally {
+                      setStructuralBusy(false);
+                    }
                   }
                 }}
               >

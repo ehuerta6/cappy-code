@@ -335,12 +335,22 @@ describe('officer problem persistence', () => {
       expect(sdk.batchUpdate).not.toHaveBeenCalled();
     },
   );
-  it('atomically removes all fixed solution paths including missing children then problem metadata', async () => {
+  it('atomically removes nested approaches, legacy solutions, and problem metadata', async () => {
+    sdk.getDocsFromServer.mockImplementation(
+      async (reference: { path: string }) =>
+        reference.path === 'sessions/session/problems/problem/approaches'
+          ? { docs: [document('primary')] }
+          : { docs: [] },
+    );
     await deleteProblem('session', 'problem');
     const deletedPaths = sdk.batchDelete.mock.calls.map(
       ([reference]) => reference.path,
     );
     expect(deletedPaths).toEqual([
+      'sessions/session/problems/problem/approaches/primary/solutions/python',
+      'sessions/session/problems/problem/approaches/primary/solutions/java',
+      'sessions/session/problems/problem/approaches/primary/solutions/cpp',
+      'sessions/session/problems/problem/approaches/primary',
       'sessions/session/problems/problem/solutions/python',
       'sessions/session/problems/problem/solutions/java',
       'sessions/session/problems/problem/solutions/cpp',
@@ -350,11 +360,27 @@ describe('officer problem persistence', () => {
       deletedPaths.every((path: string) => !path.startsWith('problemBank/')),
     ).toBe(true);
     expect(sdk.commit).toHaveBeenCalledTimes(1);
-    expect(sdk.getDocsFromServer).toHaveBeenCalledOnce();
+    expect(sdk.getDocsFromServer).toHaveBeenCalledTimes(2);
     expect(sdk.batchUpdate).toHaveBeenCalledWith(
       { path: 'sessions/session' },
       { bankProblemIds: [] },
     );
+  });
+  it('rejects an oversized Problem cascade before creating a batch', async () => {
+    sdk.getDocsFromServer.mockImplementation(
+      async (reference: { path: string }) =>
+        reference.path === 'sessions/s/problems/p/approaches'
+          ? {
+              docs: Array.from({ length: 125 }, (_, index) =>
+                document(`a${index}`),
+              ),
+            }
+          : { docs: [], empty: false },
+    );
+    await expect(deleteProblem('s', 'p')).rejects.toThrow(
+      'Too many approaches',
+    );
+    expect(sdk.commit).not.toHaveBeenCalled();
   });
   it('does not include unmaterialized reserved Bank IDs in the live hiding list', async () => {
     sdk.getDocsFromServer.mockResolvedValue({
