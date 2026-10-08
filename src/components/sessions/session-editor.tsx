@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   deleteSession,
   transitionSession,
@@ -13,6 +13,10 @@ import { formatCalendarDate } from '@/lib/calendar-date';
 import OfficerProblems from '../problems/officer-problems';
 import type { OfficerSaveState } from '@/components/officer-save-state';
 import { isPermissionDenied } from '@/lib/firebase/errors';
+import { listProblems } from '@/lib/firebase/problems';
+import { getApproaches } from '@/lib/firebase/solutions';
+import { problemPath } from '@/lib/firebase/paths';
+import { getProblemReadiness } from '@/lib/preparation-readiness';
 import {
   sessionBranchLabels,
   sessionBranches,
@@ -63,9 +67,24 @@ export default function SessionEditor({
     'live' | 'draft' | 'ended' | null
   >(null);
   const [transitionError, setTransitionError] = useState<string | null>(null);
+  const [readinessWarnings, setReadinessWarnings] = useState<string[] | null>(
+    null,
+  );
+  const [readinessChecking, setReadinessChecking] = useState(false);
+  const readinessDialog = useRef<HTMLDivElement>(null);
   const busy = useRef(false);
   const dirty =
     branch !== saved.branch || title !== saved.title || date !== saved.date;
+
+  useEffect(() => {
+    if (!readinessWarnings) return;
+    readinessDialog.current?.focus();
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === 'Escape') setReadinessWarnings(null);
+    }
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [readinessWarnings]);
 
   function updateTitle(value: string) {
     setTitle(value);
@@ -91,7 +110,7 @@ export default function SessionEditor({
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           <button
             className={primaryButtonClass}
-            onClick={() => void transition('live')}
+            onClick={() => void checkReadinessAndGoLive()}
             disabled={
               !countKnown ||
               noProblems ||
@@ -99,10 +118,15 @@ export default function SessionEditor({
               saving ||
               deleting ||
               transitionPending ||
-              problemBusy
+              problemBusy ||
+              readinessChecking
             }
           >
-            {transitionTarget === 'live' ? 'Starting…' : 'Go Live'}
+            {readinessChecking
+              ? 'Checking…'
+              : transitionTarget === 'live'
+                ? 'Starting…'
+                : 'Go Live'}
           </button>
           {problemCount.status === 'loading' ? (
             <span className="text-sm text-muted">Checking Problems…</span>
@@ -205,6 +229,52 @@ export default function SessionEditor({
       setTransitionPending(false);
       setTransitionTarget(null);
     }
+  }
+
+  async function checkReadinessAndGoLive() {
+    if (
+      busy.current ||
+      dirty ||
+      problemBusy ||
+      problemCount.status !== 'ready' ||
+      problemCount.count === 0
+    )
+      return;
+    setReadinessChecking(true);
+    setTransitionError(null);
+    try {
+      const problems = await listProblems(record.id);
+      const readiness = await Promise.all(
+        problems.map(async ({ id, problem }) => {
+          const approaches = await getApproaches(problemPath(record.id, id));
+          return {
+            title: problem.title,
+            warnings: getProblemReadiness(problem, approaches).warnings,
+          };
+        }),
+      );
+      const warnings = readiness.flatMap(
+        ({ title: problemTitle, warnings: items }) =>
+          items.map((warning) => `${problemTitle}: ${warning}`),
+      );
+      if (warnings.length) {
+        setReadinessWarnings(warnings);
+        return;
+      }
+      setReadinessChecking(false);
+      await transition('live');
+    } catch {
+      setReadinessWarnings([
+        'Readiness could not be checked because Problem content could not be loaded.',
+      ]);
+    } finally {
+      setReadinessChecking(false);
+    }
+  }
+
+  async function continueGoLive() {
+    setReadinessWarnings(null);
+    await transition('live');
   }
 
   async function save() {
@@ -312,6 +382,46 @@ export default function SessionEditor({
             {transitionError}
           </p>
         )}
+        {readinessWarnings && (
+          <div
+            className="my-4 rounded-md border border-warning/50 bg-surface p-4"
+            role="group"
+            aria-labelledby="readiness-warning-heading"
+            tabIndex={-1}
+            ref={readinessDialog}
+          >
+            <h2
+              className="m-0 text-base font-semibold"
+              id="readiness-warning-heading"
+            >
+              Preparation warnings
+            </h2>
+            <p className="my-2">
+              Some Problems are incomplete. Review the warnings, or continue to
+              Go Live anyway.
+            </p>
+            <ul className="my-2 list-disc pl-5">
+              {readinessWarnings.map((warning, index) => (
+                <li key={`${index}-${warning}`}>{warning}</li>
+              ))}
+            </ul>
+            <div className="flex flex-wrap gap-2">
+              <button
+                className={contextualButtonClass}
+                autoFocus
+                onClick={() => setReadinessWarnings(null)}
+              >
+                Cancel
+              </button>
+              <button
+                className={primaryButtonClass}
+                onClick={() => void continueGoLive()}
+              >
+                Go Live Anyway
+              </button>
+            </div>
+          </div>
+        )}
         <OfficerProblems
           sessionId={record.id}
           sessionStatus={status}
@@ -378,6 +488,46 @@ export default function SessionEditor({
         <p className="text-danger" role="alert">
           {transitionError}
         </p>
+      )}
+      {readinessWarnings && (
+        <div
+          className="my-4 rounded-md border border-warning/50 bg-surface p-4"
+          role="group"
+          aria-labelledby="readiness-warning-heading"
+          tabIndex={-1}
+          ref={readinessDialog}
+        >
+          <h2
+            className="m-0 text-base font-semibold"
+            id="readiness-warning-heading"
+          >
+            Preparation warnings
+          </h2>
+          <p className="my-2">
+            Some Problems are incomplete. Review the warnings, or continue to Go
+            Live anyway.
+          </p>
+          <ul className="my-2 list-disc pl-5">
+            {readinessWarnings.map((warning, index) => (
+              <li key={`${index}-${warning}`}>{warning}</li>
+            ))}
+          </ul>
+          <div className="flex flex-wrap gap-2">
+            <button
+              className={contextualButtonClass}
+              autoFocus
+              onClick={() => setReadinessWarnings(null)}
+            >
+              Cancel
+            </button>
+            <button
+              className={primaryButtonClass}
+              onClick={() => void continueGoLive()}
+            >
+              Go Live Anyway
+            </button>
+          </div>
+        </div>
       )}
       <label className="my-5 flex max-w-3xl flex-col gap-2">
         Session branch

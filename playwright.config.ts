@@ -11,6 +11,9 @@ export default defineConfig({
   use: {
     baseURL,
     browserName: 'chromium',
+    // GitHub's Ubuntu runner images include stable Google Chrome. Use it in CI
+    // instead of downloading a separate Playwright Chromium build for E2E.
+    channel: process.env.CI ? 'chrome' : undefined,
     trace: 'retain-on-failure',
   },
   webServer: {

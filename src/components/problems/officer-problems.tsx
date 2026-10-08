@@ -18,6 +18,10 @@ import {
 } from '@/lib/firebase/problems';
 import type { ProblemCountState } from '@/lib/firebase/sessions';
 import type { Problem, SessionStatus } from '@/lib/domain';
+import type { SolutionApproach } from '@/lib/domain';
+import { getApproaches } from '@/lib/firebase/solutions';
+import { problemPath } from '@/lib/firebase/paths';
+import { getProblemReadiness } from '@/lib/preparation-readiness';
 import {
   addBankProblemToSession,
   listOfficerBankProblems,
@@ -48,6 +52,9 @@ export default function OfficerProblems({
   onProblemCountStateChange: (state: ProblemCountState) => void;
 }) {
   const [records, setRecords] = useState<ProblemRecord[]>([]);
+  const [readinessApproaches, setReadinessApproaches] = useState<
+    Record<string, SolutionApproach[]>
+  >({});
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -217,6 +224,29 @@ export default function OfficerProblems({
       cancelled = true;
     };
   }, [sessionId, revision]);
+
+  useEffect(() => {
+    let active = true;
+    if (!records.length) {
+      setReadinessApproaches({});
+      return;
+    }
+    Promise.all(
+      records.map(
+        async ({ id }) =>
+          [id, await getApproaches(problemPath(sessionId, id))] as const,
+      ),
+    )
+      .then((entries) => {
+        if (active) setReadinessApproaches(Object.fromEntries(entries));
+      })
+      .catch(() => {
+        if (active) setReadinessApproaches({});
+      });
+    return () => {
+      active = false;
+    };
+  }, [records, sessionId]);
 
   function reload() {
     setError(null);
@@ -460,6 +490,34 @@ export default function OfficerProblems({
           Unsaved changes. Save or revert changes before leaving this Problem.
         </p>
       )}
+      {selected &&
+        readinessApproaches[selected.id] &&
+        (() => {
+          const readiness = getProblemReadiness(
+            selected.problem,
+            readinessApproaches[selected.id],
+          );
+          return readiness.warnings.length ? (
+            <section
+              className="mb-4 rounded-md border border-warning/50 bg-surface p-3"
+              aria-label={`${selected.problem.title} preparation readiness`}
+            >
+              <h3 className="m-0 text-sm font-semibold">
+                Preparation needs attention
+              </h3>
+              <ul className="my-2 list-disc pl-5 text-sm text-muted">
+                {readiness.warnings.map((warning) => (
+                  <li key={warning}>{warning}</li>
+                ))}
+              </ul>
+            </section>
+          ) : (
+            <p className="mb-4 text-sm text-muted" role="status">
+              {selected.problem.title} has useful Problem content and at least
+              one prepared language per Approach.
+            </p>
+          );
+        })()}
       {workspaceError && (
         <p className="mb-3 text-sm text-danger" role="alert">
           {workspaceError}
@@ -515,26 +573,58 @@ export default function OfficerProblems({
                   role="tablist"
                   aria-label="Problems"
                 >
-                  {records.map((record, index) => (
-                    <button
-                      key={record.id}
-                      ref={(element) => {
-                        if (element) tabs.current.set(record.id, element);
-                        else tabs.current.delete(record.id);
-                      }}
-                      className="min-h-11 shrink-0 border-b-2 border-transparent px-3 py-2 text-muted hover:bg-hover hover:text-ink aria-selected:border-accent aria-selected:font-semibold aria-selected:text-ink"
-                      role="tab"
-                      id={`problem-tab-${record.id}`}
-                      aria-controls={`problem-panel-${record.id}`}
-                      aria-selected={selectedId === record.id}
-                      tabIndex={selectedId === record.id ? 0 : -1}
-                      disabled={blocked}
-                      onKeyDown={(event) => keyboard(event, index)}
-                      onClick={() => select(record.id)}
-                    >
-                      {record.problem.title}
-                    </button>
-                  ))}
+                  {records.map((record, index) =>
+                    (() => {
+                      const readiness = readinessApproaches[record.id]
+                        ? getProblemReadiness(
+                            record.problem,
+                            readinessApproaches[record.id],
+                          )
+                        : null;
+                      return (
+                        <button
+                          key={record.id}
+                          ref={(element) => {
+                            if (element) tabs.current.set(record.id, element);
+                            else tabs.current.delete(record.id);
+                          }}
+                          className="min-h-11 shrink-0 border-b-2 border-transparent px-3 py-2 text-muted hover:bg-hover hover:text-ink aria-selected:border-accent aria-selected:font-semibold aria-selected:text-ink"
+                          role="tab"
+                          id={`problem-tab-${record.id}`}
+                          aria-controls={`problem-panel-${record.id}`}
+                          aria-describedby={
+                            readiness?.warnings.length
+                              ? `problem-readiness-${record.id}`
+                              : undefined
+                          }
+                          aria-selected={selectedId === record.id}
+                          tabIndex={selectedId === record.id ? 0 : -1}
+                          disabled={blocked}
+                          onKeyDown={(event) => keyboard(event, index)}
+                          onClick={() => select(record.id)}
+                        >
+                          {record.problem.title}
+                          {readiness?.warnings.length ? (
+                            <span
+                              className="ml-2 rounded border border-warning/50 px-1.5 py-0.5 text-xs font-medium text-warning"
+                              aria-hidden="true"
+                            >
+                              Needs prep
+                            </span>
+                          ) : null}
+                          {readiness?.warnings.length ? (
+                            <span
+                              className="sr-only"
+                              id={`problem-readiness-${record.id}`}
+                            >
+                              Preparation warnings:{' '}
+                              {readiness.warnings.join('. ')}.
+                            </span>
+                          ) : null}
+                        </button>
+                      );
+                    })(),
+                  )}
                 </div>
                 <button
                   ref={addButton}

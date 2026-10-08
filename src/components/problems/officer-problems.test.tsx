@@ -332,6 +332,24 @@ describe('Officer Problem workspace', () => {
     expect(document.activeElement).toBe(secondTab);
     expect(api.updateProblem).not.toHaveBeenCalled();
   });
+  it('shows per-Problem missing-content guidance in the Officer preparation view', async () => {
+    api.getApproaches.mockResolvedValue([
+      {
+        id: 'primary',
+        name: 'Hash Map',
+        tags: [],
+        order: 0,
+        solutions: {
+          python: { code: 'python source' },
+          java: { code: 'java source' },
+          cpp: { code: '' },
+        },
+      },
+    ]);
+    await loaded();
+    expect(await screen.findAllByText('Needs prep')).toHaveLength(2);
+    expect(await screen.findByText('Hash Map: C++ not prepared')).toBeTruthy();
+  });
   it('reveals answers only after confirmation and hides only the selected problem', async () => {
     start('live');
     await screen.findByRole('tab', { name: 'Two Sum' });

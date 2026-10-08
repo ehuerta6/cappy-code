@@ -64,39 +64,45 @@ export default function SolutionPanel(props: Props) {
       >
         {name}
       </h3>
-      <div
-        className="bg-monaco transition-[height] duration-150 focus-within:outline-2 focus-within:outline-offset-[-2px] focus-within:outline-accent"
-        style={{ height: editorHeight }}
-      >
-        <Editor
-          height={`${editorHeight}px`}
-          language={language}
-          path={modelPath}
-          value={solution.code}
-          beforeMount={defineThemes}
-          theme={dark ? 'cappy-dark' : 'cappy-light'}
-          loading={<p role="status">Loading {name} editor…</p>}
-          onChange={(code) => {
-            if (props.mode === 'officer' && !props.disabled)
-              props.onChange({ ...solution, code: code ?? '' });
-          }}
-          options={{
-            readOnly: mode === 'member' || props.disabled === true,
-            domReadOnly: mode === 'member' || props.disabled === true,
-            ariaLabel: `${name} Solution, ${mode === 'member' ? 'read-only' : props.disabled ? 'temporarily read-only' : 'editable'}`,
-            automaticLayout: true,
-            fontSize: 15,
-            lineHeight: 23,
-            fontFamily:
-              'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
-            minimap: { enabled: false },
-            scrollBeyondLastLine: false,
-            wordWrap: 'off',
-            tabSize: 4,
-            padding: { top: 16, bottom: 16 },
-          }}
-        />
-      </div>
+      {mode === 'member' && !solution.code.trim() ? (
+        <p className="m-0 min-h-32 px-3 py-5 text-sm text-muted" role="status">
+          {name} solution not prepared.
+        </p>
+      ) : (
+        <div
+          className="bg-monaco transition-[height] duration-150 focus-within:outline-2 focus-within:outline-offset-[-2px] focus-within:outline-accent"
+          style={{ height: editorHeight }}
+        >
+          <Editor
+            height={`${editorHeight}px`}
+            language={language}
+            path={modelPath}
+            value={solution.code}
+            beforeMount={defineThemes}
+            theme={dark ? 'cappy-dark' : 'cappy-light'}
+            loading={<p role="status">Loading {name} editor…</p>}
+            onChange={(code) => {
+              if (props.mode === 'officer' && !props.disabled)
+                props.onChange({ ...solution, code: code ?? '' });
+            }}
+            options={{
+              readOnly: mode === 'member' || props.disabled === true,
+              domReadOnly: mode === 'member' || props.disabled === true,
+              ariaLabel: `${name} Solution, ${mode === 'member' ? 'read-only' : props.disabled ? 'temporarily read-only' : 'editable'}`,
+              automaticLayout: true,
+              fontSize: 15,
+              lineHeight: 23,
+              fontFamily:
+                'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
+              minimap: { enabled: false },
+              scrollBeyondLastLine: false,
+              wordWrap: 'off',
+              tabSize: 4,
+              padding: { top: 16, bottom: 16 },
+            }}
+          />
+        </div>
+      )}
       {mode === 'officer' ? (
         <ComplexityEditor
           solution={solution}
