@@ -57,22 +57,28 @@ test('Officer prepares and presents a Session through its public lifecycle', asy
     await officer.getByRole('button', { name: 'Manage problems' }).click();
     await officer.getByRole('button', { name: 'Add problem' }).click();
 
-    await officer.getByLabel('Problem title').fill(problemTitle);
+    await officer
+      .getByRole('textbox', { name: 'Problem title' })
+      .fill(problemTitle);
     await officer
       .getByLabel('Problem category')
       .selectOption('interview-style');
     await officer.getByLabel('Difficulty').selectOption('medium');
     await officer
-      .getByLabel('Description')
+      .getByRole('textbox', { name: 'Description' })
       .fill('Use a **map** to find the matching pair.');
-    await officer.getByLabel('Constraints').fill('2 ≤ values.length ≤ 100,000');
     await officer
-      .getByLabel('LeetCode link (optional)')
+      .getByRole('textbox', { name: 'Constraints' })
+      .fill('2 ≤ values.length ≤ 100,000');
+    await officer
+      .getByRole('textbox', { name: 'LeetCode link (optional)' })
       .fill('https://leetcode.com/problems/two-sum/');
     await officer
-      .getByLabel('Example input')
+      .getByRole('textbox', { name: 'Example input' })
       .fill('values = [4, 8, 12], target = 12');
-    await officer.getByLabel('Expected output').fill('[0, 1]');
+    await officer
+      .getByRole('textbox', { name: 'Expected output' })
+      .fill('[0, 1]');
 
     const solutionCode = [pythonSolution, javaSolution, cppSolution];
     for (let index = 0; index < solutionCode.length; index += 1) {
