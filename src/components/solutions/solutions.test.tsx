@@ -109,6 +109,20 @@ async function openOfficer(
 }
 
 describe('solution workspace', () => {
+  it('shows an unavailable state instead of a blank Member editor for an unprepared language', () => {
+    render(
+      <SolutionWorkspace
+        solutions={{
+          python: { code: 'print(1)' },
+          java: { code: '' },
+          cpp: { code: 'int main() {}' },
+        }}
+        modelPath="member/s/p/a"
+      />,
+    );
+    expect(screen.getByText('Java solution not prepared.')).toBeTruthy();
+    expect(screen.getAllByLabelText(/Solution, read-only/)).toHaveLength(2);
+  });
   it('allows deleting the final draft Approach and adding one again', async () => {
     const newApproach = {
       id: 'next',

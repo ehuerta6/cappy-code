@@ -501,6 +501,30 @@ describe('Officer Sessions surface', () => {
     api.listSessions.mockResolvedValueOnce([record]);
     cleanup();
     await openEditor();
+    api.listProblems.mockResolvedValueOnce([
+      {
+        id: 'p1',
+        problem: {
+          title: 'Pair Sum',
+          description: 'Find it.',
+          exampleInput: 'x',
+          exampleOutput: 'y',
+        },
+      },
+    ]);
+    api.getApproaches.mockResolvedValueOnce([
+      {
+        id: 'a',
+        name: 'Hash Map',
+        tags: [],
+        order: 0,
+        solutions: {
+          python: { code: 'python' },
+          java: { code: 'java' },
+          cpp: { code: 'cpp' },
+        },
+      },
+    ]);
     let resolve!: () => void;
     api.transitionSession.mockReturnValue(
       new Promise<void>((done) => {
@@ -508,10 +532,74 @@ describe('Officer Sessions surface', () => {
       }),
     );
     fireEvent.click(screen.getByRole('button', { name: 'Go Live' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Starting…' }));
-    expect(api.transitionSession).toHaveBeenCalledOnce();
+    await waitFor(() => expect(api.transitionSession).toHaveBeenCalledOnce());
     expect(screen.getByRole('button', { name: 'Starting…' })).toBeTruthy();
     resolve();
+    await screen.findByText('live');
+    expect(api.transitionSession).toHaveBeenCalledWith('session-id', 'live');
+  });
+
+  it('shows specific preparation warnings and permits cancel or explicit Go Live anyway', async () => {
+    api.listProblems.mockResolvedValueOnce([
+      {
+        id: 'p1',
+        problem: {
+          title: 'Pair Sum',
+          description: 'Find it.',
+          exampleInput: 'x',
+          exampleOutput: 'y',
+        },
+      },
+    ]);
+    api.getApproaches.mockResolvedValueOnce([
+      {
+        id: 'a',
+        name: 'Hash Map',
+        tags: [],
+        order: 0,
+        solutions: {
+          python: { code: 'prepared' },
+          java: { code: 'prepared' },
+          cpp: { code: '' },
+        },
+      },
+    ]);
+    await openEditor();
+    fireEvent.click(screen.getByRole('button', { name: 'Go Live' }));
+    expect(
+      await screen.findByText('Pair Sum: Hash Map: C++ not prepared'),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    api.listProblems.mockResolvedValueOnce([
+      {
+        id: 'p1',
+        problem: {
+          title: 'Pair Sum',
+          description: 'Find it.',
+          exampleInput: 'x',
+          exampleOutput: 'y',
+        },
+      },
+    ]);
+    api.getApproaches.mockResolvedValueOnce([
+      {
+        id: 'a',
+        name: 'Hash Map',
+        tags: [],
+        order: 0,
+        solutions: {
+          python: { code: 'prepared' },
+          java: { code: 'prepared' },
+          cpp: { code: '' },
+        },
+      },
+    ]);
+    fireEvent.click(screen.getByRole('button', { name: 'Go Live' }));
+    expect(
+      await screen.findByRole('button', { name: 'Go Live Anyway' }),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Go Live Anyway' }));
     await screen.findByText('live');
     expect(api.transitionSession).toHaveBeenCalledWith('session-id', 'live');
   });
