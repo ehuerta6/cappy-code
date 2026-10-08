@@ -14,6 +14,14 @@ const member = vi.hoisted(() => ({
   listMemberProblems: vi.fn(),
   getMemberSolutions: vi.fn(),
   subscribeToMemberSessions: vi.fn(),
+  memberReadFailureKind: vi.fn((error: unknown) =>
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    error.code === 'permission-denied'
+      ? 'permission'
+      : 'connection',
+  ),
 }));
 const navigation = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }));
 const listeners = vi.hoisted(() => ({
@@ -234,6 +242,29 @@ describe('Member answer visibility realtime', () => {
     expect(screen.queryByText(/permission-denied/)).toBeNull();
     expect(screen.queryByLabelText('Python Solution, read-only')).toBeNull();
     expect(member.getMemberSolutions).toHaveBeenCalledOnce();
+  });
+
+  it('retries a failed Session read and restores the canonical Session', async () => {
+    member.subscribeToMemberSessions.mockImplementationOnce(
+      (
+        _onValue: (records: MemberSessionRecord[]) => void,
+        onError: (error: Error) => void,
+      ) => {
+        queueMicrotask(() => onError(new Error('temporary read failure')));
+        return vi.fn();
+      },
+    );
+    render(<MemberSessionPage sessionId="session" />);
+    expect(
+      await screen.findByText(
+        'Session updates could not be synchronized. Check your connection and retry.',
+      ),
+    ).toBeTruthy();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Retry session updates' }),
+    );
+    expect(await screen.findByText('First description')).toBeTruthy();
+    expect(screen.queryByText(/temporary read failure/)).toBeNull();
   });
 
   it('unsubscribes the Problem listener on unmount', async () => {

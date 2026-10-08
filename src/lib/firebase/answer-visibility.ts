@@ -16,8 +16,13 @@ function listenForValue<T>(
   let active = true;
   const unsubscribe = onSnapshot(
     doc(getFirestoreDb(), path),
+    { includeMetadataChanges: true },
     (snapshot) => {
       if (!active) return;
+      if (snapshot.metadata.fromCache) {
+        onError(new Error('Waiting for a server-confirmed answer visibility.'));
+        return;
+      }
       if (!snapshot.exists()) {
         onError(new Error('The presentation document no longer exists.'));
         return;

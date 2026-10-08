@@ -106,6 +106,7 @@ export default function OfficerProblems({
   const workspaceError =
     problemSaveState?.error || solutionSaveState?.error || materializationError;
   const bankCopyReadyToCreate =
+    sessionStatus === 'draft' &&
     selected?.problem.bankCopyPending === true &&
     selected.problem.title !== 'Untitled Problem';
   const saveWorkspace = useCallback(async () => {
@@ -117,7 +118,7 @@ export default function OfficerProblems({
     ]);
     if (!results.every(Boolean)) return false;
 
-    if (selected?.problem.bankCopyPending) {
+    if (selected?.problem.bankCopyPending && sessionStatus === 'draft') {
       setMaterializingBankCopy(true);
       try {
         const result = await materializeSessionProblemInBank(
@@ -154,13 +155,14 @@ export default function OfficerProblems({
     problemSaveState,
     selected,
     sessionId,
+    sessionStatus,
     solutionSaveState,
     workspaceSaving,
   ]);
 
   useEffect(() => {
-    onBusyChange(blocked || hasPendingBankCopy);
-  }, [blocked, hasPendingBankCopy, onBusyChange]);
+    onBusyChange(blocked || (hasPendingBankCopy && sessionStatus === 'draft'));
+  }, [blocked, hasPendingBankCopy, onBusyChange, sessionStatus]);
 
   useEffect(() => {
     onSaveStateChange(
@@ -358,11 +360,18 @@ export default function OfficerProblems({
           <p className="mb-0 mt-1 text-sm text-muted">
             Changes here apply to this Session only.
           </p>
+          {sessionStatus !== 'draft' && (
+            <p className="mb-0 mt-1 text-sm text-muted">
+              {sessionStatus === 'live'
+                ? 'You can correct existing Problem and Solution content while live. Problems cannot be added, removed, or reordered.'
+                : 'You can correct existing Problem and Solution content. Ended Sessions cannot be structurally changed or reopened.'}
+            </p>
+          )}
         </div>
         <div className="flex flex-wrap gap-2">
           <button
             className={buttonClass}
-            disabled={blocked || sessionStatus === 'live'}
+            disabled={blocked || sessionStatus !== 'draft'}
             onClick={() => void openBankPicker()}
           >
             Add from Problem Bank
@@ -433,7 +442,7 @@ export default function OfficerProblems({
                     </span>
                     <button
                       className={buttonClass}
-                      disabled={blocked}
+                      disabled={blocked || sessionStatus !== 'draft'}
                       onClick={() => addFromBank(entry)}
                     >
                       Add to Session
@@ -530,7 +539,7 @@ export default function OfficerProblems({
                 <button
                   ref={addButton}
                   className={buttonClass}
-                  disabled={blocked || sessionStatus === 'live'}
+                  disabled={blocked || sessionStatus !== 'draft'}
                   onClick={add}
                   aria-label="Add problem"
                 >
@@ -574,21 +583,29 @@ export default function OfficerProblems({
                   </button>
                   <button
                     className={buttonClass}
-                    disabled={blocked || records[0].id === selected.id}
+                    disabled={
+                      blocked ||
+                      sessionStatus !== 'draft' ||
+                      records[0].id === selected.id
+                    }
                     onClick={() => move(-1)}
                   >
                     Move earlier
                   </button>
                   <button
                     className={buttonClass}
-                    disabled={blocked || records.at(-1)?.id === selected.id}
+                    disabled={
+                      blocked ||
+                      sessionStatus !== 'draft' ||
+                      records.at(-1)?.id === selected.id
+                    }
                     onClick={() => move(1)}
                   >
                     Move later
                   </button>
                   <button
                     className={buttonClass}
-                    disabled={blocked}
+                    disabled={blocked || sessionStatus !== 'draft'}
                     onClick={() => {
                       setConfirmDelete(true);
                       setActionsOpen(false);
@@ -627,7 +644,7 @@ export default function OfficerProblems({
                   </button>
                   <button
                     className={buttonClass}
-                    disabled={blocked}
+                    disabled={blocked || sessionStatus !== 'draft'}
                     onClick={remove}
                   >
                     Confirm delete problem

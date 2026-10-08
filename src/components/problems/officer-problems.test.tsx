@@ -355,6 +355,70 @@ describe('Officer Problem workspace', () => {
     expect(screen.queryByRole('button', { name: 'Show answers' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Hide answers' })).toBeNull();
   });
+  it.each(['live', 'ended'] as const)(
+    'keeps %s Problem content editable and blocks structural operations',
+    async (status) => {
+      start(status);
+      await screen.findByRole('tab', { name: 'Two Sum' });
+      expect(
+        (screen.getByLabelText('Problem title') as HTMLInputElement).disabled,
+      ).toBe(false);
+      expect(
+        (
+          screen.getByRole('button', {
+            name: 'Add problem',
+          }) as HTMLButtonElement
+        ).disabled,
+      ).toBe(true);
+      expect(
+        (
+          screen.getByRole('button', {
+            name: 'Add from Problem Bank',
+          }) as HTMLButtonElement
+        ).disabled,
+      ).toBe(true);
+      actions();
+      expect(
+        (
+          screen.getByRole('button', {
+            name: 'Move later',
+          }) as HTMLButtonElement
+        ).disabled,
+      ).toBe(true);
+      expect(
+        (
+          screen.getByRole('button', {
+            name: 'Delete problem',
+          }) as HTMLButtonElement
+        ).disabled,
+      ).toBe(true);
+    },
+  );
+  it('does not materialize a pending Bank copy while correcting an ended Session', async () => {
+    api.listProblems.mockResolvedValue([
+      {
+        ...first,
+        problem: {
+          ...first.problem,
+          bankProblemId: 'reserved-bank',
+          bankOrigin: 'session',
+          bankCopyPending: true,
+        },
+      },
+    ]);
+    start('ended');
+    await screen.findByRole('tab', { name: 'Two Sum' });
+    fireEvent.change(screen.getByLabelText('Problem title'), {
+      target: { value: 'Corrected past title' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    await waitFor(() =>
+      expect(api.updateProblem).toHaveBeenCalledWith('session', 'first', {
+        title: 'Corrected past title',
+      }),
+    );
+    expect(bankApi.materializeSessionProblemInBank).not.toHaveBeenCalled();
+  });
   it('creates and selects confirmed metadata while creation is visibly pending', async () => {
     let resolve!: (record: typeof first) => void;
     api.createProblem.mockReturnValue(

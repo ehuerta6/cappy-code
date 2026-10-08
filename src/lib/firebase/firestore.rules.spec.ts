@@ -324,6 +324,60 @@ describe('Firestore security rules', () => {
     await assertFails(updateDoc(doc(db, 'sessions/ended'), { status: 'live' }));
   });
 
+  it('allows live and ended content corrections but rejects structural Problem writes', async () => {
+    const db = officerDb();
+    const liveProblem = doc(db, 'sessions/live/problems/hidden');
+    const endedProblem = doc(db, 'sessions/ended/problems/hidden');
+
+    await assertSucceeds(
+      updateDoc(liveProblem, {
+        title: 'Corrected title',
+        description: 'Corrected description',
+        constraints: 'n <= 100',
+        exampleInput: '3',
+        exampleOutput: '6',
+        difficulty: 'medium',
+        category: 'interview-style',
+        leetcodeUrl: 'https://leetcode.com/problems/two-sum/',
+      }),
+    );
+    await assertSucceeds(updateDoc(liveProblem, { answersVisible: true }));
+    await assertSucceeds(
+      setDoc(doc(db, 'sessions/live/problems/hidden/solutions/python'), {
+        code: 'corrected source',
+        timeComplexity: 'O(n)',
+      }),
+    );
+    await assertSucceeds(updateDoc(endedProblem, { title: 'Past correction' }));
+    await assertSucceeds(
+      setDoc(doc(db, 'sessions/ended/problems/hidden/solutions/java'), {
+        code: 'corrected ended source',
+        spaceComplexity: 'O(1)',
+      }),
+    );
+
+    for (const problem of [liveProblem, endedProblem]) {
+      await assertFails(updateDoc(problem, { order: 1 }));
+      await assertFails(updateDoc(problem, { bankOrigin: 'bank' }));
+      await assertFails(updateDoc(problem, { bankProblemId: 'new-bank-link' }));
+      await assertFails(updateDoc(problem, { bankCopyPending: false }));
+      await assertFails(
+        setDoc(doc(db, `${problem.path.replace('/hidden', '/new')}`), {
+          title: 'New Problem',
+          order: 1,
+          answersVisible: false,
+        }),
+      );
+      await assertFails(deleteDoc(problem));
+    }
+    await assertFails(
+      updateDoc(doc(db, 'sessions/live'), { bankProblemIds: ['new-link'] }),
+    );
+    await assertFails(
+      updateDoc(doc(db, 'sessions/ended'), { bankProblemIds: ['new-link'] }),
+    );
+  });
+
   it('allows deleting a live Session only when its live claim is released atomically', async () => {
     const db = officerDb();
     await assertFails(deleteDoc(doc(db, 'sessions/live')));

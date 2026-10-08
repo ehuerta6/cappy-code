@@ -20,8 +20,12 @@ interface Listener {
 
 let listeners: Listener[];
 
-function snapshot(value: unknown, exists = true) {
-  return { exists: () => exists, data: () => value };
+function snapshot(value: unknown, exists = true, fromCache = false) {
+  return {
+    exists: () => exists,
+    data: () => value,
+    metadata: { fromCache },
+  };
 }
 
 beforeEach(() => {
@@ -30,6 +34,7 @@ beforeEach(() => {
   sdk.onSnapshot.mockImplementation(
     (
       reference: Listener['reference'],
+      _options: unknown,
       onValue: Listener['onValue'],
       onError: Listener['onError'],
     ) => {
@@ -71,6 +76,22 @@ describe('answer visibility listener', () => {
     expect(onError).toHaveBeenCalledTimes(2);
     expect(onError.mock.calls[0][0].message).toContain('no longer exists');
     expect(onError.mock.calls[1][0].message).toContain('invalid fields');
+  });
+
+  it('does not accept a cached reveal value as canonical', () => {
+    const onValue = vi.fn();
+    const onError = vi.fn();
+    subscribeToAnswersVisible('session', 'problem', onValue, onError);
+    listeners[0].onValue(snapshot({ answersVisible: true }, true, true));
+    expect(onValue).not.toHaveBeenCalled();
+    expect(onError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: expect.stringContaining('server-confirmed'),
+      }),
+    );
+    expect(sdk.onSnapshot.mock.calls[0][1]).toEqual({
+      includeMetadataChanges: true,
+    });
   });
 
   it('ignores queued callbacks after unsubscribe and allows repeated cleanup', () => {

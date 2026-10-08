@@ -8,6 +8,14 @@ const api = vi.hoisted(() => ({
   listMemberProblems: vi.fn(),
   getMemberSolutions: vi.fn(),
   subscribeToMemberSessions: vi.fn(),
+  memberReadFailureKind: vi.fn((error: unknown) =>
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    error.code === 'permission-denied'
+      ? 'permission'
+      : 'connection',
+  ),
 }));
 const navigation = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }));
 const realtime = vi.hoisted(() => ({
@@ -111,6 +119,34 @@ describe('public member page integration', () => {
     expect(
       screen.queryByRole('button', { name: /create|delete|edit/i }),
     ).toBeNull();
+  });
+
+  it('shows a distinct recoverable permission state for Session reads', async () => {
+    api.subscribeToMemberSessions.mockImplementationOnce(
+      (
+        _onValue: (records: MemberSessionRecord[]) => void,
+        onError: (error: Error) => void,
+      ) => {
+        queueMicrotask(() =>
+          onError(
+            Object.assign(new Error('private Firebase detail'), {
+              code: 'permission-denied',
+            }),
+          ),
+        );
+        return vi.fn();
+      },
+    );
+    render(<MemberSessionPage sessionId="intro" />);
+    expect(
+      await screen.findByText(
+        'You do not have permission to view this Session.',
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText(/private Firebase detail/)).toBeNull();
+    expect(
+      screen.getByRole('button', { name: 'Retry session updates' }),
+    ).toBeTruthy();
   });
 
   it('does not request hidden Solutions and shows the hidden-answer state', async () => {

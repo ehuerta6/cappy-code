@@ -60,7 +60,7 @@ function snapshot(id: string, data: unknown, pending = false) {
     id,
     data: () => data,
     exists: () => true,
-    metadata: { hasPendingWrites: pending },
+    metadata: { hasPendingWrites: pending, fromCache: false },
   };
 }
 
@@ -104,8 +104,9 @@ describe('anonymous member persistence', () => {
     const onError = vi.fn();
     const unsubscribe = vi.fn();
     sdk.onSnapshot.mockImplementationOnce(
-      (_query: unknown, next: (value: unknown) => void) => {
+      (_query: unknown, _options: unknown, next: (value: unknown) => void) => {
         next({
+          metadata: { fromCache: false },
           docs: [
             snapshot('live', live),
             snapshot('past', { ...live, status: 'ended' }),
@@ -143,6 +144,43 @@ describe('anonymous member persistence', () => {
         { field: 'status', operator: 'in', value: ['live', 'ended'] },
       ],
     });
+    expect(sdk.onSnapshot.mock.calls[0][1]).toEqual({
+      includeMetadataChanges: true,
+    });
+  });
+
+  it('waits for a server-confirmed discovery snapshot instead of accepting cache data', () => {
+    const onValue = vi.fn();
+    const onError = vi.fn();
+    sdk.onSnapshot.mockImplementationOnce(
+      (_query: unknown, _options: unknown, next: (value: unknown) => void) => {
+        next({ metadata: { fromCache: true }, docs: [] });
+        next({
+          metadata: { fromCache: false },
+          docs: [snapshot('live', live)],
+        });
+        return vi.fn();
+      },
+    );
+
+    subscribeToMemberSessions(onValue, onError);
+    expect(onError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: expect.stringContaining('server-confirmed'),
+      }),
+    );
+    expect(onValue).toHaveBeenCalledOnce();
+    expect(onValue).toHaveBeenCalledWith([
+      {
+        id: 'live',
+        session: {
+          branch: 'intro',
+          title: 'Intro practice',
+          date: '2026-10-04',
+          status: 'live',
+        },
+      },
+    ]);
   });
 
   it('does not expose draft Sessions through a direct public read', async () => {
