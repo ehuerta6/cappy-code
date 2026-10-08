@@ -13,31 +13,36 @@ describe('ProblemBankFilters', () => {
         onChange={onChange}
       />,
     );
-    fireEvent.change(screen.getByLabelText('Difficulty'), {
-      target: { value: 'medium' },
-    });
+    fireEvent.click(screen.getByText('Difficulty'));
+    fireEvent.click(screen.getByLabelText('Medium'));
     expect(onChange).toHaveBeenCalledWith({
       ...emptyProblemBankFilters,
-      difficulty: 'medium',
+      difficulty: ['medium'],
     });
     rerender(
       <ProblemBankFilters
         value={{
           ...emptyProblemBankFilters,
-          difficulty: 'medium',
-          branch: 'general',
+          difficulty: ['easy', 'medium'],
+          branch: ['general'],
         }}
         onChange={onChange}
       />,
     );
     expect(
       screen.getByText(
-        '2 active filters; selected groups are combined with AND.',
+        '3 selected values across 2 groups; values within each group use OR and groups combine with AND.',
       ),
     ).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Clear all (2)' }));
     expect(onChange).toHaveBeenLastCalledWith(emptyProblemBankFilters);
-    expect(screen.getByLabelText('CIC branch')).toBeTruthy();
-    expect(screen.getByLabelText('DSA / algorithm')).toBeTruthy();
+    rerender(
+      <ProblemBankFilters
+        value={emptyProblemBankFilters}
+        onChange={onChange}
+      />,
+    );
+    expect(screen.getByText('CIC branch')).toBeTruthy();
+    expect(screen.getByText('DSA / algorithm')).toBeTruthy();
   });
 });

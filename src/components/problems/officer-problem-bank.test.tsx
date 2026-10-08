@@ -113,15 +113,13 @@ describe('Officer Problem Bank publication', () => {
   it('filters tag and branch results without reloading and presents a clearable empty state', async () => {
     render(<OfficerProblemBank />);
     await screen.findByRole('button', { name: 'Two Sum' });
-    fireEvent.change(screen.getByLabelText('DSA / algorithm'), {
-      target: { value: 'Two Pointers' },
-    });
+    fireEvent.click(screen.getByText('DSA / algorithm'));
+    fireEvent.click(screen.getByLabelText('Two Pointers'));
     expect(screen.getByRole('button', { name: 'Two Sum' })).toBeTruthy();
     expect(api.listOfficerBankProblems).toHaveBeenCalledOnce();
 
-    fireEvent.change(screen.getByLabelText('CIC branch'), {
-      target: { value: 'icpc' },
-    });
+    fireEvent.click(screen.getByText('CIC branch'));
+    fireEvent.click(screen.getByLabelText('ICPC'));
     expect(
       await screen.findByText(/No Problems match these filters/),
     ).toBeTruthy();

@@ -58,7 +58,7 @@ describe('Problem Bank filters', () => {
     expect(
       filterProblemBank(
         problems,
-        { ...emptyProblemBankFilters, difficulty: 'easy' },
+        { ...emptyProblemBankFilters, difficulty: ['easy'] },
         tags,
         allBranches,
       ).map(({ id }) => id),
@@ -66,7 +66,7 @@ describe('Problem Bank filters', () => {
     expect(
       filterProblemBank(
         problems,
-        { ...emptyProblemBankFilters, difficulty: 'medium' },
+        { ...emptyProblemBankFilters, difficulty: ['medium'] },
         tags,
         allBranches,
       ).map(({ id }) => id),
@@ -74,7 +74,7 @@ describe('Problem Bank filters', () => {
     expect(
       filterProblemBank(
         problems,
-        { ...emptyProblemBankFilters, difficulty: 'hard' },
+        { ...emptyProblemBankFilters, difficulty: ['hard'] },
         tags,
         allBranches,
       ).map(({ id }) => id),
@@ -87,11 +87,33 @@ describe('Problem Bank filters', () => {
       expect(
         filterProblemBank(
           problems,
-          { ...emptyProblemBankFilters, category },
+          { ...emptyProblemBankFilters, category: [category] },
           tags,
           allBranches,
         ).every((p) => p.category === category),
       ).toBe(true);
+  });
+
+  it('uses OR for multiple values in difficulty and category groups', () => {
+    expect(
+      filterProblemBank(
+        problems,
+        { ...emptyProblemBankFilters, difficulty: ['easy', 'medium'] },
+        tags,
+        allBranches,
+      ).map(({ id }) => id),
+    ).toEqual(['two-sum', 'shortest']);
+    expect(
+      filterProblemBank(
+        problems,
+        {
+          ...emptyProblemBankFilters,
+          category: ['custom', 'interview-style'],
+        },
+        tags,
+        allBranches,
+      ).map(({ id }) => id),
+    ).toEqual(['two-sum', 'draft-only', 'legacy']);
   });
 
   it('matches branch usage including multi-branch Problems', () => {
@@ -103,7 +125,7 @@ describe('Problem Bank filters', () => {
       expect(
         filterProblemBank(
           problems,
-          { ...emptyProblemBankFilters, branch },
+          { ...emptyProblemBankFilters, branch: [branch] },
           tags,
           allBranches,
         ).map(({ id }) => id),
@@ -111,7 +133,7 @@ describe('Problem Bank filters', () => {
     expect(
       filterProblemBank(
         problems,
-        { ...emptyProblemBankFilters, branch: 'general' },
+        { ...emptyProblemBankFilters, branch: ['general'] },
         tags,
         allBranches,
       ),
@@ -123,7 +145,7 @@ describe('Problem Bank filters', () => {
       expect(
         filterProblemBank(
           problems,
-          { ...emptyProblemBankFilters, tag },
+          { ...emptyProblemBankFilters, tag: [tag] },
           tags,
           allBranches,
         ).map(({ id }) => id),
@@ -131,7 +153,7 @@ describe('Problem Bank filters', () => {
     expect(
       filterProblemBank(
         problems,
-        { ...emptyProblemBankFilters, tag: 'Dynamic Programming' },
+        { ...emptyProblemBankFilters, tag: ['Dynamic Programming'] },
         tags,
         allBranches,
       ).map(({ id }) => id),
@@ -139,7 +161,7 @@ describe('Problem Bank filters', () => {
     expect(
       filterProblemBank(
         problems,
-        { ...emptyProblemBankFilters, tag: 'Queue' },
+        { ...emptyProblemBankFilters, tag: ['Queue'] },
         tags,
         allBranches,
       ),
@@ -147,7 +169,7 @@ describe('Problem Bank filters', () => {
     expect(
       filterProblemBank(
         problems,
-        { ...emptyProblemBankFilters, difficulty: 'medium' },
+        { ...emptyProblemBankFilters, difficulty: ['medium'] },
         tags,
         allBranches,
       ).map(({ id }) => id),
@@ -163,15 +185,34 @@ describe('Problem Bank filters', () => {
     ).toEqual(['Arrays', 'Hash Map', 'Two Pointers']);
   });
 
+  it('uses OR for multiple values in branch and tag groups', () => {
+    expect(
+      filterProblemBank(
+        problems,
+        { ...emptyProblemBankFilters, branch: ['general', 'icpc'] },
+        tags,
+        allBranches,
+      ).map(({ id }) => id),
+    ).toEqual(['two-sum', 'shortest']);
+    expect(
+      filterProblemBank(
+        problems,
+        { ...emptyProblemBankFilters, tag: ['Hash Map', 'Two Pointers'] },
+        tags,
+        allBranches,
+      ).map(({ id }) => id),
+    ).toEqual(['two-sum']);
+  });
+
   it('ANDs filter groups and Clear All restores every Problem', () => {
     expect(
       filterProblemBank(
         problems,
         {
           ...emptyProblemBankFilters,
-          branch: 'general',
-          difficulty: 'easy',
-          tag: 'Two Pointers',
+          branch: ['general'],
+          difficulty: ['easy'],
+          tag: ['Two Pointers'],
         },
         tags,
         allBranches,
@@ -182,8 +223,8 @@ describe('Problem Bank filters', () => {
         problems,
         {
           ...emptyProblemBankFilters,
-          category: 'interview-style',
-          tag: 'Shortest Path',
+          category: ['interview-style'],
+          tag: ['Shortest Path'],
         },
         tags,
         allBranches,
@@ -220,7 +261,7 @@ describe('Problem Bank filters', () => {
     expect(
       filterProblemBank(
         problems,
-        { ...emptyProblemBankFilters, branch: 'general' },
+        { ...emptyProblemBankFilters, branch: ['general'] },
         tags,
         { ...allBranches, 'draft-only': memberUsage },
       ).map(({ id }) => id),
@@ -228,7 +269,7 @@ describe('Problem Bank filters', () => {
     expect(
       filterProblemBank(
         problems,
-        { ...emptyProblemBankFilters, branch: 'general' },
+        { ...emptyProblemBankFilters, branch: ['general'] },
         tags,
         { ...allBranches, 'draft-only': officerUsage },
       ).map(({ id }) => id),
