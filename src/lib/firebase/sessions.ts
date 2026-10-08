@@ -211,12 +211,15 @@ export async function transitionSession(
     if (nextStatus === 'live' || releasesLiveClaim) {
       for (const bankSnapshot of bankSnapshots) {
         if (!bankSnapshot.exists()) continue;
-        transaction.update(
-          bankSnapshot.ref,
-          nextStatus === 'live'
-            ? { isPublic: false, hiddenByLiveSessionId: id }
-            : { isPublic: true, hiddenByLiveSessionId: deleteField() },
-        );
+        const bankData = bankSnapshot.data();
+        const bankUpdates: Record<string, unknown> = {
+          hiddenByLiveSessionId: nextStatus === 'live' ? id : null,
+        };
+        if (typeof bankData.isPublished !== 'boolean') {
+          bankUpdates.isPublished = bankData.isPublic === true;
+          bankUpdates.isPublic = deleteField();
+        }
+        transaction.update(bankSnapshot.ref, bankUpdates);
       }
     }
     transaction.update(reference, {
@@ -288,11 +291,17 @@ export async function deleteSession(id: string): Promise<void> {
   if (releasesLiveClaim) {
     batch.update(liveSessionReference, { sessionId: null });
     for (const bank of bankSnapshots) {
-      if (bank.exists())
-        batch.update(bank.ref, {
-          isPublic: true,
-          hiddenByLiveSessionId: deleteField(),
-        });
+      if (bank.exists()) {
+        const bankData = bank.data();
+        const bankUpdates: Record<string, unknown> = {
+          hiddenByLiveSessionId: null,
+        };
+        if (typeof bankData.isPublished !== 'boolean') {
+          bankUpdates.isPublished = bankData.isPublic === true;
+          bankUpdates.isPublic = deleteField();
+        }
+        batch.update(bank.ref, bankUpdates);
+      }
     }
   }
   batch.delete(sessionReference);

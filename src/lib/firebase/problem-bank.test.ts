@@ -9,6 +9,8 @@ const sdk = vi.hoisted(() => ({
   setDoc: vi.fn(),
   arrayUnion: vi.fn((value: string) => ({ arrayUnion: value })),
   deleteField: vi.fn(() => ({ deleteField: true })),
+  query: vi.fn((reference, ...constraints) => ({ reference, constraints })),
+  where: vi.fn((...args) => args),
   batchSet: vi.fn(),
   batchUpdate: vi.fn(),
   batchDelete: vi.fn(),
@@ -31,6 +33,8 @@ vi.mock('firebase/firestore', async (importOriginal) => ({
   updateDoc: sdk.updateDoc,
   setDoc: sdk.setDoc,
   arrayUnion: sdk.arrayUnion,
+  query: sdk.query,
+  where: sdk.where,
   deleteField: sdk.deleteField,
   writeBatch: () => ({
     set: sdk.batchSet,
@@ -42,7 +46,10 @@ vi.mock('firebase/firestore', async (importOriginal) => ({
 
 import {
   addBankProblemToSession,
+  createBankProblem,
+  listMemberBankProblems,
   materializeSessionProblemInBank,
+  updateBankPublication,
   updateBankProblem,
   updateBankSolution,
 } from './problem-bank';
@@ -131,13 +138,29 @@ describe('Problem Bank snapshots', () => {
     expect(sdk.commit).toHaveBeenCalledOnce();
   });
 
+  it('creates a new Bank Problem unpublished with no live hiding marker', async () => {
+    const result = await createBankProblem();
+    expect(result.isPublished).toBe(false);
+    expect(sdk.batchSet).toHaveBeenCalledWith(
+      expect.objectContaining({ path: 'problemBank/session-copy' }),
+      expect.objectContaining({
+        isPublished: false,
+        hiddenByLiveSessionId: null,
+      }),
+    );
+  });
+
   it('atomically materializes a prepared Session Problem and all three Solutions', async () => {
     await expect(
       materializeSessionProblemInBank('session', 'problem'),
     ).resolves.toEqual({ bankProblemId: 'reserved-bank' });
     expect(sdk.batchSet).toHaveBeenCalledWith(
       { path: 'problemBank/reserved-bank' },
-      { ...metadata, isPublic: true },
+      {
+        ...metadata,
+        isPublished: false,
+        hiddenByLiveSessionId: null,
+      },
     );
     for (const language of ['python', 'java', 'cpp'] as const) {
       expect(sdk.batchSet).toHaveBeenCalledWith(
@@ -158,6 +181,39 @@ describe('Problem Bank snapshots', () => {
       { bankProblemIds: { arrayUnion: 'reserved-bank' } },
     );
     expect(sdk.commit).toHaveBeenCalledOnce();
+  });
+
+  it('changes publication intent explicitly without clearing temporary live hiding', async () => {
+    await updateBankPublication('source', true);
+    expect(sdk.updateDoc).toHaveBeenCalledWith(
+      { path: 'problemBank/source' },
+      {
+        isPublished: true,
+        isPublic: { deleteField: true },
+      },
+    );
+  });
+
+  it('keeps legacy publication deterministic: only legacy true is public intent', async () => {
+    const legacyPublic = {
+      id: 'legacy-public',
+      data: () => ({ ...metadata, isPublic: true }),
+      metadata: { hasPendingWrites: false },
+    };
+    const canonicalPublic = {
+      id: 'canonical-public',
+      data: () => ({ ...metadata, isPublished: true }),
+      metadata: { hasPendingWrites: false },
+    };
+    sdk.getDocsFromServer
+      .mockResolvedValueOnce({ docs: [canonicalPublic] })
+      .mockResolvedValueOnce({ docs: [legacyPublic] });
+    await expect(listMemberBankProblems()).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: 'legacy-public', isPublished: true }),
+        expect.objectContaining({ id: 'canonical-public', isPublished: true }),
+      ]),
+    );
   });
 
   it('does not publish a new direct Session Problem while it is still Untitled', async () => {

@@ -1466,7 +1466,8 @@ const bankProblems = [
     exampleOutput: '6',
     category: 'custom',
     difficulty: 'easy',
-    isPublic: false,
+    isPublished: true,
+    hiddenByLiveSessionId: 'live-hash-maps',
     solution: 'first-repeat',
     complexity: {
       timeComplexity: 'O(n)',
@@ -1485,7 +1486,8 @@ const bankProblems = [
     exampleInput: 'agenda = ["warm-up", "practice", "review"]',
     exampleOutput: '["review", "practice", "warm-up"]',
     category: 'custom',
-    isPublic: true,
+    isPublished: true,
+    hiddenByLiveSessionId: null,
     solution: 'reverse-list',
     complexity: {
       timeComplexity: 'O(n)',
@@ -1505,7 +1507,8 @@ const bankProblems = [
     exampleOutput: '3',
     category: 'interview-style',
     difficulty: 'medium',
-    isPublic: true,
+    isPublished: true,
+    hiddenByLiveSessionId: null,
     leetcodeUrl:
       'https://leetcode.com/problems/longest-substring-without-repeating-characters/',
     solution: 'longest-unique-window',
@@ -1528,7 +1531,8 @@ const bankProblems = [
     exampleOutput: '4',
     category: 'interview-style',
     difficulty: 'easy',
-    isPublic: true,
+    isPublished: true,
+    hiddenByLiveSessionId: null,
     solution: 'binary-search',
     complexity: {
       timeComplexity: 'O(log n)',
@@ -1548,7 +1552,8 @@ const bankProblems = [
     exampleOutput: 'true',
     category: 'competitive-programming',
     difficulty: 'medium',
-    isPublic: true,
+    isPublished: true,
+    hiddenByLiveSessionId: null,
     solution: 'room-reachability',
     complexity: {
       timeComplexity: 'O(V + E)',
@@ -1568,7 +1573,8 @@ const bankProblems = [
     exampleOutput: '3',
     category: 'competitive-programming',
     difficulty: 'hard',
-    isPublic: true,
+    isPublished: true,
+    hiddenByLiveSessionId: null,
     solution: 'number-of-islands',
     complexity: {
       timeComplexity: 'O(rows × columns)',
@@ -1680,7 +1686,7 @@ function assertFixture() {
   const bankIds = new Set(bankProblems.map(({ id }) => id));
   if (
     bankProblems.some(
-      ({ category, isPublic, solution, complexity }) =>
+      ({ category, isPublished, solution, complexity }) =>
         !['custom', 'interview-style', 'competitive-programming'].includes(
           category,
         ) ||
@@ -1691,7 +1697,7 @@ function assertFixture() {
           'spaceComplexity',
           'spaceComplexityReason',
         ].some((field) => !complexity[field]?.trim()) ||
-        typeof isPublic !== 'boolean',
+        typeof isPublished !== 'boolean',
     ) ||
     ['custom', 'interview-style', 'competitive-programming'].some(
       (category) =>
@@ -1705,7 +1711,11 @@ function assertFixture() {
   const hiddenLiveBankProblem = bankProblems.find(
     (problem) => problem.id === liveSession.bankProblemIds?.[0],
   );
-  if (!hiddenLiveBankProblem || hiddenLiveBankProblem.isPublic)
+  if (
+    !hiddenLiveBankProblem ||
+    !hiddenLiveBankProblem.isPublished ||
+    hiddenLiveBankProblem.hiddenByLiveSessionId !== liveSession.id
+  )
     throw new Error(
       'The live Session bank Problem must be hidden from Members.',
     );
