@@ -9,6 +9,7 @@ import {
 } from '@/lib/firebase/problems';
 import type { SaveStateReporter } from '@/components/officer-save-state';
 import type { ProblemCategory } from '@/lib/domain';
+import { isPermissionDenied } from '@/lib/firebase/errors';
 
 export default function ProblemEditor({
   sessionId,
@@ -77,9 +78,11 @@ export default function ProblemEditor({
       setSaved(fields);
       onSaved(fields);
       return true;
-    } catch {
+    } catch (error) {
       setError(
-        'Save failed. Your edits are still here. Check your connection and retry.',
+        isPermissionDenied(error)
+          ? 'Permission denied. Your edits are still here; sign in to Officer Mode and retry.'
+          : 'Save failed. Your edits are still here. Check your connection and retry.',
       );
       return false;
     } finally {

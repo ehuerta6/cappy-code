@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   getMemberSolutions,
   listMemberProblems,
+  memberReadFailureKind,
   subscribeToMemberSessions,
   type MemberSessionRecord,
 } from '@/lib/firebase/member';
@@ -25,10 +26,13 @@ export default function MemberSessionPage({
   const [sessionStatus, setSessionStatus] = useState<
     'loading' | 'error' | 'unavailable'
   >('loading');
+  const [sessionErrorKind, setSessionErrorKind] = useState<
+    'permission' | 'connection'
+  >('connection');
   const [retryVersion, setRetryVersion] = useState(0);
   const [problems, setProblems] = useState<
     | { status: 'loading' }
-    | { status: 'error' }
+    | { status: 'error'; errorKind: 'permission' | 'connection' }
     | { status: 'ready'; records: PublicProblem[] }
   >({ status: 'loading' });
   const problemsRequest = useRef(0);
@@ -45,8 +49,12 @@ export default function MemberSessionPage({
           records: records.map(({ id, problem }) => ({ id, ...problem })),
         });
       }
-    } catch {
-      if (request === problemsRequest.current) setProblems({ status: 'error' });
+    } catch (error) {
+      if (request === problemsRequest.current)
+        setProblems({
+          status: 'error',
+          errorKind: memberReadFailureKind(error),
+        });
     }
   }, [sessionId]);
 
@@ -72,9 +80,10 @@ export default function MemberSessionPage({
           void reloadProblems();
         }
       },
-      () => {
+      (error) => {
         if (active) {
           setSession(null);
+          setSessionErrorKind(memberReadFailureKind(error));
           setSessionStatus('error');
         }
       },
@@ -95,6 +104,7 @@ export default function MemberSessionPage({
   if (!session && sessionStatus === 'error') {
     state = {
       status: 'error',
+      errorKind: sessionErrorKind,
       onRetry: () => setRetryVersion((value) => value + 1),
     };
   } else if (!session) {
@@ -112,7 +122,11 @@ export default function MemberSessionPage({
       selectedProblemId: problemId,
       problems:
         problems.status === 'error'
-          ? { status: 'error', onRetry: () => void reloadProblems() }
+          ? {
+              status: 'error',
+              errorKind: problems.errorKind,
+              onRetry: () => void reloadProblems(),
+            }
           : problems,
       loadRevealedSolutions,
     };

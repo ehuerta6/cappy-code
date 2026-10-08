@@ -7,10 +7,13 @@ const problemTitle = 'Playwright Hidden Answers Problem';
 const pythonSolution = 'PYTHON_E2E_SECRET = "python-answer-secret"';
 const javaSolution = 'String answer = "java-answer-secret";';
 const cppSolution = 'std::string answer = "cpp-answer-secret";';
+const correctedPythonSolution =
+  'PYTHON_E2E_SECRET = "python-corrected-answer-secret"';
 
 test('Officer prepares and presents a Session through its public lifecycle', async ({
   browser,
 }) => {
+  test.setTimeout(60_000);
   execFileSync(process.execPath, ['scripts/reset-emulator.mjs'], {
     cwd: process.cwd(),
     stdio: 'inherit',
@@ -148,30 +151,85 @@ test('Officer prepares and presents a Session through its public lifecycle', asy
 
     await officer.getByRole('button', { name: 'Go Live' }).click();
     await expect(officer.getByText('live', { exact: true })).toBeVisible();
+    await expect(
+      officer.getByText(
+        'You can correct existing Problem and Solution content while live. Problems cannot be added, removed, or reordered.',
+      ),
+    ).toBeVisible();
+    await expect(
+      officer.getByRole('button', { name: 'Add problem' }),
+    ).toBeDisabled();
+    await expect(
+      officer.getByRole('button', { name: 'Add from Problem Bank' }),
+    ).toBeDisabled();
+    await officer
+      .getByRole('button', { name: `Manage ${problemTitle}` })
+      .click();
+    await expect(
+      officer.getByRole('button', { name: 'Move later' }),
+    ).toBeDisabled();
+    await expect(
+      officer.getByRole('button', { name: 'Delete problem' }),
+    ).toBeDisabled();
+    await officer.getByLabel('Problem title').fill('Corrected live Problem');
+    await officer
+      .getByLabel('Description')
+      .fill('Corrected **live** description.');
+    await officer.getByLabel('Constraints').fill('Corrected live constraints.');
+    await officer.getByLabel('Example input').fill('values = [1, 2, 3]');
+    await officer.getByLabel('Expected output').fill('6');
+    await officer.getByLabel('Difficulty').selectOption('hard');
+    await officer
+      .getByLabel('LeetCode link (optional)')
+      .fill('https://leetcode.com/problems/valid-anagram/');
+    const pythonEditor = officer
+      .getByRole('region', { name: 'Python' })
+      .locator('.monaco-editor');
+    await pythonEditor.click();
+    await officer.keyboard.press('ControlOrMeta+A');
+    await officer.keyboard.insertText(correctedPythonSolution);
+    await expect(
+      officer.getByRole('region', { name: 'Python' }).locator('.view-lines'),
+    ).toContainText('python-corrected-answer-secret');
+    await officer.getByLabel('Time Complexity').nth(0).fill('O(n log n)');
+    await officer.getByRole('button', { name: 'Save changes' }).click();
+    await expect(officer.getByText('Saved ✓')).toBeVisible();
+    await expect(
+      officer.getByRole('region', { name: 'Python' }).locator('.view-lines'),
+    ).toContainText('python-corrected-answer-secret');
     await member.goto('/');
     await member.getByRole('link', { name: sessionTitle }).click();
     await expect(member).toHaveURL(/\/sessions\/.*\/.*$/);
     await expect(
-      member.getByRole('heading', { name: problemTitle }),
+      member.getByRole('heading', { name: 'Corrected live Problem' }),
     ).toBeVisible();
-    await expect(
-      member.getByText('Use a map to find the matching pair.'),
-    ).toBeVisible();
+    await expect(member.getByText('Corrected live description.')).toBeVisible();
     await expect(
       member.getByText('2 ≤ values.length ≤ 100,000', { exact: true }),
-    ).toBeVisible();
-    await expect(
-      member.getByText('values = [4, 8, 12], target = 12'),
-    ).toBeVisible();
-    await expect(member.getByText('[0, 1]', { exact: true })).toBeVisible();
-    await expect(member.getByText(/medium/i)).toBeVisible();
+    ).toHaveCount(0);
+    await expect(member.getByText('Corrected live constraints.')).toBeVisible();
+    await expect(member.getByText('values = [1, 2, 3]')).toBeVisible();
+    await expect(member.getByText('6', { exact: true })).toBeVisible();
+    await expect(member.getByText(/hard/i)).toBeVisible();
     await expect(
       member.getByRole('link', { name: /LeetCode/ }),
-    ).toHaveAttribute('href', 'https://leetcode.com/problems/two-sum/');
+    ).toHaveAttribute('href', 'https://leetcode.com/problems/valid-anagram/');
     await expect(
       member.getByText('Waiting for the officer to reveal the solution…'),
     ).toBeVisible();
     await expect(member.getByText(/answer-secret/)).toHaveCount(0);
+    const liveUrlBackedProblem = member.url();
+    await member.reload();
+    await expect(member).toHaveURL(liveUrlBackedProblem);
+    await expect(
+      member.getByRole('heading', { name: 'Corrected live Problem' }),
+    ).toBeVisible();
+    await expect(member.getByText('Corrected live constraints.')).toBeVisible();
+    await expect(member.getByText('values = [1, 2, 3]')).toBeVisible();
+    await expect(member.getByText(/answer-secret/)).toHaveCount(0);
+    await expect(
+      member.getByText('Waiting for the officer to reveal the solution…'),
+    ).toBeVisible();
     const sessionId = new URL(member.url()).pathname.split('/').at(-2);
     expect(sessionId).toBeTruthy();
     const liveSessionUrl = member.url();
@@ -204,16 +262,18 @@ test('Officer prepares and presents a Session through its public lifecycle', asy
     expect(protectedBody).not.toContain('python-answer-secret');
 
     await officer.getByRole('button', { name: 'Show answers' }).click();
-    await expect(member.getByText('python-answer-secret')).toBeVisible();
+    await expect(
+      member.getByText('python-corrected-answer-secret'),
+    ).toBeVisible();
     await expect(member.getByText('java-answer-secret')).toBeVisible();
     await expect(member.getByText('cpp-answer-secret')).toBeVisible();
     await expect(member.getByText('Time: O(n)', { exact: true })).toHaveCount(
-      2,
+      1,
     );
     await expect(member.getByText('Space: O(n)', { exact: true })).toHaveCount(
       2,
     );
-    await expect(member.getByText('Time: O(n log n)')).toBeVisible();
+    await expect(member.getByText('Time: O(n log n)')).toHaveCount(2);
     await expect(member.getByText('Space: O(1)')).toBeVisible();
     await expect(member.getByText('Python time analysis.')).toBeVisible();
     await expect(member.getByText('Java time analysis.')).toBeVisible();
@@ -221,6 +281,13 @@ test('Officer prepares and presents a Session through its public lifecycle', asy
     await expect(member.getByText('Python space analysis.')).toBeVisible();
     await expect(member.getByText('Java space analysis.')).toBeVisible();
     await expect(member.getByText('C++ space analysis.')).toBeVisible();
+    const revealedLiveUrl = member.url();
+    await member.reload();
+    await expect(member).toHaveURL(revealedLiveUrl);
+    await expect(
+      member.getByText('python-corrected-answer-secret'),
+    ).toBeVisible();
+    await expect(member.getByText('Time: O(n log n)')).toHaveCount(2);
     await officer.getByRole('button', { name: 'Hide answers' }).click();
     await expect(
       member.getByText('Waiting for the officer to reveal the solution…'),
@@ -249,12 +316,37 @@ test('Officer prepares and presents a Session through its public lifecycle', asy
     await member.getByRole('link', { name: sessionTitle }).click();
     await expect(member).toHaveURL(/\/sessions\/.*\/.*$/);
     await expect(
-      member.getByRole('heading', { name: problemTitle }),
+      member.getByRole('heading', { name: 'Corrected live Problem' }),
     ).toBeVisible();
     officer.once('dialog', (dialog) => dialog.accept());
     await officer.getByRole('button', { name: 'End Session' }).click();
     await expect(member.getByText('Ended', { exact: true })).toBeVisible();
-    await expect(member.getByText('python-answer-secret')).toBeVisible();
+    await expect(
+      member.getByText('python-corrected-answer-secret'),
+    ).toBeVisible();
+
+    await expect(
+      officer.getByText(
+        'You can correct existing Problem and Solution content. Ended Sessions cannot be structurally changed or reopened.',
+      ),
+    ).toBeVisible();
+    await expect(officer.getByRole('button', { name: 'Go Live' })).toHaveCount(
+      0,
+    );
+    await officer.getByLabel('Problem title').fill('Corrected ended Problem');
+    await officer.getByRole('button', { name: 'Save changes' }).click();
+    await expect(officer.getByText('Saved ✓')).toBeVisible();
+    await expect(officer.getByText('ended', { exact: true })).toBeVisible();
+    await expect(officer.getByRole('button', { name: 'Go Live' })).toHaveCount(
+      0,
+    );
+    await member.reload();
+    await expect(
+      member.getByRole('heading', { name: 'Corrected ended Problem' }),
+    ).toBeVisible();
+    await expect(
+      member.getByText('python-corrected-answer-secret'),
+    ).toBeVisible();
 
     const endedURL = member.url();
     await member.goto('/problem-bank');

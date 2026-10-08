@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import {
   subscribeToMemberSessions,
+  memberReadFailureKind,
   type MemberSessionRecord,
 } from '@/lib/firebase/member';
 import {
@@ -13,7 +14,7 @@ import {
 export default function MemberHome() {
   const [sessions, setSessions] = useState<
     | { status: 'loading' }
-    | { status: 'error' }
+    | { status: 'error'; errorKind: 'permission' | 'connection' }
     | { status: 'ready'; records: MemberSessionRecord[] }
   >({ status: 'loading' });
   const [retryVersion, setRetryVersion] = useState(0);
@@ -22,13 +23,21 @@ export default function MemberHome() {
     setSessions({ status: 'loading' });
     return subscribeToMemberSessions(
       (records) => setSessions({ status: 'ready', records }),
-      () => setSessions({ status: 'error' }),
+      (error) =>
+        setSessions({
+          status: 'error',
+          errorKind: memberReadFailureKind(error),
+        }),
     );
   }, [retryVersion]);
 
   let state: DiscoveryState;
   if (sessions.status === 'error') {
-    state = { status: 'error', onRetry: () => setRetryVersion((v) => v + 1) };
+    state = {
+      status: 'error',
+      errorKind: sessions.errorKind,
+      onRetry: () => setRetryVersion((v) => v + 1),
+    };
   } else if (sessions.status === 'loading') {
     state = { status: 'loading' };
   } else if (sessions.records.length) {

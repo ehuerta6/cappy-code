@@ -20,6 +20,7 @@ import {
   type Solution,
 } from '../domain';
 import { getFirestoreDb } from './client';
+import { isPermissionDenied } from './errors';
 import { sessionPath, solutionPath } from './paths';
 
 export interface MemberSessionRecord {
@@ -38,6 +39,12 @@ export interface MemberProblemRecord {
 }
 
 export type MemberSolutions = Record<(typeof languages)[number], Solution>;
+
+export function memberReadFailureKind(
+  error: unknown,
+): 'permission' | 'connection' {
+  return isPermissionDenied(error) ? 'permission' : 'connection';
+}
 
 const publicStatuses: SessionStatus[] = ['live', 'ended'];
 
@@ -125,7 +132,16 @@ export function subscribeToMemberSessions(
         collection(getFirestoreDb(), 'sessions'),
         where('status', 'in', publicStatuses),
       ),
+      { includeMetadataChanges: true },
       (snapshot) => {
+        // Cache results can describe a Session that has since gone draft or
+        // an obsolete reveal value. Wait for a server-confirmed snapshot.
+        if (snapshot.metadata.fromCache) {
+          onError(
+            new Error('Waiting for a server-confirmed Session snapshot.'),
+          );
+          return;
+        }
         try {
           const records = snapshot.docs.map((document) => {
             if (document.metadata.hasPendingWrites)

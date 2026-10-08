@@ -39,7 +39,11 @@ export interface PublicProblem {
 
 export type DiscoveryState =
   | { status: 'loading' }
-  | { status: 'error'; onRetry: () => void }
+  | {
+      status: 'error';
+      errorKind?: 'permission' | 'connection';
+      onRetry: () => void;
+    }
   | { status: 'empty' }
   | { status: 'ready'; sessions: PublicSessionSummary[] };
 
@@ -73,7 +77,11 @@ export function PublicSessionDiscovery({ state }: { state: DiscoveryState }) {
             className="mt-4 rounded-md border border-border-strong bg-surface p-4"
             role="alert"
           >
-            <p>Sessions could not be loaded.</p>
+            <p>
+              {state.errorKind === 'permission'
+                ? 'You do not have permission to view these Sessions.'
+                : 'Sessions could not be loaded. Check your connection and retry.'}
+            </p>
             <button
               className="min-h-11 rounded border border-border-strong bg-surface px-3 py-2 text-ink hover:bg-hover"
               type="button"
@@ -195,7 +203,11 @@ function SessionGroup({
 
 export type SessionState =
   | { status: 'loading' }
-  | { status: 'error'; onRetry: () => void }
+  | {
+      status: 'error';
+      errorKind?: 'permission' | 'connection';
+      onRetry: () => void;
+    }
   | { status: 'unavailable'; kind?: 'session' | 'problem' }
   | {
       status: 'ready';
@@ -203,7 +215,11 @@ export type SessionState =
       selectedProblemId?: string | null;
       problems:
         | { status: 'loading' }
-        | { status: 'error'; onRetry: () => void }
+        | {
+            status: 'error';
+            errorKind?: 'permission' | 'connection';
+            onRetry: () => void;
+          }
         | { status: 'ready'; records: PublicProblem[] };
       loadRevealedSolutions: (problemId: string) => Promise<ProblemSolutions>;
     };
@@ -252,7 +268,11 @@ export function PublicSessionView({ state }: { state: SessionState }) {
           className="mx-auto w-[calc(100%-32px)] max-w-[1440px] py-6 sm:w-[calc(100%-48px)]"
           role="alert"
         >
-          <p>Session updates could not be synchronized.</p>
+          <p>
+            {state.errorKind === 'permission'
+              ? 'You do not have permission to view this Session.'
+              : 'Session updates could not be synchronized. Check your connection and retry.'}
+          </p>
           <button
             className="min-h-11 rounded border border-border-strong bg-surface px-3 py-2 text-ink hover:bg-hover"
             type="button"
@@ -351,7 +371,11 @@ function SessionContent({
           className="mt-4 rounded-md border border-border-strong bg-surface p-4"
           role="alert"
         >
-          <p>Problems could not be loaded.</p>
+          <p>
+            {state.problems.errorKind === 'permission'
+              ? 'You do not have permission to view these Problems.'
+              : 'Problems could not be loaded. Check your connection and retry.'}
+          </p>
           <button
             className="min-h-11 rounded border border-border-strong bg-surface px-3 py-2 hover:bg-hover"
             type="button"

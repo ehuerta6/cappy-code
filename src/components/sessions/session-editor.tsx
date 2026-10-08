@@ -12,6 +12,7 @@ import { validateSessionMetadata } from '@/lib/session-metadata';
 import { formatCalendarDate } from '@/lib/calendar-date';
 import OfficerProblems from '../problems/officer-problems';
 import type { OfficerSaveState } from '@/components/officer-save-state';
+import { isPermissionDenied } from '@/lib/firebase/errors';
 import {
   sessionBranchLabels,
   sessionBranches,
@@ -195,7 +196,9 @@ export default function SessionEditor({
         error instanceof Error &&
           error.message.startsWith('Another Session is already live.')
           ? error.message
-          : 'Session status could not be changed. Check your connection and try again.',
+          : isPermissionDenied(error)
+            ? 'Permission denied. Sign in to Officer Mode and retry the status change.'
+            : 'Session status could not be changed. Check your connection and try again.',
       );
     } finally {
       busy.current = false;
@@ -234,9 +237,11 @@ export default function SessionEditor({
       setBranch(metadata.branch);
       setTitle(metadata.title);
       setSaved(metadata);
-    } catch {
+    } catch (error) {
       setSaveError(
-        'Save failed. Your edits are still here. Check your connection and retry.',
+        isPermissionDenied(error)
+          ? 'Permission denied. Your edits are still here; sign in to Officer Mode and retry.'
+          : 'Save failed. Your edits are still here. Check your connection and retry.',
       );
     } finally {
       busy.current = false;

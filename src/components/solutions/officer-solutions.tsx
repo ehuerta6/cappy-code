@@ -13,6 +13,7 @@ import type {
   OfficerSaveState,
   SaveStateReporter,
 } from '@/components/officer-save-state';
+import { isPermissionDenied } from '@/lib/firebase/errors';
 
 const buttonClass =
   'min-h-10 rounded border border-border-strong bg-surface px-3 py-2 text-ink hover:bg-hover disabled:cursor-default disabled:bg-raised disabled:text-muted';
@@ -230,7 +231,7 @@ function EditableSolution({
   const [draft, setDraft] = useState(initial);
   const [saved, setSaved] = useState(initial);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const busy = useRef(false);
   const dirty =
     draft.code !== saved.code ||
@@ -243,13 +244,17 @@ function EditableSolution({
     const submitted = draft;
     busy.current = true;
     setSaving(true);
-    setError(false);
+    setError(null);
     try {
       await updateSolution(sessionId, problemId, language, submitted);
       setSaved(submitted);
       return true;
-    } catch {
-      setError(true);
+    } catch (error) {
+      setError(
+        isPermissionDenied(error)
+          ? 'Permission denied. Sign in to Officer Mode and retry.'
+          : 'Save failed. Check your connection and retry.',
+      );
       return false;
     } finally {
       busy.current = false;
@@ -266,7 +271,7 @@ function EditableSolution({
             saving,
             error:
               error && isDirty
-                ? `${languageNames[language]} Solution could not be saved.`
+                ? `${languageNames[language]} Solution could not be saved. ${error}`
                 : undefined,
             save,
           }
@@ -292,7 +297,7 @@ function EditableSolution({
             next.spaceComplexity === saved.spaceComplexity &&
             next.spaceComplexityReason === saved.spaceComplexityReason
           )
-            setError(false);
+            setError(null);
         }}
       />
     </div>

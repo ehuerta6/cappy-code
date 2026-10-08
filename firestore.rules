@@ -56,6 +56,33 @@ service cloud.firestore {
         && data.category in ['custom', 'interview-style', 'competitive-programming'];
     }
 
+    function changesOnlyProblemContent() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        'title',
+        'description',
+        'constraints',
+        'exampleInput',
+        'exampleOutput',
+        'leetcodeUrl',
+        'difficulty',
+        'category'
+      ]);
+    }
+
+    function changesOnlyLiveProblemContent() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        'title',
+        'description',
+        'constraints',
+        'exampleInput',
+        'exampleOutput',
+        'leetcodeUrl',
+        'difficulty',
+        'category',
+        'answersVisible'
+      ]);
+    }
+
     function bankProblemUsedLiveAfter(problemId) {
       return existsAfter(liveSessionPath())
         ? bankProblemUsedLiveWithPointer(problemId)
@@ -83,7 +110,7 @@ service cloud.firestore {
         && hasSupportedBranch(request.resource.data);
       allow update: if isOfficer()
         && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['bankProblemIds'])
-          || resource.data.status != 'live')
+          || resource.data.status == 'draft')
         && ((!resource.data.keys().hasAny(['branch'])
             && !request.resource.data.keys().hasAny(['branch']))
           || hasSupportedBranch(request.resource.data))
@@ -101,13 +128,15 @@ service cloud.firestore {
       match /problems/{problemId} {
         allow read: if isOfficer() || sessionIsPublic(sessionId);
         allow create: if isOfficer()
-          && get(/databases/$(database)/documents/sessions/$(sessionId)).data.status != 'live';
+          && get(/databases/$(database)/documents/sessions/$(sessionId)).data.status == 'draft';
         allow update: if isOfficer()
-          && (get(/databases/$(database)/documents/sessions/$(sessionId)).data.status != 'live'
-            || request.resource.data.get('bankProblemId', null)
-              == resource.data.get('bankProblemId', null));
+          && (get(/databases/$(database)/documents/sessions/$(sessionId)).data.status == 'draft'
+            || (get(/databases/$(database)/documents/sessions/$(sessionId)).data.status == 'live'
+              && changesOnlyLiveProblemContent())
+            || (get(/databases/$(database)/documents/sessions/$(sessionId)).data.status == 'ended'
+              && changesOnlyProblemContent()));
         allow delete: if isOfficer()
-          && get(/databases/$(database)/documents/sessions/$(sessionId)).data.status != 'live';
+          && get(/databases/$(database)/documents/sessions/$(sessionId)).data.status == 'draft';
 
         match /solutions/{language} {
           allow read: if (isOfficer() && language in ['python', 'java', 'cpp']) ||
