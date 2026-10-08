@@ -6,6 +6,7 @@ import AppHeader from '@/components/app-header';
 import ProblemMarkdown from '@/components/member/problem-markdown';
 import SolutionWorkspace from '@/components/solutions/solution-workspace';
 import { problemCategories } from '@/lib/domain';
+import type { SolutionApproach } from '@/lib/domain';
 import {
   getBankProblem,
   listMemberBankProblems,
@@ -127,12 +128,19 @@ export function MemberBankProblemPage({ problemId }: { problemId: string }) {
   const [state, setState] = useState<
     | { status: 'loading' }
     | { status: 'unavailable' }
-    | { status: 'ready'; problem: BankProblemRecord; solutions: BankSolutions }
+    | {
+        status: 'ready';
+        problem: BankProblemRecord;
+        solutions: BankSolutions;
+        approaches: SolutionApproach[];
+      }
   >({ status: 'loading' });
   const [retry, setRetry] = useState(0);
+  const [approachId, setApproachId] = useState('primary');
   useEffect(() => {
     let active = true;
     setState({ status: 'loading' });
+    setApproachId('primary');
     getBankProblem(problemId).then(
       (result) => {
         if (active)
@@ -263,10 +271,45 @@ export function MemberBankProblemPage({ problemId }: { problemId: string }) {
               >
                 Prepared Solutions
               </h2>
-              <SolutionWorkspace
-                solutions={state.solutions}
-                modelPath={`bank/${problemId}`}
-              />
+              {state.approaches.length === 0 ? (
+                <p>No solution approaches are available.</p>
+              ) : (
+                <>
+                  {state.approaches.length > 1 && (
+                    <div
+                      className="mb-4 flex flex-wrap gap-2"
+                      aria-label="Solution approaches"
+                    >
+                      {state.approaches.map((approach) => (
+                        <button
+                          key={approach.id}
+                          type="button"
+                          aria-pressed={approach.id === approachId}
+                          className="rounded border border-border-strong bg-surface px-3 py-2"
+                          onClick={() => setApproachId(approach.id)}
+                        >
+                          {approach.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {state.approaches.find(({ id }) => id === approachId)?.tags
+                    .length ? (
+                    <p className="mb-3 text-sm text-muted">
+                      {state.approaches
+                        .find(({ id }) => id === approachId)
+                        ?.tags.join(' · ')}
+                    </p>
+                  ) : null}
+                  <SolutionWorkspace
+                    solutions={
+                      state.approaches.find(({ id }) => id === approachId)
+                        ?.solutions ?? state.solutions
+                    }
+                    modelPath={`bank/${problemId}/${approachId}`}
+                  />
+                </>
+              )}
             </section>
           </>
         )}

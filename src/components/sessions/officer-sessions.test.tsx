@@ -20,6 +20,7 @@ const api = vi.hoisted(() => ({
   updateProblem: vi.fn(),
   getSolutionsForProblem: vi.fn(),
   updateSolution: vi.fn(),
+  getApproaches: vi.fn(),
 }));
 vi.mock('@/lib/firebase/sessions', () => api);
 vi.mock('@/lib/firebase/problems', async (original) => ({
@@ -30,6 +31,11 @@ vi.mock('@/lib/firebase/problems', async (original) => ({
 vi.mock('@/lib/firebase/solutions', () => ({
   getSolutionsForProblem: api.getSolutionsForProblem,
   updateSolution: api.updateSolution,
+  getApproaches: api.getApproaches,
+  createApproach: vi.fn(),
+  deleteApproach: vi.fn(),
+  reorderApproaches: vi.fn(),
+  saveApproach: vi.fn(),
 }));
 vi.mock('client-only', () => ({}));
 vi.mock('@monaco-editor/react', () => ({
@@ -80,6 +86,19 @@ beforeEach(() => {
     java: { code: '' },
     cpp: { code: '' },
   });
+  api.getApproaches.mockResolvedValue([
+    {
+      id: 'primary',
+      name: 'Primary Approach',
+      tags: [],
+      order: 0,
+      solutions: {
+        python: { code: 'python source' },
+        java: { code: 'java source' },
+        cpp: { code: 'cpp source' },
+      },
+    },
+  ]);
   api.updateSolution.mockResolvedValue(undefined);
   api.createSession.mockResolvedValue('new-session');
   api.updateSession.mockResolvedValue(undefined);
@@ -804,6 +823,7 @@ describe('Officer Sessions surface', () => {
         {
           code: 'static source',
         },
+        'primary',
       ),
     );
     await waitFor(() =>
@@ -878,6 +898,7 @@ describe('Officer Sessions surface', () => {
       'problem',
       'java',
       { code: 'new java source' },
+      'primary',
     ]);
     expect(api.updateProblem).toHaveBeenCalledOnce();
     await waitFor(() =>
@@ -939,6 +960,7 @@ describe('Officer Sessions surface', () => {
         'problem',
         'cpp',
         { code: 'changed source' },
+        'primary',
       ),
     );
     await screen.findByRole('alert');

@@ -1,5 +1,11 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const api = vi.hoisted(() => ({
@@ -9,10 +15,20 @@ const api = vi.hoisted(() => ({
   updateBankProblem: vi.fn(),
   updateBankPublication: vi.fn(),
   updateBankSolution: vi.fn(),
+  updateBankApproach: vi.fn(),
 }));
 
 vi.mock('client-only', () => ({}));
 vi.mock('@/lib/firebase/problem-bank', () => api);
+vi.mock('@/lib/firebase/solutions', () => ({
+  createApproach: vi.fn(),
+  deleteApproach: vi.fn(),
+  reorderApproaches: vi.fn(),
+}));
+vi.mock('@/lib/firebase/paths', async (original) => ({
+  ...(await original<typeof import('@/lib/firebase/paths')>()),
+  bankProblemPath: (id: string) => `problemBank/${id}`,
+}));
 vi.mock('@monaco-editor/react', () => ({
   default: ({
     value,
@@ -33,6 +49,7 @@ vi.mock('@monaco-editor/react', () => ({
 }));
 
 import OfficerProblemBank from './officer-problem-bank';
+import { createApproach } from '@/lib/firebase/solutions';
 
 const record = {
   id: 'two-sum',
@@ -46,11 +63,34 @@ const record = {
   isTemporarilyHidden: false,
 };
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
+
 beforeEach(() => {
   vi.resetAllMocks();
   api.listOfficerBankProblems.mockResolvedValue([record]);
   api.getBankProblem.mockResolvedValue({
     problem: record,
+    approaches: [
+      {
+        id: 'primary',
+        name: 'Primary Approach',
+        tags: [],
+        order: 0,
+        solutions: {
+          python: { code: 'def two_sum(): pass' },
+          java: { code: 'class Solution {}' },
+          cpp: { code: 'class Solution {};' },
+        },
+      },
+    ],
     solutions: {
       python: { code: 'def two_sum(): pass' },
       java: { code: 'class Solution {}' },
@@ -60,11 +100,116 @@ beforeEach(() => {
   api.updateBankProblem.mockResolvedValue(undefined);
   api.updateBankPublication.mockResolvedValue(undefined);
   api.updateBankSolution.mockResolvedValue(undefined);
+  api.updateBankApproach.mockResolvedValue(undefined);
 });
 
 afterEach(() => cleanup());
 
 describe('Officer Problem Bank publication', () => {
+  it('preserves dirty active Approach edits until Save and switches only after persistence', async () => {
+    const primary = {
+      id: 'primary',
+      name: 'Primary Approach',
+      tags: [],
+      order: 0,
+      solutions: {
+        python: { code: 'primary python' },
+        java: { code: 'primary java' },
+        cpp: { code: 'primary cpp' },
+      },
+    };
+    const alternate = {
+      id: 'alternate',
+      name: 'Alternate Approach',
+      tags: [],
+      order: 1,
+      solutions: {
+        python: { code: 'alternate python' },
+        java: { code: 'alternate java' },
+        cpp: { code: 'alternate cpp' },
+      },
+    };
+    api.getBankProblem.mockResolvedValueOnce({
+      problem: record,
+      approaches: [primary, alternate],
+      solutions: primary.solutions,
+    });
+    const saveSolution = deferred<void>();
+    api.updateBankSolution.mockReturnValueOnce(saveSolution.promise);
+    render(<OfficerProblemBank />);
+    await screen.findByLabelText('Python Solution, editable');
+    const alternateButton = screen.getByRole('button', {
+      name: 'Alternate Approach',
+    });
+    fireEvent.change(screen.getByLabelText('Approach name'), {
+      target: { value: 'Edited Primary' },
+    });
+    fireEvent.change(screen.getByLabelText('Python Solution, editable'), {
+      target: { value: 'edited primary python' },
+    });
+    for (const button of [
+      alternateButton,
+      screen.getByRole('button', { name: 'Add Approach' }),
+      screen.getByRole('button', { name: 'Delete Approach' }),
+      screen.getByRole('button', { name: 'Move Approach earlier' }),
+      screen.getByRole('button', { name: 'Move Approach later' }),
+    ])
+      expect((button as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(alternateButton);
+    expect(
+      (
+        screen.getByLabelText(
+          'Python Solution, editable',
+        ) as HTMLTextAreaElement
+      ).value,
+    ).toBe('edited primary python');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    await waitFor(() => expect(api.updateBankSolution).toHaveBeenCalledOnce());
+    expect(api.updateBankApproach).not.toHaveBeenCalled();
+    saveSolution.resolve();
+    await waitFor(() => expect(api.updateBankApproach).toHaveBeenCalledOnce());
+    expect(api.updateBankApproach).toHaveBeenCalledWith(
+      'two-sum',
+      expect.objectContaining({
+        id: 'primary',
+        name: 'Edited Primary',
+        solutions: expect.objectContaining({
+          python: { code: 'edited primary python' },
+        }),
+      }),
+    );
+    await waitFor(() =>
+      expect((alternateButton as HTMLButtonElement).disabled).toBe(false),
+    );
+    fireEvent.click(alternateButton);
+    expect(
+      (
+        screen.getByLabelText(
+          'Python Solution, editable',
+        ) as HTMLTextAreaElement
+      ).value,
+    ).toBe('alternate python');
+  });
+
+  it('keeps changes dirty and reports structural failures without changing the approach list', async () => {
+    vi.mocked(createApproach).mockRejectedValueOnce(new Error('offline'));
+    render(<OfficerProblemBank />);
+    await screen.findByLabelText('Python Solution, editable');
+    fireEvent.click(screen.getByRole('button', { name: 'Add Approach' }));
+    expect((await screen.findByRole('alert')).textContent).toContain(
+      'Approach could not be added. Retry.',
+    );
+    expect(screen.queryByRole('button', { name: 'New Approach' })).toBeNull();
+    expect(
+      (
+        screen.getByLabelText(
+          'Python Solution, editable',
+        ) as HTMLTextAreaElement
+      ).value,
+    ).toBe('def two_sum(): pass');
+  });
+
   it('shows the saved publication intent and preserves unsaved content edits', async () => {
     render(<OfficerProblemBank />);
     await screen.findByRole('button', { name: 'Two Sum' });

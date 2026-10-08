@@ -17,6 +17,7 @@ const api = vi.hoisted(() => ({
   deleteProblem: vi.fn(),
   getSolutionsForProblem: vi.fn(),
   updateSolution: vi.fn(),
+  getApproaches: vi.fn(),
 }));
 const bankApi = vi.hoisted(() => ({
   addBankProblemToSession: vi.fn(),
@@ -31,6 +32,11 @@ vi.mock('client-only', () => ({}));
 vi.mock('@/lib/firebase/solutions', () => ({
   getSolutionsForProblem: api.getSolutionsForProblem,
   updateSolution: api.updateSolution,
+  getApproaches: api.getApproaches,
+  createApproach: vi.fn(),
+  deleteApproach: vi.fn(),
+  reorderApproaches: vi.fn(),
+  saveApproach: vi.fn(),
 }));
 vi.mock('@/lib/firebase/problem-bank', () => bankApi);
 vi.mock('@monaco-editor/react', () => ({
@@ -121,6 +127,19 @@ beforeEach(() => {
     java: { code: 'java source' },
     cpp: { code: 'cpp source' },
   });
+  api.getApproaches.mockResolvedValue([
+    {
+      id: 'primary',
+      name: 'Primary Approach',
+      tags: [],
+      order: 0,
+      solutions: {
+        python: { code: 'python source' },
+        java: { code: 'java source' },
+        cpp: { code: 'cpp source' },
+      },
+    },
+  ]);
   api.updateSolution.mockResolvedValue(undefined);
   bankApi.addBankProblemToSession.mockResolvedValue({
     id: 'bank-copy',
@@ -157,11 +176,19 @@ describe('Officer Problem workspace', () => {
       },
     };
     api.listProblems.mockResolvedValue([pendingProblem]);
-    api.getSolutionsForProblem.mockResolvedValue({
-      python: { code: '' },
-      java: { code: '' },
-      cpp: { code: '' },
-    });
+    api.getApproaches.mockResolvedValueOnce([
+      {
+        id: 'primary',
+        name: 'Primary Approach',
+        tags: [],
+        order: 0,
+        solutions: {
+          python: { code: '' },
+          java: { code: '' },
+          cpp: { code: '' },
+        },
+      },
+    ]);
     start();
     await screen.findByRole('tab', { name: 'Untitled Problem' });
     fireEvent.change(screen.getByLabelText('Problem title'), {
@@ -245,7 +272,7 @@ describe('Officer Problem workspace', () => {
         'Reusable Bank copy could not be created. Your Session content is saved; retry to create the copy.',
       ),
     ).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Retry' }));
     await waitFor(() =>
       expect(bankApi.materializeSessionProblemInBank).toHaveBeenCalledTimes(2),
     );
@@ -652,7 +679,9 @@ describe('Officer Problem workspace', () => {
     expect(python.getAttribute('data-path')).toBe(
       'officer/session/first/python',
     );
-    expect(api.getSolutionsForProblem).toHaveBeenCalledWith('session', 'first');
+    expect(api.getApproaches).toHaveBeenCalledWith(
+      'sessions/session/problems/first',
+    );
     fireEvent.change(screen.getByLabelText('Expected output'), {
       target: { value: 'shared expected result' },
     });
@@ -674,6 +703,7 @@ describe('Officer Problem workspace', () => {
         {
           code: 'updated C++ source',
         },
+        'primary',
       ),
     );
     expect(api.updateProblem).toHaveBeenCalledWith('session', 'first', {
@@ -682,9 +712,8 @@ describe('Officer Problem workspace', () => {
     await waitFor(() => expect(onBusyChange).toHaveBeenLastCalledWith(false));
     fireEvent.click(screen.getByRole('tab', { name: 'Anagram' }));
     await screen.findByLabelText('Python Solution, editable');
-    expect(api.getSolutionsForProblem).toHaveBeenLastCalledWith(
-      'session',
-      'second',
+    expect(api.getApproaches).toHaveBeenLastCalledWith(
+      'sessions/session/problems/second',
     );
     expect(onBusyChange.mock.calls.length).toBeGreaterThan(initialBusyChanges);
   });

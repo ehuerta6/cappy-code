@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  getMemberSolutions,
+  getMemberApproaches,
   listMemberProblems,
   memberReadFailureKind,
   subscribeToMemberSessions,
@@ -96,7 +96,7 @@ export default function MemberSessionPage({
   }, [reloadProblems, retryVersion, sessionId]);
 
   const loadRevealedSolutions = useCallback(
-    (problemId: string) => getMemberSolutions(sessionId, problemId),
+    (problemId: string) => getMemberApproaches(sessionId, problemId),
     [sessionId],
   );
 

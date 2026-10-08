@@ -709,6 +709,7 @@ export default function OfficerProblems({
                     key={`${sessionId}/${selected.id}`}
                     sessionId={sessionId}
                     problemId={selected.id}
+                    structuralChangesAllowed={sessionStatus === 'draft'}
                     disabled={operation !== null}
                     onPendingChange={setSolutionPending}
                     onSaveStateChange={setSolutionSaveState}

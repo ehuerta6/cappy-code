@@ -121,7 +121,7 @@ describe('Problem Bank snapshots', () => {
     });
     expect(sdk.batchSet).toHaveBeenCalledWith(
       { path: 'sessions/session/problems/session-copy' },
-      result.problem,
+      { ...result.problem, approachesEnabled: true },
     );
     for (const language of ['python', 'java', 'cpp'] as const) {
       expect(sdk.batchSet).toHaveBeenCalledWith(
@@ -131,6 +131,17 @@ describe('Problem Bank snapshots', () => {
         solutions[language],
       );
     }
+    expect(sdk.batchSet).toHaveBeenCalledWith(
+      { path: 'sessions/session/problems/session-copy/approaches/primary' },
+      { name: 'Primary Approach', tags: [], order: 0 },
+    );
+    for (const language of ['python', 'java', 'cpp'] as const)
+      expect(sdk.batchSet).toHaveBeenCalledWith(
+        {
+          path: `sessions/session/problems/session-copy/approaches/primary/solutions/${language}`,
+        },
+        solutions[language],
+      );
     expect(sdk.batchUpdate).toHaveBeenCalledWith(
       { path: 'sessions/session' },
       { bankProblemIds: { arrayUnion: 'source' } },
@@ -160,6 +171,7 @@ describe('Problem Bank snapshots', () => {
         ...metadata,
         isPublished: false,
         hiddenByLiveSessionId: null,
+        approachesEnabled: true,
       },
     );
     for (const language of ['python', 'java', 'cpp'] as const) {
@@ -275,10 +287,18 @@ describe('Problem Bank snapshots', () => {
       'problemBank/reserved-bank/solutions/python',
       'problemBank/reserved-bank/solutions/java',
       'problemBank/reserved-bank/solutions/cpp',
+      'problemBank/reserved-bank/approaches/primary',
+      'problemBank/reserved-bank/approaches/primary/solutions/python',
+      'problemBank/reserved-bank/approaches/primary/solutions/java',
+      'problemBank/reserved-bank/approaches/primary/solutions/cpp',
       'problemBank/reserved-bank',
       'problemBank/reserved-bank/solutions/python',
       'problemBank/reserved-bank/solutions/java',
       'problemBank/reserved-bank/solutions/cpp',
+      'problemBank/reserved-bank/approaches/primary',
+      'problemBank/reserved-bank/approaches/primary/solutions/python',
+      'problemBank/reserved-bank/approaches/primary/solutions/java',
+      'problemBank/reserved-bank/approaches/primary/solutions/cpp',
     ]);
     expect(sdk.commit).toHaveBeenCalledTimes(2);
   });
@@ -345,7 +365,7 @@ describe('Problem Bank snapshots', () => {
     await expect(addBankProblemToSession('session', 'source')).rejects.toBe(
       error,
     );
-    expect(sdk.batchSet).toHaveBeenCalledTimes(4);
+    expect(sdk.batchSet).toHaveBeenCalledTimes(8);
     expect(sdk.commit).toHaveBeenCalledOnce();
   });
 

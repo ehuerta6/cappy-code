@@ -1,9 +1,18 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { languages, type Language, type Solution } from '@/lib/domain';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  getSolutionsForProblem,
+  languages,
+  type Language,
+  type Solution,
+  type SolutionApproach,
+} from '@/lib/domain';
+import {
+  createApproach,
+  deleteApproach,
+  getApproaches,
+  reorderApproaches,
+  saveApproach,
   updateSolution,
   type ProblemSolutions,
 } from '@/lib/firebase/solutions';
@@ -14,6 +23,7 @@ import type {
   SaveStateReporter,
 } from '@/components/officer-save-state';
 import { isPermissionDenied } from '@/lib/firebase/errors';
+import { problemPath } from '@/lib/firebase/paths';
 
 const buttonClass =
   'min-h-10 rounded border border-border-strong bg-surface px-3 py-2 text-ink hover:bg-hover disabled:cursor-default disabled:bg-raised disabled:text-muted';
@@ -24,6 +34,7 @@ type Props = {
   onPendingChange?: (pending: boolean) => void;
   onSaveStateChange?: SaveStateReporter;
   disabled?: boolean;
+  structuralChangesAllowed?: boolean;
 };
 
 // The parent must prevent navigation/deletion while onPendingChange reports true.
@@ -42,13 +53,23 @@ function ProblemSolutionsEditor({
   onPendingChange,
   onSaveStateChange,
   disabled,
+  structuralChangesAllowed = true,
 }: Props) {
   const [solutions, setSolutions] = useState<ProblemSolutions | null>(null);
+  const [approaches, setApproaches] = useState<SolutionApproach[]>([]);
+  const [approachesLoaded, setApproachesLoaded] = useState(false);
+  const [approachId, setApproachId] = useState('primary');
+  const [approachName, setApproachName] = useState('Primary Approach');
+  const [approachTags, setApproachTags] = useState('');
   const [currentCode, setCurrentCode] = useState<Record<
     Language,
     string
   > | null>(null);
   const [error, setError] = useState(false);
+  const [metadataSaving, setMetadataSaving] = useState(false);
+  const [metadataError, setMetadataError] = useState<string | undefined>();
+  const [actionError, setActionError] = useState<string | undefined>();
+  const [structuralBusy, setStructuralBusy] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [saveStates, setSaveStates] = useState<
     Record<Language, OfficerSaveState | null>
@@ -67,9 +88,64 @@ function ProblemSolutionsEditor({
     },
     [],
   );
-  const hasUnsavedContent = languages.some(
-    (language) => saveStates[language]?.dirty || saveStates[language]?.saving,
+  const parentPath = problemPath(sessionId, problemId);
+  const selectedApproach = approaches.find(({ id }) => id === approachId);
+  const updatedApproach = useMemo(
+    () =>
+      selectedApproach
+        ? {
+            ...selectedApproach,
+            name: approachName,
+            tags: approachTags
+              .split(',')
+              .map((tag) => tag.trim())
+              .filter(Boolean),
+          }
+        : null,
+    [approachName, approachTags, selectedApproach],
   );
+  const metadataDirty = Boolean(
+    selectedApproach &&
+    updatedApproach &&
+    (selectedApproach.name !== updatedApproach.name ||
+      JSON.stringify(selectedApproach.tags) !==
+        JSON.stringify(updatedApproach.tags)),
+  );
+  const hasUnsavedContent =
+    metadataDirty ||
+    languages.some(
+      (language) => saveStates[language]?.dirty || saveStates[language]?.saving,
+    );
+  const actionLocked = hasUnsavedContent || structuralBusy || metadataSaving;
+  const saveApproachMetadata = useCallback(async () => {
+    if (!updatedApproach || !metadataDirty) return true;
+    setMetadataSaving(true);
+    setMetadataError(undefined);
+    const updated = {
+      ...updatedApproach,
+    };
+    try {
+      await saveApproach(parentPath, updated);
+      setApproaches((items) =>
+        items.map((item) => (item.id === updated.id ? updated : item)),
+      );
+      return true;
+    } catch {
+      setMetadataError('Approach details could not be saved. Retry.');
+      return false;
+    } finally {
+      setMetadataSaving(false);
+    }
+  }, [metadataDirty, parentPath, updatedApproach]);
+  const saveAll = useCallback(async () => {
+    const results = await Promise.all(
+      languages.map((language) =>
+        saveStates[language] ? saveStates[language]?.save() : true,
+      ),
+    );
+    const metadataSaved = await saveApproachMetadata();
+    return results.every(Boolean) && metadataSaved;
+  }, [saveApproachMetadata, saveStates]);
   const editorHeight = solutions
     ? getSharedEditorHeight({
         ...solutions,
@@ -97,14 +173,7 @@ function ProblemSolutionsEditor({
         dirty: true,
         saving: languages.some((language) => saveStates[language]?.saving),
         error: saveStates[failed]?.error,
-        save: async () => {
-          const results = await Promise.all(
-            languages.map((language) =>
-              saveStates[language] ? saveStates[language]?.save() : true,
-            ),
-          );
-          return results.every(Boolean);
-        },
+        save: saveAll,
       });
       return;
     }
@@ -112,30 +181,44 @@ function ProblemSolutionsEditor({
       hasUnsavedContent
         ? {
             dirty: true,
-            saving: languages.some((language) => saveStates[language]?.saving),
-            save: async () => {
-              const results = await Promise.all(
-                languages.map((language) =>
-                  saveStates[language] ? saveStates[language]?.save() : true,
-                ),
-              );
-              return results.every(Boolean);
-            },
+            saving:
+              metadataSaving ||
+              languages.some((language) => saveStates[language]?.saving),
+            error: metadataError,
+            save: saveAll,
           }
         : null,
     );
-  }, [hasUnsavedContent, onSaveStateChange, saveStates]);
+  }, [
+    hasUnsavedContent,
+    metadataError,
+    metadataSaving,
+    onSaveStateChange,
+    saveAll,
+    saveStates,
+  ]);
   useEffect(() => {
     let active = true;
-    getSolutionsForProblem(sessionId, problemId)
+    getApproaches(parentPath)
       .then((loaded) => {
         if (active) {
-          setSolutions(loaded);
-          setCurrentCode({
-            python: loaded.python.code,
-            java: loaded.java.code,
-            cpp: loaded.cpp.code,
-          });
+          setApproaches(loaded);
+          setApproachesLoaded(true);
+          const selected =
+            loaded.find(({ id }) => id === approachId) ?? loaded[0];
+          setApproachId(selected?.id ?? 'primary');
+          setApproachName(selected?.name ?? 'Primary Approach');
+          setApproachTags(selected?.tags.join(', ') ?? '');
+          setSolutions(selected?.solutions ?? null);
+          setCurrentCode(
+            selected
+              ? {
+                  python: selected?.solutions.python.code ?? '',
+                  java: selected?.solutions.java.code ?? '',
+                  cpp: selected?.solutions.cpp.code ?? '',
+                }
+              : null,
+          );
         }
       })
       .catch(() => {
@@ -144,10 +227,207 @@ function ProblemSolutionsEditor({
     return () => {
       active = false;
     };
-  }, [sessionId, problemId, attempt]);
+  }, [sessionId, problemId, attempt, parentPath]);
   return (
     <section aria-label="Solutions">
       <h2>Solutions</h2>
+      {approaches.length > 1 && (
+        <div
+          className="mb-3 flex flex-wrap gap-2"
+          aria-label="Solution approaches"
+        >
+          {approaches.map((approach) => (
+            <button
+              key={approach.id}
+              className={buttonClass}
+              type="button"
+              disabled={actionLocked}
+              aria-pressed={approach.id === approachId}
+              onClick={() => {
+                setApproachId(approach.id);
+                setApproachName(approach.name);
+                setApproachTags(approach.tags.join(', '));
+                setSolutions(approach.solutions);
+                setCurrentCode({
+                  python: approach.solutions.python.code,
+                  java: approach.solutions.java.code,
+                  cpp: approach.solutions.cpp.code,
+                });
+              }}
+            >
+              {approach.name}
+            </button>
+          ))}
+        </div>
+      )}
+      {approachesLoaded && (
+        <div className="mb-4 flex flex-wrap items-end gap-2">
+          {actionError && <p role="alert">{actionError}</p>}
+          {structuralChangesAllowed && (
+            <button
+              className={buttonClass}
+              type="button"
+              disabled={disabled || actionLocked}
+              onClick={async () => {
+                setActionError(undefined);
+                setStructuralBusy(true);
+                try {
+                  const added = await createApproach(parentPath);
+                  const next = [...approaches, added].map((item, order) => ({
+                    ...item,
+                    order,
+                  }));
+                  setApproaches(next);
+                  setApproachId(added.id);
+                  setApproachName(added.name);
+                  setApproachTags('');
+                  setSolutions(added.solutions);
+                  setCurrentCode({ python: '', java: '', cpp: '' });
+                } catch {
+                  setActionError('Approach could not be added. Retry.');
+                } finally {
+                  setStructuralBusy(false);
+                }
+              }}
+            >
+              Add Approach
+            </button>
+          )}
+          {selectedApproach && (
+            <>
+              <label>
+                Approach name
+                <input
+                  className="ml-2 rounded border border-border-strong bg-surface px-2 py-2"
+                  value={approachName}
+                  onChange={(event) => setApproachName(event.target.value)}
+                />
+              </label>
+              <label>
+                Tags (comma separated)
+                <input
+                  className="ml-2 rounded border border-border-strong bg-surface px-2 py-2"
+                  value={approachTags}
+                  onChange={(event) => setApproachTags(event.target.value)}
+                />
+              </label>
+              <button
+                className={buttonClass}
+                type="button"
+                onClick={() => void saveApproachMetadata()}
+              >
+                Save approach details
+              </button>
+            </>
+          )}
+          {selectedApproach && structuralChangesAllowed && (
+            <>
+              <button
+                className={buttonClass}
+                type="button"
+                disabled={disabled || actionLocked}
+                onClick={async () => {
+                  setActionError(undefined);
+                  setStructuralBusy(true);
+                  try {
+                    await deleteApproach(parentPath, approachId);
+                    const nextApproaches = approaches
+                      .filter(({ id }) => id !== approachId)
+                      .map((item, order) => ({ ...item, order }));
+                    const next = nextApproaches[0];
+                    setApproaches(nextApproaches);
+                    setApproachId(next?.id ?? 'primary');
+                    setApproachName(next?.name ?? '');
+                    setApproachTags(next?.tags.join(', ') ?? '');
+                    setSolutions(next?.solutions ?? null);
+                    setCurrentCode(
+                      next
+                        ? {
+                            python: next.solutions.python.code,
+                            java: next.solutions.java.code,
+                            cpp: next.solutions.cpp.code,
+                          }
+                        : null,
+                    );
+                  } catch {
+                    setActionError('Approach could not be deleted. Retry.');
+                  } finally {
+                    setStructuralBusy(false);
+                  }
+                }}
+              >
+                Delete Approach
+              </button>
+              <button
+                className={buttonClass}
+                type="button"
+                disabled={disabled || actionLocked}
+                onClick={async () => {
+                  const index = approaches.findIndex(
+                    ({ id }) => id === approachId,
+                  );
+                  if (index > 0) {
+                    const next = [...approaches];
+                    [next[index - 1], next[index]] = [
+                      next[index],
+                      next[index - 1],
+                    ];
+                    setActionError(undefined);
+                    setStructuralBusy(true);
+                    try {
+                      await reorderApproaches(parentPath, next);
+                      setApproaches(
+                        next.map((item, order) => ({ ...item, order })),
+                      );
+                    } catch {
+                      setActionError(
+                        'Approaches could not be reordered. Retry.',
+                      );
+                    } finally {
+                      setStructuralBusy(false);
+                    }
+                  }
+                }}
+              >
+                Move Approach earlier
+              </button>
+              <button
+                className={buttonClass}
+                type="button"
+                disabled={disabled || actionLocked}
+                onClick={async () => {
+                  const index = approaches.findIndex(
+                    ({ id }) => id === approachId,
+                  );
+                  if (index >= 0 && index < approaches.length - 1) {
+                    const next = [...approaches];
+                    [next[index], next[index + 1]] = [
+                      next[index + 1],
+                      next[index],
+                    ];
+                    setActionError(undefined);
+                    setStructuralBusy(true);
+                    try {
+                      await reorderApproaches(parentPath, next);
+                      setApproaches(
+                        next.map((item, order) => ({ ...item, order })),
+                      );
+                    } catch {
+                      setActionError(
+                        'Approaches could not be reordered. Retry.',
+                      );
+                    } finally {
+                      setStructuralBusy(false);
+                    }
+                  }
+                }}
+              >
+                Move Approach later
+              </button>
+            </>
+          )}
+        </div>
+      )}
       {error ? (
         <div role="alert">
           <p>Solutions could not be loaded. Check your connection and retry.</p>
@@ -161,6 +441,10 @@ function ProblemSolutionsEditor({
             Retry solutions
           </button>
         </div>
+      ) : !approachesLoaded ? (
+        <p role="status">Loading solutions…</p>
+      ) : !selectedApproach ? (
+        <p>No solution approaches yet. Add an Approach to prepare solutions.</p>
       ) : !solutions ? (
         <p role="status">Loading solutions…</p>
       ) : (
@@ -176,9 +460,10 @@ function ProblemSolutionsEditor({
             <div className="grid grid-cols-[repeat(3,minmax(min(360px,calc(100vw-40px)),1fr))] items-stretch gap-4">
               {languages.map((language) => (
                 <EditableSolution
-                  key={language}
+                  key={`${approachId}/${language}`}
                   sessionId={sessionId}
                   problemId={problemId}
+                  approachId={approachId}
                   language={language}
                   initial={solutions[language]}
                   editorHeight={editorHeight}
@@ -209,6 +494,7 @@ function ProblemSolutionsEditor({
 function EditableSolution({
   sessionId,
   problemId,
+  approachId,
   language,
   initial,
   editorHeight,
@@ -218,6 +504,7 @@ function EditableSolution({
 }: {
   sessionId: string;
   problemId: string;
+  approachId: string;
   language: Language;
   initial: Solution;
   editorHeight: number;
@@ -246,7 +533,13 @@ function EditableSolution({
     setSaving(true);
     setError(null);
     try {
-      await updateSolution(sessionId, problemId, language, submitted);
+      await updateSolution(
+        sessionId,
+        problemId,
+        language,
+        submitted,
+        approachId,
+      );
       setSaved(submitted);
       return true;
     } catch (error) {
@@ -260,7 +553,7 @@ function EditableSolution({
       busy.current = false;
       setSaving(false);
     }
-  }, [dirty, sessionId, problemId, language, draft]);
+  }, [dirty, sessionId, problemId, language, draft, approachId]);
   useEffect(() => {
     const isDirty = dirty;
     onSaveStateChange(

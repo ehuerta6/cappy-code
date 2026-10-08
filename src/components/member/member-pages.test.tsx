@@ -7,6 +7,7 @@ const api = vi.hoisted(() => ({
   getMemberSession: vi.fn(),
   listMemberProblems: vi.fn(),
   getMemberSolutions: vi.fn(),
+  getMemberApproaches: vi.fn(),
   subscribeToMemberSessions: vi.fn(),
   memberReadFailureKind: vi.fn((error: unknown) =>
     typeof error === 'object' &&
@@ -95,6 +96,15 @@ beforeEach(() => {
   api.getMemberSession.mockResolvedValue(session);
   api.listMemberProblems.mockResolvedValue([problem]);
   api.getMemberSolutions.mockResolvedValue(solutions);
+  api.getMemberApproaches.mockImplementation(async (...args: unknown[]) => [
+    {
+      id: 'primary',
+      name: 'Primary Approach',
+      tags: [],
+      order: 0,
+      solutions: await api.getMemberSolutions(...args),
+    },
+  ]);
   api.subscribeToMemberSessions.mockImplementation(
     (onValue: (records: MemberSessionRecord[]) => void) => {
       queueMicrotask(() => onValue([session]));

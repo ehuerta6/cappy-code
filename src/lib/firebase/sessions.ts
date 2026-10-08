@@ -23,7 +23,12 @@ import {
 } from '../session-metadata';
 import { getOfficerAuth } from './auth';
 import { getFirestoreDb } from './client';
-import { bankProblemPath, sessionPath } from './paths';
+import {
+  approachCollectionPath,
+  bankProblemPath,
+  problemPath,
+  sessionPath,
+} from './paths';
 import { appendProblemDeletion } from './problems';
 
 export interface SessionRecord {
@@ -276,18 +281,36 @@ export async function deleteSession(id: string): Promise<void> {
         ),
       )
     : [];
+  const approachSnapshots = await Promise.all(
+    problems.docs.map((problem) =>
+      getDocsFromServer(
+        collection(db, approachCollectionPath(problemPath(id, problem.id))),
+      ),
+    ),
+  );
+  const problemWrites = problems.docs.reduce(
+    (count, _problem, index) =>
+      count + 4 + approachSnapshots[index].docs.length * 4,
+    0,
+  );
+  const bankVisibilityWrites = bankSnapshots.filter((item) =>
+    item.exists(),
+  ).length;
   // Keep the entire cascade atomic within Firestore's 500-write batch limit.
-  if (
-    problems.docs.length * 4 +
-      1 +
-      Number(releasesLiveClaim) +
-      bankSnapshots.filter((item) => item.exists()).length >
-    500
-  )
+  const writeCount =
+    problemWrites + 1 + Number(releasesLiveClaim) + bankVisibilityWrites;
+  if (writeCount > 500)
     throw new Error('Too many problems to delete this session in one batch.');
   const batch = writeBatch(db);
-  for (const problem of problems.docs)
-    appendProblemDeletion(batch, db, id, problem.id);
+  problems.docs.forEach((problem, index) =>
+    appendProblemDeletion(
+      batch,
+      db,
+      id,
+      problem.id,
+      approachSnapshots[index].docs.map(({ id: approachId }) => approachId),
+    ),
+  );
   if (releasesLiveClaim) {
     batch.update(liveSessionReference, { sessionId: null });
     for (const bank of bankSnapshots) {

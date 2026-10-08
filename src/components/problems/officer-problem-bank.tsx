@@ -4,10 +4,17 @@ import { useCallback, useEffect, useState } from 'react';
 import SolutionPanel from '@/components/solutions/solution-panel';
 import { getSharedEditorHeight } from '@/components/solutions/solution-sizing';
 import {
+  createApproach,
+  deleteApproach,
+  reorderApproaches,
+} from '@/lib/firebase/solutions';
+import { bankProblemPath } from '@/lib/firebase/paths';
+import {
   languages,
   problemCategories,
   type Language,
   type Solution,
+  type SolutionApproach,
 } from '@/lib/domain';
 import {
   createBankProblem,
@@ -16,6 +23,7 @@ import {
   updateBankPublication,
   updateBankProblem,
   updateBankSolution,
+  updateBankApproach,
   type BankProblemContent,
   type BankProblemRecord,
   type BankSolutions,
@@ -37,6 +45,12 @@ export default function OfficerProblemBank() {
     null,
   );
   const [solutions, setSolutions] = useState<BankSolutions | null>(null);
+  const [approaches, setApproaches] = useState<SolutionApproach[]>([]);
+  const [savedApproaches, setSavedApproaches] = useState<SolutionApproach[]>(
+    [],
+  );
+  const [approachId, setApproachId] = useState('primary');
+  const activeApproach = approaches.find(({ id }) => id === approachId);
   const [savedSolutions, setSavedSolutions] = useState<BankSolutions | null>(
     null,
   );
@@ -44,6 +58,7 @@ export default function OfficerProblemBank() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [publicationSaving, setPublicationSaving] = useState(false);
+  const [structuralBusy, setStructuralBusy] = useState(false);
   const [publicationError, setPublicationError] = useState<boolean | null>(
     null,
   );
@@ -63,7 +78,9 @@ export default function OfficerProblemBank() {
           JSON.stringify(solutions[language]) !==
           JSON.stringify(savedSolutions[language]),
       ),
-    );
+    ) ||
+    JSON.stringify(approaches) !== JSON.stringify(savedApproaches);
+  const approachActionsDisabled = dirty || saving || structuralBusy;
 
   useEffect(() => {
     if (!dirty && !saving) return;
@@ -126,6 +143,8 @@ export default function OfficerProblemBank() {
       setSavedContent(null);
       setSolutions(null);
       setSavedSolutions(null);
+      setApproaches([]);
+      setSavedApproaches([]);
       return;
     }
     let active = true;
@@ -151,6 +170,9 @@ export default function OfficerProblemBank() {
         setSavedContent(fields);
         setSolutions(result.solutions);
         setSavedSolutions(result.solutions);
+        setApproaches(result.approaches);
+        setSavedApproaches(result.approaches);
+        setApproachId(result.approaches[0]?.id ?? 'primary');
         setError(null);
       },
       () => {
@@ -180,12 +202,29 @@ export default function OfficerProblemBank() {
             JSON.stringify(savedSolutions[language])
         )
           work.push(
-            updateBankSolution(selectedId, language, solutions[language]),
+            updateBankSolution(
+              selectedId,
+              language,
+              solutions[language],
+              approachId,
+            ),
           );
       }
+      // Persist language values before legacy-primary conversion reads the old
+      // flat documents. Once conversion completes, nested data is canonical.
       await Promise.all(work);
+      if (activeApproach)
+        await updateBankApproach(selectedId, {
+          ...activeApproach,
+          solutions,
+        });
+      const savedApproachList = approaches.map((approach) =>
+        approach.id === approachId ? { ...approach, solutions } : approach,
+      );
       setSavedContent(content);
       setSavedSolutions(solutions);
+      setApproaches(savedApproachList);
+      setSavedApproaches(savedApproachList);
       setRecords((items) =>
         items.map((item) =>
           item.id === selectedId ? { ...item, ...content } : item,
@@ -198,7 +237,17 @@ export default function OfficerProblemBank() {
     } finally {
       setSaving(false);
     }
-  }, [content, savedContent, savedSolutions, saving, selectedId, solutions]);
+  }, [
+    activeApproach,
+    approaches,
+    approachId,
+    content,
+    savedContent,
+    savedSolutions,
+    saving,
+    selectedId,
+    solutions,
+  ]);
 
   async function add() {
     setError(null);
@@ -489,31 +538,258 @@ export default function OfficerProblemBank() {
                   />
                 </label>
               </div>
+              {approaches.length > 1 && (
+                <div
+                  className="mb-3 flex flex-wrap gap-2"
+                  aria-label="Solution approaches"
+                >
+                  {approaches.map((approach) => (
+                    <button
+                      key={approach.id}
+                      type="button"
+                      className={buttonClass}
+                      disabled={approachActionsDisabled}
+                      aria-pressed={approach.id === approachId}
+                      onClick={() => {
+                        setApproachId(approach.id);
+                        setSolutions(approach.solutions);
+                        setSavedSolutions(approach.solutions);
+                      }}
+                    >
+                      {approach.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div className="mb-3 flex flex-wrap items-end gap-2">
+                <button
+                  className={buttonClass}
+                  type="button"
+                  disabled={approachActionsDisabled}
+                  onClick={async () => {
+                    setError(null);
+                    setStructuralBusy(true);
+                    try {
+                      const added = await createApproach(
+                        bankProblemPath(selected.id),
+                      );
+                      const next = [...approaches, added].map(
+                        (approach, order) => ({ ...approach, order }),
+                      );
+                      setApproaches(next);
+                      setSavedApproaches(next);
+                      setApproachId(added.id);
+                      setSolutions(added.solutions);
+                      setSavedSolutions(added.solutions);
+                    } catch {
+                      setError('Approach could not be added. Retry.');
+                    } finally {
+                      setStructuralBusy(false);
+                    }
+                  }}
+                >
+                  Add Approach
+                </button>
+                {activeApproach && (
+                  <>
+                    <label>
+                      Approach name
+                      <input
+                        className="ml-2 rounded border border-border-strong bg-surface px-2 py-2"
+                        value={activeApproach.name}
+                        onChange={(event) =>
+                          setApproaches((items) =>
+                            items.map((item) =>
+                              item.id === approachId
+                                ? { ...item, name: event.target.value }
+                                : item,
+                            ),
+                          )
+                        }
+                      />
+                    </label>
+                    <label>
+                      Tags
+                      <input
+                        className="ml-2 rounded border border-border-strong bg-surface px-2 py-2"
+                        value={activeApproach.tags.join(', ')}
+                        onChange={(event) =>
+                          setApproaches((items) =>
+                            items.map((item) =>
+                              item.id === approachId
+                                ? {
+                                    ...item,
+                                    tags: event.target.value
+                                      .split(',')
+                                      .map((tag) => tag.trim())
+                                      .filter(Boolean),
+                                  }
+                                : item,
+                            ),
+                          )
+                        }
+                      />
+                    </label>
+                    <button
+                      className={buttonClass}
+                      type="button"
+                      disabled={saving}
+                      onClick={() => void save()}
+                    >
+                      Save approach details
+                    </button>
+                    <button
+                      className={buttonClass}
+                      type="button"
+                      disabled={approachActionsDisabled}
+                      onClick={async () => {
+                        setError(null);
+                        setStructuralBusy(true);
+                        try {
+                          await deleteApproach(
+                            bankProblemPath(selected.id),
+                            approachId,
+                          );
+                          const next = approaches
+                            .filter((approach) => approach.id !== approachId)
+                            .map((approach, order) => ({ ...approach, order }));
+                          const empty = {
+                            python: { code: '' },
+                            java: { code: '' },
+                            cpp: { code: '' },
+                          };
+                          setApproaches(next);
+                          setSavedApproaches(next);
+                          setApproachId(next[0]?.id ?? '');
+                          setSolutions(next[0]?.solutions ?? empty);
+                          setSavedSolutions(next[0]?.solutions ?? empty);
+                        } catch {
+                          setError('Approach could not be deleted. Retry.');
+                        } finally {
+                          setStructuralBusy(false);
+                        }
+                      }}
+                    >
+                      Delete Approach
+                    </button>
+                    <button
+                      className={buttonClass}
+                      type="button"
+                      disabled={approachActionsDisabled}
+                      onClick={async () => {
+                        const index = approaches.findIndex(
+                          (item) => item.id === approachId,
+                        );
+                        if (index > 0) {
+                          const order = [...approaches];
+                          [order[index - 1], order[index]] = [
+                            order[index],
+                            order[index - 1],
+                          ];
+                          setError(null);
+                          setStructuralBusy(true);
+                          try {
+                            await reorderApproaches(
+                              bankProblemPath(selected.id),
+                              order,
+                            );
+                            const next = order.map((item, i) => ({
+                              ...item,
+                              order: i,
+                            }));
+                            setApproaches(next);
+                            setSavedApproaches(next);
+                          } catch {
+                            setError(
+                              'Approaches could not be reordered. Retry.',
+                            );
+                          } finally {
+                            setStructuralBusy(false);
+                          }
+                        }
+                      }}
+                    >
+                      Move Approach earlier
+                    </button>
+                    <button
+                      className={buttonClass}
+                      type="button"
+                      disabled={approachActionsDisabled}
+                      onClick={async () => {
+                        const index = approaches.findIndex(
+                          (item) => item.id === approachId,
+                        );
+                        if (index >= 0 && index < approaches.length - 1) {
+                          const order = [...approaches];
+                          [order[index], order[index + 1]] = [
+                            order[index + 1],
+                            order[index],
+                          ];
+                          setError(null);
+                          setStructuralBusy(true);
+                          try {
+                            await reorderApproaches(
+                              bankProblemPath(selected.id),
+                              order,
+                            );
+                            const next = order.map((item, i) => ({
+                              ...item,
+                              order: i,
+                            }));
+                            setApproaches(next);
+                            setSavedApproaches(next);
+                          } catch {
+                            setError(
+                              'Approaches could not be reordered. Retry.',
+                            );
+                          } finally {
+                            setStructuralBusy(false);
+                          }
+                        }
+                      }}
+                    >
+                      Move Approach later
+                    </button>
+                  </>
+                )}
+              </div>
+              {activeApproach?.tags.length ? (
+                <p className="text-sm text-muted">
+                  {activeApproach.tags.join(' · ')}
+                </p>
+              ) : null}
               <h2 className="mb-3 mt-7 text-lg font-semibold">
                 Prepared Solutions
               </h2>
-              <div className="overflow-x-auto pb-2">
-                <div className="grid min-w-[1080px] grid-cols-3 gap-4">
-                  {languages.map((language: Language) => (
-                    <SolutionPanel
-                      key={language}
-                      mode="officer"
-                      language={language}
-                      solution={solutions[language]}
-                      modelPath={`bank/${selectedId}/${language}`}
-                      editorHeight={getSharedEditorHeight(solutions)}
-                      onChange={(solution: Solution) =>
-                        setSolutions((current) =>
-                          current
-                            ? { ...current, [language]: solution }
-                            : current,
-                        )
-                      }
-                      disabled={saving}
-                    />
-                  ))}
+              {activeApproach ? (
+                <div className="overflow-x-auto pb-2">
+                  <div className="grid min-w-[1080px] grid-cols-3 gap-4">
+                    {languages.map((language: Language) => (
+                      <SolutionPanel
+                        key={language}
+                        mode="officer"
+                        language={language}
+                        solution={solutions[language]}
+                        modelPath={`bank/${selectedId}/${approachId}/${language}`}
+                        editorHeight={getSharedEditorHeight(solutions)}
+                        onChange={(solution: Solution) =>
+                          setSolutions((current) =>
+                            current
+                              ? { ...current, [language]: solution }
+                              : current,
+                          )
+                        }
+                        disabled={saving}
+                      />
+                    ))}
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <p>
+                  No solution approaches yet. Add an Approach to prepare
+                  Solutions.
+                </p>
+              )}
             </section>
           ) : error ? null : (
             <p role="status">Loading selected Problem…</p>

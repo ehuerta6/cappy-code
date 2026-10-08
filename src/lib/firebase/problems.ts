@@ -23,7 +23,14 @@ import {
 import { validateLeetcodeProblemUrl } from '../problem-metadata';
 import { getOfficerAuth } from './auth';
 import { getFirestoreDb } from './client';
-import { problemPath, sessionPath, solutionPath } from './paths';
+import {
+  approachCollectionPath,
+  approachPath,
+  approachSolutionPath,
+  problemPath,
+  sessionPath,
+  solutionPath,
+} from './paths';
 
 export interface ProblemRecord {
   id: string;
@@ -228,7 +235,24 @@ export function appendProblemDeletion(
   db: Firestore,
   sessionId: string,
   problemId: string,
+  approachIds: string[],
 ): void {
+  for (const approachId of approachIds) {
+    for (const language of languages)
+      batch.delete(
+        doc(
+          db,
+          approachSolutionPath(
+            problemPath(sessionId, problemId),
+            approachId,
+            language,
+          ),
+        ),
+      );
+    batch.delete(
+      doc(db, approachPath(problemPath(sessionId, problemId), approachId)),
+    );
+  }
   for (const language of languages)
     batch.delete(doc(db, solutionPath(sessionId, problemId, language)));
   batch.delete(doc(db, problemPath(sessionId, problemId)));
@@ -249,8 +273,20 @@ export async function deleteProblem(
         .filter((id): id is string => Boolean(id)),
     ),
   ];
+  const approaches = await getDocsFromServer(
+    collection(db, approachCollectionPath(problemPath(sessionId, problemId))),
+  );
+  const writes = 4 + approaches.docs.length * 4 + 1;
+  if (writes > 500)
+    throw new Error('Too many approaches to delete this Problem in one batch.');
   const batch = writeBatch(db);
-  appendProblemDeletion(batch, db, sessionId, problemId);
+  appendProblemDeletion(
+    batch,
+    db,
+    sessionId,
+    problemId,
+    approaches.docs.map(({ id }) => id),
+  );
   batch.update(doc(db, sessionPath(sessionId)), { bankProblemIds });
   await batch.commit();
 }
