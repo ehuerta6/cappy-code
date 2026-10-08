@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import SolutionPanel from '@/components/solutions/solution-panel';
+import { ProblemUsageHistory, ProblemUsageMetadata } from './problem-usage';
 import { getSharedEditorHeight } from '@/components/solutions/solution-sizing';
 import {
   createApproach,
@@ -28,6 +29,8 @@ import {
   type BankProblemRecord,
   type BankSolutions,
 } from '@/lib/firebase/problem-bank';
+import { listProblemUsageSummaries } from '@/lib/firebase/problem-usage';
+import type { ProblemUsageSummary } from '@/lib/problem-usage';
 
 const labels = {
   custom: 'Custom',
@@ -39,6 +42,8 @@ const buttonClass =
 
 export default function OfficerProblemBank() {
   const [records, setRecords] = useState<BankProblemRecord[]>([]);
+  const [usage, setUsage] = useState<Record<string, ProblemUsageSummary>>({});
+  const [usageFailed, setUsageFailed] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [content, setContent] = useState<BankProblemContent | null>(null);
   const [savedContent, setSavedContent] = useState<BankProblemContent | null>(
@@ -115,10 +120,31 @@ export default function OfficerProblemBank() {
     let active = true;
     setLoading(true);
     setError(null);
+    setUsage({});
+    setUsageFailed(false);
     listOfficerBankProblems().then(
       (items) => {
         if (!active) return;
         setRecords(items);
+        setUsageFailed(false);
+        if (items.length === 0) {
+          setUsage({});
+        } else {
+          listProblemUsageSummaries(
+            items.map(({ id }) => id),
+            true,
+          ).then(
+            (summaries) => {
+              if (active) setUsage(summaries);
+            },
+            () => {
+              if (active) {
+                setUsage({});
+                setUsageFailed(true);
+              }
+            },
+          );
+        }
         setSelectedId((current) =>
           current && items.some((item) => item.id === current)
             ? current
@@ -349,6 +375,10 @@ export default function OfficerProblemBank() {
                           >
                             {item.title}
                           </button>
+                          <ProblemUsageMetadata
+                            summary={usage[item.id]}
+                            failed={usageFailed}
+                          />
                         </li>
                       ))}
                     </ul>
@@ -790,6 +820,10 @@ export default function OfficerProblemBank() {
                   Solutions.
                 </p>
               )}
+              <ProblemUsageHistory
+                summary={usage[selected.id]}
+                failed={usageFailed}
+              />
             </section>
           ) : error ? null : (
             <p role="status">Loading selected Problem…</p>
