@@ -1,0 +1,1230 @@
+{
+  "formatVersion": 1,
+  "target": {
+    "projectId": "cappycode-f133c",
+    "databaseId": "(default)"
+  },
+  "cutoff": "2026-10-08",
+  "problems": [
+    {
+      "id": "cappy-1-two-sum-21abd3036c",
+      "identity": {
+        "source": "leetcode",
+        "identifier": "1-two-sum"
+      },
+      "title": "Two Sum",
+      "description": "Given an integer array and a target, return the indices of two distinct elements whose values add to the target. Exactly one pair is valid; return the indices in either order.",
+      "constraints": "2 <= nums.length <= 10^4\n-10^9 <= nums[i] <= 10^9\n-10^9 <= target <= 10^9\nExactly one valid answer exists.",
+      "exampleInput": "nums = [2, 7, 11, 15], target = 9",
+      "exampleOutput": "[0, 1]",
+      "category": "interview-style",
+      "difficulty": "easy",
+      "difficultyProvenance": {
+        "source": "LeetCode Problem 1",
+        "reason": "LeetCode labels the canonical Two Sum problem Easy.",
+        "reviewed": true
+      },
+      "sourceUrl": "https://leetcode.com/problems/two-sum/",
+      "occurrences": [
+        {
+          "branch": "general",
+          "session": "September 8, 2026",
+          "week": "General Sep 8",
+          "sourceRef": "09/08/26 Tues, Cappy's Two Sum",
+          "decision": "canonical-match"
+        },
+        {
+          "branch": "general",
+          "session": "September 9, 2026",
+          "week": "General Sep 9",
+          "sourceRef": "09/09/26 Wed, Cappy's Two Sum",
+          "decision": "canonical-match"
+        }
+      ],
+      "approaches": [
+        {
+          "id": "brute-force",
+          "name": "Brute Force",
+          "tags": ["Arrays"],
+          "order": 0,
+          "solutions": {
+            "python": {
+              "code": "class Solution:\n    def twoSum(self, nums: list[int], target: int) -> list[int]:\n        for first in range(len(nums)):\n            for second in range(first + 1, len(nums)):\n                if nums[first] + nums[second] == target:\n                    return [first, second]\n        return []",
+              "timeComplexity": "O(n^2)",
+              "timeComplexityReason": "The nested loops inspect each distinct pair at most once.",
+              "spaceComplexity": "O(1)",
+              "spaceComplexityReason": "The search uses a fixed number of index variables and returns two indices."
+            },
+            "java": {
+              "code": "class Solution {\n    public int[] twoSum(int[] nums, int target) {\n        for (int first = 0; first < nums.length; first++) {\n            for (int second = first + 1; second < nums.length; second++) {\n                if (nums[first] + nums[second] == target) {\n                    return new int[] {first, second};\n                }\n            }\n        }\n        return new int[0];\n    }\n}",
+              "timeComplexity": "O(n^2)",
+              "timeComplexityReason": "The nested loops inspect each distinct pair at most once.",
+              "spaceComplexity": "O(1)",
+              "spaceComplexityReason": "The search uses a fixed number of index variables and returns two indices."
+            },
+            "cpp": {
+              "code": "class Solution {\npublic:\n    vector<int> twoSum(vector<int>& nums, int target) {\n        for (int first = 0; first < static_cast<int>(nums.size()); ++first) {\n            for (int second = first + 1; second < static_cast<int>(nums.size()); ++second) {\n                if (nums[first] + nums[second] == target) {\n                    return {first, second};\n                }\n            }\n        }\n        return {};\n    }\n};",
+              "timeComplexity": "O(n^2)",
+              "timeComplexityReason": "The nested loops inspect each distinct pair at most once.",
+              "spaceComplexity": "O(1)",
+              "spaceComplexityReason": "The search uses a fixed number of index variables and returns two indices."
+            }
+          }
+        },
+        {
+          "id": "hash-map",
+          "name": "Hash Map",
+          "tags": ["Arrays", "Hash Map"],
+          "order": 1,
+          "solutions": {
+            "python": {
+              "code": "class Solution:\n    def twoSum(self, nums: list[int], target: int) -> list[int]:\n        index_by_value: dict[int, int] = {}\n        for index, value in enumerate(nums):\n            needed = target - value\n            if needed in index_by_value:\n                return [index_by_value[needed], index]\n            index_by_value[value] = index\n        return []",
+              "timeComplexity": "O(n) average",
+              "timeComplexityReason": "Each element is checked once, with average constant-time hash map lookup and insertion.",
+              "spaceComplexity": "O(n)",
+              "spaceComplexityReason": "In the worst case the map stores all previously visited values."
+            },
+            "java": {
+              "code": "class Solution {\n    public int[] twoSum(int[] nums, int target) {\n        Map<Integer, Integer> indexByValue = new HashMap<>();\n        for (int index = 0; index < nums.length; index++) {\n            int needed = target - nums[index];\n            if (indexByValue.containsKey(needed)) {\n                return new int[] {indexByValue.get(needed), index};\n            }\n            indexByValue.put(nums[index], index);\n        }\n        return new int[0];\n    }\n}",
+              "timeComplexity": "O(n) average",
+              "timeComplexityReason": "Each element is checked once, with average constant-time hash map lookup and insertion.",
+              "spaceComplexity": "O(n)",
+              "spaceComplexityReason": "In the worst case the map stores all previously visited values."
+            },
+            "cpp": {
+              "code": "class Solution {\npublic:\n    vector<int> twoSum(vector<int>& nums, int target) {\n        unordered_map<int, int> indexByValue;\n        for (int index = 0; index < static_cast<int>(nums.size()); ++index) {\n            int needed = target - nums[index];\n            auto found = indexByValue.find(needed);\n            if (found != indexByValue.end()) {\n                return {found->second, index};\n            }\n            indexByValue[nums[index]] = index;\n        }\n        return {};\n    }\n};",
+              "timeComplexity": "O(n) average",
+              "timeComplexityReason": "Each element is checked once, with average constant-time hash map lookup and insertion.",
+              "spaceComplexity": "O(n)",
+              "spaceComplexityReason": "In the worst case the map stores all previously visited values."
+            }
+          }
+        }
+      ],
+      "review": {
+        "approved": true,
+        "warnings": []
+      },
+      "createOrReconcile": "CREATE",
+      "provenanceBackfills": []
+    },
+    {
+      "id": "cappy-125-valid-palindrome-e0c720bc07",
+      "identity": {
+        "source": "leetcode",
+        "identifier": "125-valid-palindrome"
+      },
+      "title": "Valid Palindrome",
+      "description": "Treat uppercase and lowercase letters as equal and ignore every non-letter and non-digit. Return whether the remaining sequence reads the same in both directions.",
+      "constraints": "1 <= s.length <= 2 * 10^5\ns contains printable ASCII characters.",
+      "exampleInput": "s = \"Snack kacns!\"",
+      "exampleOutput": "true",
+      "category": "interview-style",
+      "difficulty": "easy",
+      "difficultyProvenance": {
+        "source": "LeetCode Problem 125",
+        "reason": "LeetCode labels Valid Palindrome Easy.",
+        "reviewed": true
+      },
+      "sourceUrl": "https://leetcode.com/problems/valid-palindrome/",
+      "occurrences": [
+        {
+          "branch": "intro",
+          "session": "Intro Week 2",
+          "week": "Week 2",
+          "sourceRef": "CIC intro Week 2, slide 20",
+          "decision": "canonical-match"
+        }
+      ],
+      "approaches": [
+        {
+          "id": "two-pointers",
+          "name": "Two Pointers",
+          "tags": ["Two Pointers"],
+          "order": 0,
+          "solutions": {
+            "python": {
+              "code": "class Solution:\n    def isPalindrome(self, s: str) -> bool:\n        left, right = 0, len(s) - 1\n        while left < right:\n            while left < right and not s[left].isalnum():\n                left += 1\n            while left < right and not s[right].isalnum():\n                right -= 1\n            if s[left].lower() != s[right].lower():\n                return False\n            left += 1\n            right -= 1\n        return True",
+              "timeComplexity": "O(n)",
+              "timeComplexityReason": "The two pointers move inward and each character is examined at most once.",
+              "spaceComplexity": "O(1)",
+              "spaceComplexityReason": "The algorithm uses only two index variables."
+            },
+            "java": {
+              "code": "class Solution {\n    public boolean isPalindrome(String s) {\n        int left = 0, right = s.length() - 1;\n        while (left < right) {\n            while (left < right && !Character.isLetterOrDigit(s.charAt(left))) left++;\n            while (left < right && !Character.isLetterOrDigit(s.charAt(right))) right--;\n            if (Character.toLowerCase(s.charAt(left)) != Character.toLowerCase(s.charAt(right))) return false;\n            left++;\n            right--;\n        }\n        return true;\n    }\n}",
+              "timeComplexity": "O(n)",
+              "timeComplexityReason": "The two pointers move inward and each character is examined at most once.",
+              "spaceComplexity": "O(1)",
+              "spaceComplexityReason": "The algorithm uses only two index variables."
+            },
+            "cpp": {
+              "code": "class Solution {\npublic:\n    bool isPalindrome(string s) {\n        int left = 0, right = static_cast<int>(s.size()) - 1;\n        while (left < right) {\n            while (left < right && !isalnum(static_cast<unsigned char>(s[left]))) ++left;\n            while (left < right && !isalnum(static_cast<unsigned char>(s[right]))) --right;\n            if (tolower(static_cast<unsigned char>(s[left])) != tolower(static_cast<unsigned char>(s[right]))) return false;\n            ++left;\n            --right;\n        }\n        return true;\n    }\n};",
+              "timeComplexity": "O(n)",
+              "timeComplexityReason": "The two pointers move inward and each character is examined at most once.",
+              "spaceComplexity": "O(1)",
+              "spaceComplexityReason": "The algorithm uses only two index variables."
+            }
+          }
+        }
+      ],
+      "review": {
+        "approved": true,
+        "warnings": []
+      },
+      "createOrReconcile": "CREATE",
+      "provenanceBackfills": []
+    },
+    {
+      "id": "cappy-905-sort-array-by-parity-ac050dd2e7",
+      "identity": {
+        "source": "leetcode",
+        "identifier": "905-sort-array-by-parity"
+      },
+      "title": "Sort Array By Parity",
+      "description": "Rearrange the integers so every even value comes before every odd value. Any ordering that satisfies this condition is valid.",
+      "constraints": "1 <= nums.length <= 5000\n0 <= nums[i] <= 5000",
+      "exampleInput": "nums = [3, 1, 2, 4]",
+      "exampleOutput": "[2, 4, 3, 1]",
+      "category": "interview-style",
+      "difficulty": "easy",
+      "difficultyProvenance": {
+        "source": "LeetCode Problem 905",
+        "reason": "LeetCode labels Sort Array By Parity Easy.",
+        "reviewed": true
+      },
+      "sourceUrl": "https://leetcode.com/problems/sort-array-by-parity/",
+      "occurrences": [
+        {
+          "branch": "intro",
+          "session": "Intro Week 2",
+          "week": "Week 2",
+          "sourceRef": "CIC intro Week 2, slide 21",
+          "decision": "canonical-match"
+        }
+      ],
+      "approaches": [
+        {
+          "id": "two-pointer-partition",
+          "name": "Two-Pointer Partition",
+          "tags": ["Arrays", "Two Pointers"],
+          "order": 0,
+          "solutions": {
+            "python": {
+              "code": "class Solution:\n    def sortArrayByParity(self, nums: list[int]) -> list[int]:\n        left, right = 0, len(nums) - 1\n        while left < right:\n            while left < right and nums[left] % 2 == 0:\n                left += 1\n            while left < right and nums[right] % 2 == 1:\n                right -= 1\n            nums[left], nums[right] = nums[right], nums[left]\n        return nums",
+              "timeComplexity": "O(n)",
+              "timeComplexityReason": "The left and right indices move inward, so each element is inspected a constant number of times.",
+              "spaceComplexity": "O(1)",
+              "spaceComplexityReason": "The rearrangement swaps values in place and stores only two indices."
+            },
+            "java": {
+              "code": "class Solution {\n    public int[] sortArrayByParity(int[] nums) {\n        int left = 0, right = nums.length - 1;\n        while (left < right) {\n            while (left < right && nums[left] % 2 == 0) left++;\n            while (left < right && nums[right] % 2 == 1) right--;\n            int value = nums[left]; nums[left] = nums[right]; nums[right] = value;\n        }\n        return nums;\n    }\n}",
+              "timeComplexity": "O(n)",
+              "timeComplexityReason": "The left and right indices move inward, so each element is inspected a constant number of times.",
+              "spaceComplexity": "O(1)",
+              "spaceComplexityReason": "The rearrangement swaps values in place and stores only two indices."
+            },
+            "cpp": {
+              "code": "class Solution {\npublic:\n    vector<int> sortArrayByParity(vector<int>& nums) {\n        int left = 0, right = static_cast<int>(nums.size()) - 1;\n        while (left < right) {\n            while (left < right && nums[left] % 2 == 0) ++left;\n            while (left < right && nums[right] % 2 == 1) --right;\n            swap(nums[left], nums[right]);\n        }\n        return nums;\n    }\n};",
+              "timeComplexity": "O(n)",
+              "timeComplexityReason": "The left and right indices move inward, so each element is inspected a constant number of times.",
+              "spaceComplexity": "O(1)",
+              "spaceComplexityReason": "The rearrangement swaps values in place and stores only two indices."
+            }
+          }
+        }
+      ],
+      "review": {
+        "approved": true,
+        "warnings": []
+      },
+      "createOrReconcile": "CREATE",
+      "provenanceBackfills": []
+    },
+    {
+      "id": "cappy-3-longest-substring-without-repeating-ch-1d6969b058",
+      "identity": {
+        "source": "leetcode",
+        "identifier": "3-longest-substring-without-repeating-characters"
+      },
+      "title": "Longest Substring Without Repeating Characters",
+      "description": "Given a string, return the length of its longest contiguous substring that contains no repeated character.",
+      "constraints": "0 <= s.length <= 10^5\ns contains English letters, digits, symbols, and spaces.",
+      "exampleInput": "s = \"abcabcbb\"",
+      "exampleOutput": "3",
+      "category": "interview-style",
+      "difficulty": "medium",
+      "difficultyProvenance": {
+        "source": "LeetCode Problem 3",
+        "reason": "LeetCode labels Longest Substring Without Repeating Characters Medium.",
+        "reviewed": true
+      },
+      "sourceUrl": "https://leetcode.com/problems/longest-substring-without-repeating-characters/",
+      "occurrences": [
+        {
+          "branch": "intro",
+          "session": "Intro Week 2",
+          "week": "Week 2",
+          "sourceRef": "CIC intro Week 2, slide 24",
+          "decision": "canonical-match"
+        }
+      ],
+      "approaches": [
+        {
+          "id": "brute-force",
+          "name": "Brute Force",
+          "tags": ["Arrays"],
+          "order": 0,
+          "solutions": {
+            "python": {
+              "code": "class Solution:\n    def lengthOfLongestSubstring(self, s: str) -> int:\n        best = 0\n        for start in range(len(s)):\n            seen: set[str] = set()\n            for end in range(start, len(s)):\n                if s[end] in seen:\n                    break\n                seen.add(s[end])\n                best = max(best, end - start + 1)\n        return best",
+              "timeComplexity": "O(n^2) average",
+              "timeComplexityReason": "There are O(n^2) start/end pairs and each set membership operation is average O(1).",
+              "spaceComplexity": "O(n)",
+              "spaceComplexityReason": "The set for one candidate substring holds at most n distinct characters."
+            },
+            "java": {
+              "code": "class Solution {\n    public int lengthOfLongestSubstring(String s) {\n        int best = 0;\n        for (int start = 0; start < s.length(); start++) {\n            Set<Character> seen = new HashSet<>();\n            for (int end = start; end < s.length(); end++) {\n                char current = s.charAt(end);\n                if (!seen.add(current)) break;\n                best = Math.max(best, end - start + 1);\n            }\n        }\n        return best;\n    }\n}",
+              "timeComplexity": "O(n^2) average",
+              "timeComplexityReason": "There are O(n^2) start/end pairs and average O(1) hash set operations.",
+              "spaceComplexity": "O(n)",
+              "spaceComplexityReason": "The set for one candidate substring holds at most n distinct characters."
+            },
+            "cpp": {
+              "code": "class Solution {\npublic:\n    int lengthOfLongestSubstring(string s) {\n        int best = 0;\n        for (int start = 0; start < static_cast<int>(s.size()); ++start) {\n            unordered_set<char> seen;\n            for (int end = start; end < static_cast<int>(s.size()); ++end) {\n                if (!seen.insert(s[end]).second) break;\n                best = max(best, end - start + 1);\n            }\n        }\n        return best;\n    }\n};",
+              "timeComplexity": "O(n^2) average",
+              "timeComplexityReason": "There are O(n^2) start/end pairs and average O(1) hash set operations.",
+              "spaceComplexity": "O(n)",
+              "spaceComplexityReason": "The set for one candidate substring holds at most n distinct characters."
+            }
+          }
+        },
+        {
+          "id": "sliding-window",
+          "name": "Sliding Window",
+          "tags": ["Arrays", "Hash Map", "Two Pointers"],
+          "order": 1,
+          "solutions": {
+            "python": {
+              "code": "class Solution:\n    def lengthOfLongestSubstring(self, s: str) -> int:\n        last_seen: dict[str, int] = {}\n        start = best = 0\n        for end, char in enumerate(s):\n            if char in last_seen and last_seen[char] >= start:\n                start = last_seen[char] + 1\n            last_seen[char] = end\n            best = max(best, end - start + 1)\n        return best",
+              "timeComplexity": "O(n) average",
+              "timeComplexityReason": "Each character is processed once with average constant-time map operations.",
+              "spaceComplexity": "O(n)",
+              "spaceComplexityReason": "The map stores the most recent index of each distinct character."
+            },
+            "java": {
+              "code": "class Solution {\n    public int lengthOfLongestSubstring(String s) {\n        Map<Character, Integer> lastSeen = new HashMap<>();\n        int start = 0, best = 0;\n        for (int end = 0; end < s.length(); end++) {\n            char current = s.charAt(end);\n            if (lastSeen.containsKey(current) && lastSeen.get(current) >= start) start = lastSeen.get(current) + 1;\n            lastSeen.put(current, end);\n            best = Math.max(best, end - start + 1);\n        }\n        return best;\n    }\n}",
+              "timeComplexity": "O(n) average",
+              "timeComplexityReason": "Each character is processed once with average constant-time map operations.",
+              "spaceComplexity": "O(n)",
+              "spaceComplexityReason": "The map stores the most recent index of each distinct character."
+            },
+            "cpp": {
+              "code": "class Solution {\npublic:\n    int lengthOfLongestSubstring(string s) {\n        unordered_map<char, int> lastSeen;\n        int start = 0, best = 0;\n        for (int end = 0; end < static_cast<int>(s.size()); ++end) {\n            char current = s[end];\n            auto found = lastSeen.find(current);\n            if (found != lastSeen.end() && found->second >= start) start = found->second + 1;\n            lastSeen[current] = end;\n            best = max(best, end - start + 1);\n        }\n        return best;\n    }\n};",
+              "timeComplexity": "O(n) average",
+              "timeComplexityReason": "Each character is processed once with average constant-time map operations.",
+              "spaceComplexity": "O(n)",
+              "spaceComplexityReason": "The map stores the most recent index of each distinct character."
+            }
+          }
+        }
+      ],
+      "review": {
+        "approved": true,
+        "warnings": []
+      },
+      "createOrReconcile": "CREATE",
+      "provenanceBackfills": []
+    },
+    {
+      "id": "cappy-904-fruit-into-baskets-c9b1e8e503",
+      "identity": {
+        "source": "leetcode",
+        "identifier": "904-fruit-into-baskets"
+      },
+      "title": "Fruit Into Baskets",
+      "description": "Given an integer array, return the longest contiguous segment that contains at most two distinct values.",
+      "constraints": "1 <= fruits.length <= 10^5\n0 <= fruits[i] < fruits.length",
+      "exampleInput": "fruits = [1, 2, 3, 2, 2]",
+      "exampleOutput": "4",
+      "category": "interview-style",
+      "difficulty": "medium",
+      "difficultyProvenance": {
+        "source": "LeetCode Problem 904",
+        "reason": "LeetCode labels Fruit Into Baskets Medium.",
+        "reviewed": true
+      },
+      "sourceUrl": "https://leetcode.com/problems/fruit-into-baskets/",
+      "occurrences": [
+        {
+          "branch": "general",
+          "session": "September 15, 2026",
+          "week": "General Sep 15",
+          "sourceRef": "09/15/26 tues, Cappy's Snack Streak",
+          "decision": "canonical-match"
+        }
+      ],
+      "approaches": [
+        {
+          "id": "sliding-window",
+          "name": "Sliding Window",
+          "tags": ["Arrays", "Hash Map", "Two Pointers"],
+          "order": 0,
+          "solutions": {
+            "python": {
+              "code": "class Solution:\n    def totalFruit(self, fruits: list[int]) -> int:\n        counts: dict[int, int] = {}\n        start = best = 0\n        for end, fruit in enumerate(fruits):\n            counts[fruit] = counts.get(fruit, 0) + 1\n            while len(counts) > 2:\n                leaving = fruits[start]\n                counts[leaving] -= 1\n                if counts[leaving] == 0:\n                    del counts[leaving]\n                start += 1\n            best = max(best, end - start + 1)\n        return best",
+              "timeComplexity": "O(n) average",
+              "timeComplexityReason": "Each index enters and leaves the window once; map updates are average O(1).",
+              "spaceComplexity": "O(1)",
+              "spaceComplexityReason": "The count map contains at most three fruit types while the window is being adjusted."
+            },
+            "java": {
+              "code": "class Solution {\n    public int totalFruit(int[] fruits) {\n        Map<Integer, Integer> counts = new HashMap<>();\n        int start = 0, best = 0;\n        for (int end = 0; end < fruits.length; end++) {\n            counts.put(fruits[end], counts.getOrDefault(fruits[end], 0) + 1);\n            while (counts.size() > 2) {\n                int leaving = fruits[start++];\n                counts.put(leaving, counts.get(leaving) - 1);\n                if (counts.get(leaving) == 0) counts.remove(leaving);\n            }\n            best = Math.max(best, end - start + 1);\n        }\n        return best;\n    }\n}",
+              "timeComplexity": "O(n) average",
+              "timeComplexityReason": "Each index enters and leaves the window once; map updates are average O(1).",
+              "spaceComplexity": "O(1)",
+              "spaceComplexityReason": "The count map contains at most three fruit types while the window is being adjusted."
+            },
+            "cpp": {
+              "code": "class Solution {\npublic:\n    int totalFruit(vector<int>& fruits) {\n        unordered_map<int, int> counts;\n        int start = 0, best = 0;\n        for (int end = 0; end < static_cast<int>(fruits.size()); ++end) {\n            ++counts[fruits[end]];\n            while (counts.size() > 2) {\n                int leaving = fruits[start++];\n                if (--counts[leaving] == 0) counts.erase(leaving);\n            }\n            best = max(best, end - start + 1);\n        }\n        return best;\n    }\n};",
+              "timeComplexity": "O(n) average",
+              "timeComplexityReason": "Each index enters and leaves the window once; map updates are average O(1).",
+              "spaceComplexity": "O(1)",
+              "spaceComplexityReason": "The count map contains at most three fruit types while the window is being adjusted."
+            }
+          }
+        }
+      ],
+      "review": {
+        "approved": true,
+        "warnings": []
+      },
+      "createOrReconcile": "CREATE",
+      "provenanceBackfills": []
+    },
+    {
+      "id": "cappy-121-best-time-to-buy-and-sell-stock-11b5a1f99e",
+      "identity": {
+        "source": "leetcode",
+        "identifier": "121-best-time-to-buy-and-sell-stock"
+      },
+      "title": "Best Time to Buy and Sell Stock",
+      "description": "Choose one day to buy a share and a later day to sell it. Return the greatest profit, or zero if no profitable trade exists.",
+      "constraints": "1 <= prices.length <= 10^5\n0 <= prices[i] <= 10^4",
+      "exampleInput": "prices = [7, 1, 5, 3, 6, 4]",
+      "exampleOutput": "5",
+      "category": "interview-style",
+      "difficulty": "easy",
+      "difficultyProvenance": {
+        "source": "LeetCode Problem 121",
+        "reason": "LeetCode labels Best Time to Buy and Sell Stock Easy.",
+        "reviewed": true
+      },
+      "sourceUrl": "https://leetcode.com/problems/best-time-to-buy-and-sell-stock/",
+      "occurrences": [
+        {
+          "branch": "intro",
+          "session": "Intro Week 2",
+          "week": "Week 2",
+          "sourceRef": "CIC intro Week 2, slide 27",
+          "decision": "canonical-match"
+        }
+      ],
+      "approaches": [
+        {
+          "id": "running-minimum",
+          "name": "Running Minimum",
+          "tags": ["Arrays"],
+          "order": 0,
+          "solutions": {
+            "python": {
+              "code": "class Solution:\n    def maxProfit(self, prices: list[int]) -> int:\n        lowest = prices[0]\n        best = 0\n        for price in prices[1:]:\n            best = max(best, price - lowest)\n            lowest = min(lowest, price)\n        return best",
+              "timeComplexity": "O(n)",
+              "timeComplexityReason": "Each price is processed once while tracking the lowest earlier price.",
+              "spaceComplexity": "O(1)",
+              "spaceComplexityReason": "Only the minimum price and best profit are stored."
+            },
+            "java": {
+              "code": "class Solution {\n    public int maxProfit(int[] prices) {\n        int lowest = prices[0], best = 0;\n        for (int day = 1; day < prices.length; day++) {\n            best = Math.max(best, prices[day] - lowest);\n            lowest = Math.min(lowest, prices[day]);\n        }\n        return best;\n    }\n}",
+              "timeComplexity": "O(n)",
+              "timeComplexityReason": "Each price is processed once while tracking the lowest earlier price.",
+              "spaceComplexity": "O(1)",
+              "spaceComplexityReason": "Only the minimum price and best profit are stored."
+            },
+            "cpp": {
+              "code": "class Solution {\npublic:\n    int maxProfit(vector<int>& prices) {\n        int lowest = prices[0], best = 0;\n        for (int day = 1; day < static_cast<int>(prices.size()); ++day) {\n            best = max(best, prices[day] - lowest);\n            lowest = min(lowest, prices[day]);\n        }\n        return best;\n    }\n};",
+              "timeComplexity": "O(n)",
+              "timeComplexityReason": "Each price is processed once while tracking the lowest earlier price.",
+              "spaceComplexity": "O(1)",
+              "spaceComplexityReason": "Only the minimum price and best profit are stored."
+            }
+          }
+        }
+      ],
+      "review": {
+        "approved": true,
+        "warnings": []
+      },
+      "createOrReconcile": "CREATE",
+      "provenanceBackfills": []
+    },
+    {
+      "id": "cappy-9-palindrome-number-e6f6fde407",
+      "identity": {
+        "source": "leetcode",
+        "identifier": "9-palindrome-number"
+      },
+      "title": "Palindrome Number",
+      "description": "Return whether the integer reads identically from left to right and right to left. Negative values are not palindromes.",
+      "constraints": "-2^31 <= x <= 2^31 - 1",
+      "exampleInput": "x = 121",
+      "exampleOutput": "true",
+      "category": "interview-style",
+      "difficulty": "easy",
+      "difficultyProvenance": {
+        "source": "LeetCode Problem 9",
+        "reason": "LeetCode labels Palindrome Number Easy.",
+        "reviewed": true
+      },
+      "sourceUrl": "https://leetcode.com/problems/palindrome-number/",
+      "occurrences": [
+        {
+          "branch": "intro",
+          "session": "Intro Week 2",
+          "week": "Week 2",
+          "sourceRef": "CIC intro Week 2, slide 30",
+          "decision": "canonical-match"
+        }
+      ],
+      "approaches": [
+        {
+          "id": "reverse-half",
+          "name": "Reverse Half the Digits",
+          "tags": [],
+          "order": 0,
+          "solutions": {
+            "python": {
+              "code": "class Solution:\n    def isPalindrome(self, x: int) -> bool:\n        if x < 0 or (x % 10 == 0 and x != 0):\n            return False\n        reversed_half = 0\n        while x > reversed_half:\n            reversed_half = reversed_half * 10 + x % 10\n            x //= 10\n        return x == reversed_half or x == reversed_half // 10",
+              "timeComplexity": "O(log10 x)",
+              "timeComplexityReason": "The loop processes about half of the decimal digits.",
+              "spaceComplexity": "O(1)",
+              "spaceComplexityReason": "Only integer variables are used; no string or digit array is created."
+            },
+            "java": {
+              "code": "class Solution {\n    public boolean isPalindrome(int x) {\n        if (x < 0 || (x % 10 == 0 && x != 0)) return false;\n        int reversedHalf = 0;\n        while (x > reversedHalf) {\n            reversedHalf = reversedHalf * 10 + x % 10;\n            x /= 10;\n        }\n        return x == reversedHalf || x == reversedHalf / 10;\n    }\n}",
+              "timeComplexity": "O(log10 x)",
+              "timeComplexityReason": "The loop processes about half of the decimal digits.",
+              "spaceComplexity": "O(1)",
+              "spaceComplexityReason": "Only integer variables are used; no string or digit array is created."
+            },
+            "cpp": {
+              "code": "class Solution {\npublic:\n    bool isPalindrome(int x) {\n        if (x < 0 || (x % 10 == 0 && x != 0)) return false;\n        int reversedHalf = 0;\n        while (x > reversedHalf) {\n            reversedHalf = reversedHalf * 10 + x % 10;\n            x /= 10;\n        }\n        return x == reversedHalf || x == reversedHalf / 10;\n    }\n};",
+              "timeComplexity": "O(log10 x)",
+              "timeComplexityReason": "The loop processes about half of the decimal digits.",
+              "spaceComplexity": "O(1)",
+              "spaceComplexityReason": "Only integer variables are used; no string or digit array is created."
+            }
+          }
+        }
+      ],
+      "review": {
+        "approved": true,
+        "warnings": []
+      },
+      "createOrReconcile": "CREATE",
+      "provenanceBackfills": []
+    },
+    {
+      "id": "cappy-75-sort-colors-a6f255e8b8",
+      "identity": {
+        "source": "leetcode",
+        "identifier": "75-sort-colors"
+      },
+      "title": "Sort Colors",
+      "description": "Reorder an array containing only 0, 1, and 2 in place so equal values are adjacent in increasing order, without calling a library sort.",
+      "constraints": "1 <= nums.length <= 300\nnums[i] is 0, 1, or 2.",
+      "exampleInput": "nums = [2, 0, 2, 1, 1, 0]",
+      "exampleOutput": "[0, 0, 1, 1, 2, 2]",
+      "category": "interview-style",
+      "difficulty": "medium",
+      "difficultyProvenance": {
+        "source": "LeetCode Problem 75",
+        "reason": "LeetCode labels Sort Colors Medium.",
+        "reviewed": true
+      },
+      "sourceUrl": "https://leetcode.com/problems/sort-colors/",
+      "occurrences": [
+        {
+          "branch": "intro",
+          "session": "Intro Week 2",
+          "week": "Week 2",
+          "sourceRef": "CIC intro Week 2, slide 31",
+          "decision": "canonical-match"
+        }
+      ],
+      "approaches": [
+        {
+          "id": "three-way-partition",
+          "name": "Three-Way Partition",
+          "tags": ["Arrays", "Two Pointers"],
+          "order": 0,
+          "solutions": {
+            "python": {
+              "code": "class Solution:\n    def sortColors(self, nums: list[int]) -> None:\n        low = current = 0\n        high = len(nums) - 1\n        while current <= high:\n            if nums[current] == 0:\n                nums[low], nums[current] = nums[current], nums[low]\n                low += 1\n                current += 1\n            elif nums[current] == 2:\n                nums[current], nums[high] = nums[high], nums[current]\n                high -= 1\n            else:\n                current += 1",
+              "timeComplexity": "O(n)",
+              "timeComplexityReason": "The current pointer advances through the array and the high pointer only moves left.",
+              "spaceComplexity": "O(1)",
+              "spaceComplexityReason": "The algorithm rearranges the input in place using three indices."
+            },
+            "java": {
+              "code": "class Solution {\n    public void sortColors(int[] nums) {\n        int low = 0, current = 0, high = nums.length - 1;\n        while (current <= high) {\n            if (nums[current] == 0) {\n                int value = nums[low]; nums[low] = nums[current]; nums[current] = value;\n                low++; current++;\n            } else if (nums[current] == 2) {\n                int value = nums[current]; nums[current] = nums[high]; nums[high] = value;\n                high--;\n            } else current++;\n        }\n    }\n}",
+              "timeComplexity": "O(n)",
+              "timeComplexityReason": "The current pointer advances through the array and the high pointer only moves left.",
+              "spaceComplexity": "O(1)",
+              "spaceComplexityReason": "The algorithm rearranges the input in place using three indices."
+            },
+            "cpp": {
+              "code": "class Solution {\npublic:\n    void sortColors(vector<int>& nums) {\n        int low = 0, current = 0, high = static_cast<int>(nums.size()) - 1;\n        while (current <= high) {\n            if (nums[current] == 0) { swap(nums[low], nums[current]); ++low; ++current; }\n            else if (nums[current] == 2) { swap(nums[current], nums[high]); --high; }\n            else ++current;\n        }\n    }\n};",
+              "timeComplexity": "O(n)",
+              "timeComplexityReason": "The current pointer advances through the array and the high pointer only moves left.",
+              "spaceComplexity": "O(1)",
+              "spaceComplexityReason": "The algorithm rearranges the input in place using three indices."
+            }
+          }
+        }
+      ],
+      "review": {
+        "approved": true,
+        "warnings": []
+      },
+      "createOrReconcile": "CREATE",
+      "provenanceBackfills": []
+    },
+    {
+      "id": "cappy-48-rotate-image-5ebce76c26",
+      "identity": {
+        "source": "leetcode",
+        "identifier": "48-rotate-image"
+      },
+      "title": "Rotate Image",
+      "description": "Rotate the square input matrix 90 degrees clockwise in place without allocating another matrix.",
+      "constraints": "n == matrix.length == matrix[i].length\n1 <= n <= 20\n-1000 <= matrix[i][j] <= 1000",
+      "exampleInput": "matrix = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]",
+      "exampleOutput": "[[7, 4, 1], [8, 5, 2], [9, 6, 3]]",
+      "category": "interview-style",
+      "difficulty": "medium",
+      "difficultyProvenance": {
+        "source": "LeetCode Problem 48",
+        "reason": "LeetCode labels Rotate Image Medium.",
+        "reviewed": true
+      },
+      "sourceUrl": "https://leetcode.com/problems/rotate-image/",
+      "occurrences": [
+        {
+          "branch": "intro",
+          "session": "Intro Week 2",
+          "week": "Week 2",
+          "sourceRef": "CIC intro Week 2, slide 34",
+          "decision": "canonical-match"
+        }
+      ],
+      "approaches": [
+        {
+          "id": "transpose-reverse-rows",
+          "name": "Transpose and Reverse Rows",
+          "tags": ["Arrays"],
+          "order": 0,
+          "solutions": {
+            "python": {
+              "code": "class Solution:\n    def rotate(self, matrix: list[list[int]]) -> None:\n        size = len(matrix)\n        for row in range(size):\n            for column in range(row + 1, size):\n                matrix[row][column], matrix[column][row] = matrix[column][row], matrix[row][column]\n        for row in matrix:\n            row.reverse()",
+              "timeComplexity": "O(n^2)",
+              "timeComplexityReason": "The transpose visits each matrix cell once and reversing all rows visits n^2 values.",
+              "spaceComplexity": "O(1)",
+              "spaceComplexityReason": "The matrix is modified in place and only loop indices are used."
+            },
+            "java": {
+              "code": "class Solution {\n    public void rotate(int[][] matrix) {\n        int size = matrix.length;\n        for (int row = 0; row < size; row++) {\n            for (int column = row + 1; column < size; column++) {\n                int value = matrix[row][column]; matrix[row][column] = matrix[column][row]; matrix[column][row] = value;\n            }\n        }\n        for (int[] row : matrix) {\n            for (int left = 0, right = size - 1; left < right; left++, right--) {\n                int value = row[left]; row[left] = row[right]; row[right] = value;\n            }\n        }\n    }\n}",
+              "timeComplexity": "O(n^2)",
+              "timeComplexityReason": "The transpose visits each matrix cell once and reversing all rows visits n^2 values.",
+              "spaceComplexity": "O(1)",
+              "spaceComplexityReason": "The matrix is modified in place and only loop indices are used."
+            },
+            "cpp": {
+              "code": "class Solution {\npublic:\n    void rotate(vector<vector<int>>& matrix) {\n        int size = static_cast<int>(matrix.size());\n        for (int row = 0; row < size; ++row) {\n            for (int column = row + 1; column < size; ++column) swap(matrix[row][column], matrix[column][row]);\n        }\n        for (auto& row : matrix) reverse(row.begin(), row.end());\n    }\n};",
+              "timeComplexity": "O(n^2)",
+              "timeComplexityReason": "The transpose visits each matrix cell once and reversing all rows visits n^2 values.",
+              "spaceComplexity": "O(1)",
+              "spaceComplexityReason": "The matrix is modified in place and only loop indices are used."
+            }
+          }
+        }
+      ],
+      "review": {
+        "approved": true,
+        "warnings": []
+      },
+      "createOrReconcile": "CREATE",
+      "provenanceBackfills": []
+    },
+    {
+      "id": "cappy-206-reverse-linked-list-bde754e8ac",
+      "identity": {
+        "source": "leetcode",
+        "identifier": "206-reverse-linked-list"
+      },
+      "title": "Reverse Linked List",
+      "description": "Given the head of a singly linked list, reverse the links between its nodes and return the new head.",
+      "constraints": "The number of nodes is in the range [0, 5000].\n-5000 <= Node.val <= 5000",
+      "exampleInput": "head = [1, 2, 3, 4, 5]",
+      "exampleOutput": "[5, 4, 3, 2, 1]",
+      "category": "interview-style",
+      "difficulty": "easy",
+      "difficultyProvenance": {
+        "source": "LeetCode Problem 206",
+        "reason": "LeetCode labels the canonical Reverse Linked List problem Easy.",
+        "reviewed": true
+      },
+      "sourceUrl": "https://leetcode.com/problems/reverse-linked-list/",
+      "occurrences": [
+        {
+          "branch": "intro",
+          "session": "Intro Week 5",
+          "week": "Week 5",
+          "sourceRef": "CIC Intro Week 5, slides 26–27",
+          "decision": "canonical-match"
+        }
+      ],
+      "approaches": [
+        {
+          "id": "iterative",
+          "name": "Iterative Reversal",
+          "tags": ["Linked List"],
+          "order": 0,
+          "solutions": {
+            "python": {
+              "code": "class Solution:\n    def reverseList(self, head: ListNode | None) -> ListNode | None:\n        previous = None\n        current = head\n        while current is not None:\n            following = current.next\n            current.next = previous\n            previous = current\n            current = following\n        return previous",
+              "timeComplexity": "O(n)",
+              "timeComplexityReason": "Each of the n nodes is visited once.",
+              "spaceComplexity": "O(1)",
+              "spaceComplexityReason": "The algorithm keeps only three node references, regardless of list length."
+            },
+            "java": {
+              "code": "class Solution {\n    public ListNode reverseList(ListNode head) {\n        ListNode previous = null;\n        ListNode current = head;\n        while (current != null) {\n            ListNode following = current.next;\n            current.next = previous;\n            previous = current;\n            current = following;\n        }\n        return previous;\n    }\n}",
+              "timeComplexity": "O(n)",
+              "timeComplexityReason": "Each of the n nodes is visited once.",
+              "spaceComplexity": "O(1)",
+              "spaceComplexityReason": "The algorithm keeps only three node references, regardless of list length."
+            },
+            "cpp": {
+              "code": "class Solution {\npublic:\n    ListNode* reverseList(ListNode* head) {\n        ListNode* previous = nullptr;\n        ListNode* current = head;\n        while (current != nullptr) {\n            ListNode* following = current->next;\n            current->next = previous;\n            previous = current;\n            current = following;\n        }\n        return previous;\n    }\n};",
+              "timeComplexity": "O(n)",
+              "timeComplexityReason": "Each of the n nodes is visited once.",
+              "spaceComplexity": "O(1)",
+              "spaceComplexityReason": "The algorithm keeps only three node references, regardless of list length."
+            }
+          }
+        }
+      ],
+      "review": {
+        "approved": true,
+        "warnings": []
+      },
+      "createOrReconcile": "CREATE",
+      "provenanceBackfills": []
+    }
+  ],
+  "excludedOccurrences": [
+    {
+      "branch": "general",
+      "session": "September 23, 2026",
+      "sourceRef": "09/23/26 wed, Count and Say",
+      "title": "Count and Say",
+      "reason": "No presenter is recorded for this session by the cutoff; not confirmed as presented."
+    },
+    {
+      "branch": "icpc",
+      "session": "October 7, 2026",
+      "sourceRef": "ICPC Week 6 Dynamic Programming deck",
+      "title": "Min Cost Climbing Stairs (LeetCode 746)",
+      "reason": "The calendar has no presenter for October 7, so this stored future deck is unpresented at cutoff."
+    },
+    {
+      "branch": "icpc",
+      "session": "October 7, 2026",
+      "sourceRef": "ICPC Week 6 Dynamic Programming deck, CSES 1633",
+      "title": "Dice Combinations (CSES 1633)",
+      "reason": "The calendar has no presenter for October 7, so this stored future deck is unpresented at cutoff."
+    },
+    {
+      "branch": "icpc",
+      "session": "October 7, 2026",
+      "sourceRef": "ICPC Week 6 Dynamic Programming deck, CSES 1634",
+      "title": "Minimizing Coins (CSES 1634)",
+      "reason": "The calendar has no presenter for October 7, so this stored future deck is unpresented at cutoff."
+    },
+    {
+      "branch": "icpc",
+      "session": "October 7, 2026",
+      "sourceRef": "ICPC Week 6 Dynamic Programming deck, CSES 1158",
+      "title": "Money Sums (CSES 1158)",
+      "reason": "The calendar has no presenter for October 7, so this stored future deck is unpresented at cutoff."
+    },
+    {
+      "branch": "general",
+      "session": "After October 8, 2026",
+      "sourceRef": "General October future decks",
+      "title": "Problems in future scheduled decks",
+      "reason": "Future material is excluded regardless of its presence in Drive."
+    }
+  ],
+  "unresolvedHistoricalSnapshots": [
+    {
+      "sessionId": "51HKVOkGH7YVes7XcoSP",
+      "problemId": "MjFosCiVslNCIX1VgTn6",
+      "title": "TWO SUM",
+      "reason": "The live production Session contains a similarly titled snapshot, but its statement and examples are placeholder text and do not exactly match the canonical Problem. Do not backfill it."
+    }
+  ],
+  "unresolvedOccurrences": [
+    {
+      "branch": "intro",
+      "session": "Intro Week 1",
+      "sourceRef": "CIC intro Week 1, slide 23",
+      "title": "Cappy Sum",
+      "reason": "Need full prompt and examples from source deck; no external identity shown."
+    },
+    {
+      "branch": "intro",
+      "session": "Intro Week 3",
+      "sourceRef": "CIC intro Week 3, slide 18",
+      "title": "Cappy's Baseball Game",
+      "reason": "Need full prompt and examples from source deck."
+    },
+    {
+      "branch": "intro",
+      "session": "Intro Week 3",
+      "sourceRef": "CIC intro Week 3, slides 19–20",
+      "title": "Cappy's Duplicate Snacks",
+      "reason": "Need full prompt and examples from source deck."
+    },
+    {
+      "branch": "intro",
+      "session": "Intro Week 4",
+      "sourceRef": "CIC intro Week 4, slide 23",
+      "title": "Subarray with largest sum",
+      "reason": "Practice prompt title may be Kadane's Maximum Subarray; confirm canonical identity and source wording."
+    },
+    {
+      "branch": "intro",
+      "session": "Intro Week 5",
+      "sourceRef": "CIC Intro Week 5, slides 24–25",
+      "title": "Cappy's Sub Array",
+      "reason": "Likely Maximum Subarray but is a separate occurrence; confirm intended equivalence and recover constraints."
+    },
+    {
+      "branch": "intro",
+      "session": "Intro Week 5",
+      "sourceRef": "CIC Intro Week 5, slides 28–29",
+      "title": "Cappy and the Lost Expedition Code",
+      "reason": "Title/source identity requires review; preserve custom intent."
+    },
+    {
+      "branch": "general",
+      "session": "September 1, 2026",
+      "sourceRef": "09/01/26 Tues",
+      "title": "Cappy's Valid Anagram",
+      "reason": "Canonical source and full prompt need review."
+    },
+    {
+      "branch": "general",
+      "session": "September 1, 2026",
+      "sourceRef": "09/01/26 Tues",
+      "title": "Cappy Spring Line (return-to-origin prompt)",
+      "reason": "Repeated custom title is used for a distinct prompt; the calendar says Split Linked List in Parts, which is not safely matched."
+    },
+    {
+      "branch": "general",
+      "session": "September 1, 2026",
+      "sourceRef": "09/01/26 Tues",
+      "title": "Cappy Spring Line (linked-list partition prompt)",
+      "reason": "Repeated custom title and calendar wording conflict; exact source identity unresolved."
+    },
+    {
+      "branch": "general",
+      "session": "September 8, 2026",
+      "sourceRef": "09/08/26 Tues",
+      "title": "Daily hotter-temperature waits",
+      "reason": "Likely Daily Temperatures; verify canonical match and full CIC prompt."
+    },
+    {
+      "branch": "general",
+      "session": "September 8, 2026",
+      "sourceRef": "09/08/26 Tues",
+      "title": "Unnamed integer-array prompt",
+      "reason": "No title; only example output [1, 2, 1, 2, 1, 2] is recorded."
+    },
+    {
+      "branch": "general",
+      "session": "September 8, 2026",
+      "sourceRef": "Calendar-only candidate",
+      "title": "Unremembered Problem",
+      "reason": "Calendar says the presenter forgot which Problem was presented."
+    },
+    {
+      "branch": "general",
+      "session": "September 8, 2026",
+      "sourceRef": "Calendar-only candidate",
+      "title": "LeetCode 436",
+      "reason": "Calendar link is not safely matched to a deck prompt."
+    },
+    {
+      "branch": "general",
+      "session": "September 9, 2026",
+      "sourceRef": "09/09/26 Wed",
+      "title": "Maximum trees visible along a path",
+      "reason": "Custom prompt; need original statement and intended algorithm."
+    },
+    {
+      "branch": "general",
+      "session": "September 9, 2026",
+      "sourceRef": "09/09/26 Wed",
+      "title": "Cappy and the Capybara Ponds",
+      "reason": "Calendar's own entry may refer to this but does not establish a match; custom difficulty needs review."
+    },
+    {
+      "branch": "general",
+      "session": "September 15, 2026",
+      "sourceRef": "09/15/26 tues",
+      "title": "Fruit Into Baskets",
+      "reason": "Only a solution slide appears; no CIC prompt is present. Calendar mentions the name but does not establish source prompt."
+    },
+    {
+      "branch": "general",
+      "session": "September 15, 2026",
+      "sourceRef": "09/15/26 tues",
+      "title": "Rectangle Overlap",
+      "reason": "Recover the prompt/examples and verify canonical identity."
+    },
+    {
+      "branch": "general",
+      "session": "September 15, 2026",
+      "sourceRef": "09/15/26 tues",
+      "title": "Capybara Tree Peek",
+      "reason": "Custom prompt; recover wording and examples."
+    },
+    {
+      "branch": "general",
+      "session": "September 22, 2026",
+      "sourceRef": "09/22 tues",
+      "title": "Add Two Numbers",
+      "reason": "Likely LeetCode 2; verify canonical statement and source identity."
+    },
+    {
+      "branch": "general",
+      "session": "September 22, 2026",
+      "sourceRef": "09/22 tues",
+      "title": "Minimum Cappy Coins Needed",
+      "reason": "Displayed examples conflict with listed coin values/outputs; content and difficulty require review."
+    },
+    {
+      "branch": "general",
+      "session": "September 22, 2026",
+      "sourceRef": "Calendar-only candidate",
+      "title": "LeetCode 1928",
+      "reason": "Not identified in the Sep 22 deck; historical match unresolved."
+    },
+    {
+      "branch": "general",
+      "session": "September 29, 2026",
+      "sourceRef": "09/29/26 tues",
+      "title": "Cappy's Favorite Numbers",
+      "reason": "Likely Happy Number; verify canonical equivalence and recover full prompt."
+    },
+    {
+      "branch": "general",
+      "session": "September 29, 2026",
+      "sourceRef": "09/29/26 tues",
+      "title": "Cappy Roman Numbers",
+      "reason": "Likely Integer to Roman; verify source match and full prompt."
+    },
+    {
+      "branch": "general",
+      "session": "September 30, 2026",
+      "sourceRef": "09/30/26 wed",
+      "title": "Cappy and the Gates of the Riverbank",
+      "reason": "Likely Valid Parentheses; recover prompt/examples and verify identity."
+    },
+    {
+      "branch": "general",
+      "session": "September 30, 2026",
+      "sourceRef": "09/30/26 wed",
+      "title": "Count and Say",
+      "reason": "Prompt occurs in a presented deck; statement and exact canonical identity need confirmation."
+    },
+    {
+      "branch": "general",
+      "session": "September 30, 2026",
+      "sourceRef": "09/30/26 wed",
+      "title": "Validate Binary Search Tree",
+      "reason": "Only example/tree-logic slides are present; calendar link alone does not establish the prompt was taught."
+    },
+    {
+      "branch": "general",
+      "session": "October 6, 2026",
+      "sourceRef": "10/06/26 Tues",
+      "title": "Chill Cappy Number",
+      "reason": "Calendar says Ugly Number; title aligns by shape only, so canonical identity remains unverified."
+    },
+    {
+      "branch": "general",
+      "session": "October 6, 2026",
+      "sourceRef": "10/06/26 Tues",
+      "title": "Cappy and the Fruit Basket",
+      "reason": "Calendar says Longest Substring; title aligns by shape only, so canonical identity remains unverified."
+    },
+    {
+      "branch": "general",
+      "session": "October 6, 2026",
+      "sourceRef": "10/06/26 Tues",
+      "title": "Minimum Cappy Coins Needed",
+      "reason": "Repeated custom prompt has conflicting examples and unresolved equivalence with Sep 22."
+    },
+    {
+      "branch": "icpc",
+      "session": "ICPC Week 1",
+      "sourceRef": "ICPC Week 1 .pptx",
+      "title": "Longest subarray with sum <= K",
+      "reason": "May be a teaching exercise; confirm it was intended as a distinct Problem."
+    },
+    {
+      "branch": "icpc",
+      "session": "ICPC Week 1",
+      "sourceRef": "ICPC Week 1 .pptx",
+      "title": "CSES 1661 Subarray Sums II",
+      "reason": "Verify official source content and whether the practice item was presented."
+    },
+    {
+      "branch": "icpc",
+      "session": "ICPC Week 1",
+      "sourceRef": "ICPC Week 1 .pptx",
+      "title": "CSES 1662 Subarray Divisibility",
+      "reason": "Verify official source content and whether the practice item was presented."
+    },
+    {
+      "branch": "icpc",
+      "session": "ICPC Week 1",
+      "sourceRef": "ICPC Week 1 .pptx",
+      "title": "CSES 1141 Playlist",
+      "reason": "Verify official source content and whether the practice item was presented."
+    },
+    {
+      "branch": "icpc",
+      "session": "ICPC Week 1.5",
+      "sourceRef": "ICPC Week 1.5.pptx",
+      "title": "Codeforces 363B Fence",
+      "reason": "Deck calls itself UTEP ICPC Week 2; preserve filename and resolve the title/week/date mismatch."
+    },
+    {
+      "branch": "icpc",
+      "session": "ICPC Week 1.5",
+      "sourceRef": "ICPC Week 1.5.pptx",
+      "title": "Codeforces 474B Worms",
+      "reason": "Deck calls itself UTEP ICPC Week 2; verify official source and date mapping."
+    },
+    {
+      "branch": "icpc",
+      "session": "ICPC Week 1.5",
+      "sourceRef": "ICPC Week 1.5.pptx",
+      "title": "Codeforces 433B Kuriyama Mirai's Stones",
+      "reason": "Deck calls itself UTEP ICPC Week 2; verify official source and date mapping."
+    },
+    {
+      "branch": "icpc",
+      "session": "ICPC Week 2",
+      "sourceRef": "ICPC Week 2.pptx",
+      "title": "LeetCode 303 Range Sum Query",
+      "reason": "Warm-up prompt; verify full statement and whether CIC taught it."
+    },
+    {
+      "branch": "icpc",
+      "session": "ICPC Week 2",
+      "sourceRef": "ICPC Week 2.pptx",
+      "title": "CSES Range XOR",
+      "reason": "Need exact CSES identifier and full prompt."
+    },
+    {
+      "branch": "icpc",
+      "session": "ICPC Week 2",
+      "sourceRef": "ICPC Week 2.pptx",
+      "title": "CSES Sliding Window XOR",
+      "reason": "Need exact CSES identifier and full prompt; also appears on the Sep 9 calendar."
+    },
+    {
+      "branch": "icpc",
+      "session": "ICPC Week 2",
+      "sourceRef": "ICPC Week 2.pptx",
+      "title": "Codeforces 1872E Data Structures Fan",
+      "reason": "Verify official source and whether the practice item was taught."
+    },
+    {
+      "branch": "icpc",
+      "session": "ICPC Week 2",
+      "sourceRef": "ICPC Week 2.pptx",
+      "title": "Subarray Sum Equals K / LeetCode 560",
+      "reason": "Named explanatory slide without a full prompt; verify the presented scope."
+    },
+    {
+      "branch": "icpc",
+      "session": "ICPC Week 3",
+      "sourceRef": "ICPC Week 3 - BFS DFS Stacks Queues.pptx",
+      "title": "LeetCode Valid Parentheses",
+      "reason": "Warm-up identity may duplicate the General custom prompt; verify canonical and cross-branch match."
+    },
+    {
+      "branch": "icpc",
+      "session": "ICPC Week 3",
+      "sourceRef": "ICPC Week 3 - BFS DFS Stacks Queues.pptx",
+      "title": "Codeforces 115A Party",
+      "reason": "Verify official problem source and content."
+    },
+    {
+      "branch": "icpc",
+      "session": "ICPC Week 3",
+      "sourceRef": "ICPC Week 3 - BFS DFS Stacks Queues.pptx",
+      "title": "Codeforces 500A New Year Transportation",
+      "reason": "Verify official problem source and content."
+    },
+    {
+      "branch": "icpc",
+      "session": "ICPC Week 3",
+      "sourceRef": "ICPC Week 3 - BFS DFS Stacks Queues.pptx",
+      "title": "Codeforces 1020B Badge",
+      "reason": "Verify official problem source and content."
+    },
+    {
+      "branch": "icpc",
+      "session": "ICPC Week 4",
+      "sourceRef": "ICPC_Week_4_-_Multi-Source_BFS_Tree_Diameter.pptx",
+      "title": "LeetCode Number of Islands",
+      "reason": "Warm-up; verify if the occurrence maps to LeetCode 200 and was presented."
+    },
+    {
+      "branch": "icpc",
+      "session": "ICPC Week 4",
+      "sourceRef": "ICPC_Week_4_-_Multi-Source_BFS_Tree_Diameter.pptx",
+      "title": "2172M Distance to Port",
+      "reason": "Need authoritative archive/source identity for this contest problem."
+    },
+    {
+      "branch": "icpc",
+      "session": "ICPC Week 4",
+      "sourceRef": "ICPC_Week_4_-_Multi-Source_BFS_Tree_Diameter.pptx",
+      "title": "Codeforces 977E Cyclic Components",
+      "reason": "Verify official source and whether the problem was presented."
+    },
+    {
+      "branch": "icpc",
+      "session": "ICPC Week 4",
+      "sourceRef": "ICPC_Week_4_-_Multi-Source_BFS_Tree_Diameter.pptx",
+      "title": "Elevated Rails (SCUSA 2024)",
+      "reason": "Need authoritative statement and source URL; preserve contest identity."
+    },
+    {
+      "branch": "icpc",
+      "session": "ICPC Week 5",
+      "sourceRef": "ICPC_Week_5 - Greedy.pptx",
+      "title": "Codeforces A. Dragons",
+      "reason": "Need exact Codeforces identifier/source and date/week mapping."
+    },
+    {
+      "branch": "icpc",
+      "session": "ICPC Week 5",
+      "sourceRef": "ICPC_Week_5 - Greedy.pptx",
+      "title": "Boats to Save People",
+      "reason": "Likely LeetCode 881; verify source and exact prompt."
+    },
+    {
+      "branch": "icpc",
+      "session": "ICPC Week 5",
+      "sourceRef": "ICPC_Week_5 - Greedy.pptx",
+      "title": "Codeforces C. Woodcutters",
+      "reason": "Need exact Codeforces identifier/source and date/week mapping."
+    },
+    {
+      "branch": "icpc",
+      "session": "ICPC Week 5",
+      "sourceRef": "ICPC_Week5_MinHeaps_Dijkstra.pptx",
+      "title": "LeetCode Last Stone Weight",
+      "reason": "Warm-up; verify canonical identity and supported tags without introducing Heap / Priority Queue."
+    },
+    {
+      "branch": "icpc",
+      "session": "ICPC Week 5",
+      "sourceRef": "ICPC_Week5_MinHeaps_Dijkstra.pptx",
+      "title": "CSES 1671 Shortest Routes I",
+      "reason": "Verify official statement and difficulty mapping."
+    },
+    {
+      "branch": "icpc",
+      "session": "ICPC Week 5",
+      "sourceRef": "ICPC_Week5_MinHeaps_Dijkstra.pptx",
+      "title": "Codeforces 229B Planets",
+      "reason": "Verify official statement and date/week mapping."
+    },
+    {
+      "branch": "icpc",
+      "session": "ICPC Week 5",
+      "sourceRef": "ICPC_Week5_MinHeaps_Dijkstra.pptx",
+      "title": "Codeforces 20C Dijkstra?",
+      "reason": "Deck title is uncertain; confirm identity before source or difficulty assignment."
+    },
+    {
+      "branch": "icpc",
+      "session": "ICPC Week 5",
+      "sourceRef": "ICPC_Week5_MinHeaps_Dijkstra.pptx",
+      "title": "CSES 1195 Flight Discount",
+      "reason": "Verify official statement and date/week mapping."
+    },
+    {
+      "branch": "icpc",
+      "session": "ICPC Week 6",
+      "sourceRef": "ICPC Week 6 Binary Search deck",
+      "title": "LeetCode Search Insert Position",
+      "reason": "Warm-up; verify canonical identity and whether it was taught."
+    },
+    {
+      "branch": "icpc",
+      "session": "ICPC Week 6",
+      "sourceRef": "ICPC Week 6 Binary Search deck",
+      "title": "CSES 1620 Factory Machines",
+      "reason": "Worked example; review whether it was presented as a distinct Problem."
+    },
+    {
+      "branch": "icpc",
+      "session": "ICPC Week 6",
+      "sourceRef": "ICPC Week 6 Binary Search deck",
+      "title": "Codeforces 474B Worms",
+      "reason": "Possible repeat of Week 1.5 Worms; exact occurrence/date mapping unresolved."
+    },
+    {
+      "branch": "icpc",
+      "session": "ICPC Week 6",
+      "sourceRef": "ICPC Week 6 Binary Search deck",
+      "title": "AtCoder ABC146 C Buy an Integer",
+      "reason": "Verify official statement and date/week mapping."
+    },
+    {
+      "branch": "icpc",
+      "session": "ICPC Week 6",
+      "sourceRef": "ICPC Week 6 Binary Search deck",
+      "title": "CSES 1085 Array Division",
+      "reason": "Verify official statement and date/week mapping."
+    },
+    {
+      "branch": "icpc",
+      "session": "ICPC Week 6",
+      "sourceRef": "ICPC Week 6 Binary Search deck",
+      "title": "Codeforces 1324D Pair of Topics",
+      "reason": "Verify official statement and date/week mapping."
+    }
+  ]
+}
