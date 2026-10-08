@@ -5,6 +5,10 @@ import { useEffect, useState } from 'react';
 import AppHeader from '@/components/app-header';
 import ProblemMarkdown from '@/components/member/problem-markdown';
 import SolutionWorkspace from '@/components/solutions/solution-workspace';
+import {
+  ProblemUsageHistory,
+  ProblemUsageMetadata,
+} from '@/components/problems/problem-usage';
 import { problemCategories } from '@/lib/domain';
 import type { SolutionApproach } from '@/lib/domain';
 import {
@@ -13,6 +17,8 @@ import {
   type BankProblemRecord,
   type BankSolutions,
 } from '@/lib/firebase/problem-bank';
+import { listProblemUsageSummaries } from '@/lib/firebase/problem-usage';
+import type { ProblemUsageSummary } from '@/lib/problem-usage';
 
 const labels = {
   custom: 'Custom',
@@ -27,12 +33,33 @@ export function MemberProblemBank() {
     | { status: 'ready'; records: BankProblemRecord[] }
   >({ status: 'loading' });
   const [retry, setRetry] = useState(0);
+  const [usage, setUsage] = useState<Record<string, ProblemUsageSummary>>({});
+  const [usageFailed, setUsageFailed] = useState(false);
   useEffect(() => {
     let active = true;
     setState({ status: 'loading' });
+    setUsage({});
+    setUsageFailed(false);
     listMemberBankProblems().then(
       (records) => {
-        if (active) setState({ status: 'ready', records });
+        if (!active) return;
+        setState({ status: 'ready', records });
+        setUsageFailed(false);
+        if (records.length === 0) {
+          setUsage({});
+          return;
+        }
+        listProblemUsageSummaries(records.map(({ id }) => id)).then(
+          (summaries) => {
+            if (active) setUsage(summaries);
+          },
+          () => {
+            if (active) {
+              setUsage({});
+              setUsageFailed(true);
+            }
+          },
+        );
       },
       () => {
         if (active) setState({ status: 'error' });
@@ -106,6 +133,10 @@ export function MemberProblemBank() {
                           >
                             {record.title}
                           </Link>
+                          <ProblemUsageMetadata
+                            summary={usage[record.id]}
+                            failed={usageFailed}
+                          />
                         </li>
                       ))}
                     </ul>
@@ -137,10 +168,22 @@ export function MemberBankProblemPage({ problemId }: { problemId: string }) {
   >({ status: 'loading' });
   const [retry, setRetry] = useState(0);
   const [approachId, setApproachId] = useState('primary');
+  const [usage, setUsage] = useState<ProblemUsageSummary | undefined>();
+  const [usageFailed, setUsageFailed] = useState(false);
   useEffect(() => {
     let active = true;
     setState({ status: 'loading' });
     setApproachId('primary');
+    setUsage(undefined);
+    setUsageFailed(false);
+    listProblemUsageSummaries([problemId]).then(
+      (summaries) => {
+        if (active) setUsage(summaries[problemId]);
+      },
+      () => {
+        if (active) setUsageFailed(true);
+      },
+    );
     getBankProblem(problemId).then(
       (result) => {
         if (active)
@@ -227,6 +270,7 @@ export function MemberBankProblemPage({ problemId }: { problemId: string }) {
               </div>
             </div>
             <ProblemMarkdown>{state.problem.description}</ProblemMarkdown>
+            <ProblemUsageHistory summary={usage} failed={usageFailed} />
             {state.problem.constraints && (
               <section
                 className="mt-5 max-w-[80ch]"
