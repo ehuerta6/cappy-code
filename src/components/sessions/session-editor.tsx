@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   deleteSession,
+  duplicateSession,
   transitionSession,
   updateSession,
   type ProblemCountState,
@@ -36,9 +37,11 @@ const statusTone = {
 export default function SessionEditor({
   record,
   onClose,
+  onDuplicated,
 }: {
   record: SessionRecord;
   onClose: () => void;
+  onDuplicated: (id: string) => void;
 }) {
   const [problemsOpen, setProblemsOpen] = useState(false);
   const [problemBusy, setProblemBusy] = useState(false);
@@ -56,6 +59,8 @@ export default function SessionEditor({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState(false);
+  const [duplicating, setDuplicating] = useState(false);
+  const [duplicateError, setDuplicateError] = useState<string | null>(null);
   const [status, setStatus] = useState(record.session.status);
   const [problemCount, setProblemCount] = useState<ProblemCountState>(
     record.problemCount === null
@@ -341,6 +346,25 @@ export default function SessionEditor({
     }
   }
 
+  async function duplicate() {
+    if (busy.current || dirty || duplicating || deleting || saving) return;
+    busy.current = true;
+    setDuplicating(true);
+    setDuplicateError(null);
+    try {
+      onDuplicated(await duplicateSession(record.id));
+    } catch (error) {
+      setDuplicateError(
+        error instanceof Error
+          ? error.message
+          : 'Session could not be duplicated. Check your connection and try again.',
+      );
+    } finally {
+      busy.current = false;
+      setDuplicating(false);
+    }
+  }
+
   if (problemsOpen)
     return (
       <section
@@ -583,6 +607,15 @@ export default function SessionEditor({
         Manage problems
       </button>
       <button
+        className={`${contextualButtonClass} ml-2`}
+        onClick={() => void duplicate()}
+        disabled={
+          dirty || saving || deleting || duplicating || transitionPending
+        }
+      >
+        {duplicating ? 'Duplicating…' : 'Duplicate session'}
+      </button>
+      <button
         className="ml-2 min-h-11 rounded px-3 py-2 text-sm text-danger hover:bg-danger-surface disabled:cursor-default disabled:text-muted"
         onClick={() => void remove()}
         disabled={saving || deleting || transitionPending || dirty}
@@ -593,6 +626,11 @@ export default function SessionEditor({
         <p role="alert">
           Session could not be deleted. Check your connection and try Delete
           session again.
+        </p>
+      )}
+      {duplicateError && (
+        <p role="alert" className="mt-3 text-danger">
+          {duplicateError}
         </p>
       )}
     </section>

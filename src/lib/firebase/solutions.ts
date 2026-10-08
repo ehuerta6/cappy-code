@@ -41,6 +41,8 @@ export async function getApproaches(
   const snapshot = await getDocsFromServer(
     collection(db, approachCollectionPath(parentPath)),
   );
+  if (snapshot.docs.some((entry) => entry.metadata?.hasPendingWrites))
+    throw new Error('Approach changes are awaiting confirmation.');
   const approaches = await Promise.all(
     snapshot.docs.map(async (entry) => {
       const data = entry.data();
@@ -49,6 +51,8 @@ export async function getApproaches(
           const solution = await getDocFromServer(
             doc(db, approachSolutionPath(parentPath, entry.id, language)),
           );
+          if (solution.metadata?.hasPendingWrites)
+            throw new Error('Solution changes are awaiting confirmation.');
           return [
             language,
             solution.exists()
@@ -73,12 +77,16 @@ export async function getApproaches(
       (a, b) => a.order - b.order || a.id.localeCompare(b.id),
     );
   const parent = await getDocFromServer(doc(db, parentPath));
+  if (parent.metadata.hasPendingWrites)
+    throw new Error('Problem changes are awaiting confirmation.');
   if (parent.data()?.approachesEnabled === true) return [];
   const legacy = await Promise.all(
     languages.map(async (language) => {
       const solution = await getDocFromServer(
         doc(db, `${parentPath}/solutions/${language}`),
       );
+      if (solution.metadata?.hasPendingWrites)
+        throw new Error('Solution changes are awaiting confirmation.');
       return [
         language,
         solution.exists() ? validateSolution(solution.data()) : { code: '' },

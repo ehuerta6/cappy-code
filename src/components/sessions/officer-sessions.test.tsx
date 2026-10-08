@@ -16,6 +16,7 @@ const api = vi.hoisted(() => ({
   updateSession: vi.fn(),
   transitionSession: vi.fn(),
   deleteSession: vi.fn(),
+  duplicateSession: vi.fn(),
   listProblems: vi.fn(),
   updateProblem: vi.fn(),
   getSolutionsForProblem: vi.fn(),
@@ -104,6 +105,7 @@ beforeEach(() => {
   api.updateSession.mockResolvedValue(undefined);
   api.transitionSession.mockResolvedValue(undefined);
   api.deleteSession.mockResolvedValue(undefined);
+  api.duplicateSession.mockResolvedValue('copied-session');
 });
 afterEach(() => {
   cleanup();
@@ -117,6 +119,36 @@ async function openEditor() {
 }
 
 describe('Officer Sessions surface', () => {
+  it('duplicates the persisted Session and shows a useful failure', async () => {
+    await openEditor();
+    api.duplicateSession.mockRejectedValue(
+      new Error('Session changes are awaiting confirmation.'),
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Duplicate session' }));
+
+    expect(api.duplicateSession).toHaveBeenCalledWith('session-id');
+    expect((await screen.findByRole('alert')).textContent).toContain(
+      'Session changes are awaiting confirmation.',
+    );
+  });
+
+  it('disables Session duplication while local metadata edits are unsaved', async () => {
+    await openEditor();
+    const title = screen.getByRole('textbox', { name: 'Session title' });
+    fireEvent.change(title, { target: { value: 'Unsaved title' } });
+
+    expect(
+      (
+        screen.getByRole('button', {
+          name: 'Duplicate session',
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Duplicate session' }));
+    expect(api.duplicateSession).not.toHaveBeenCalled();
+  });
+
   it('shows loading until Firestore responds, then lists persisted metadata', async () => {
     let resolve!: (records: (typeof record)[]) => void;
     api.listSessions.mockReturnValue(

@@ -10,6 +10,7 @@ import {
 import {
   createProblem,
   deleteProblem,
+  duplicateProblem,
   listProblems,
   reorderProblems,
   setAnswersVisible,
@@ -361,6 +362,27 @@ export default function OfficerProblems({
     });
   }
 
+  function duplicate() {
+    if (!selected) return;
+    void act('Duplicating problem', async () => {
+      const record = await duplicateProblem(sessionId, selected.id);
+      const ordered = [...records];
+      ordered.splice(
+        ordered.findIndex((item) => item.id === selected.id) + 1,
+        0,
+        record,
+      );
+      setRecords(
+        ordered.map((item, order) => ({
+          ...item,
+          problem: { ...item.problem, order },
+        })),
+      );
+      select(record.id);
+      focusProblem(record.id);
+    });
+  }
+
   function toggleAnswers() {
     if (!selected) return;
     const visible = !selected.problem.answersVisible;
@@ -670,6 +692,13 @@ export default function OfficerProblems({
                     }}
                   >
                     Rename
+                  </button>
+                  <button
+                    className={buttonClass}
+                    disabled={blocked || sessionStatus !== 'draft'}
+                    onClick={duplicate}
+                  >
+                    Duplicate problem
                   </button>
                   <button
                     className={buttonClass}

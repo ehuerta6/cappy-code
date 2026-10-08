@@ -15,21 +15,24 @@ import {
   where,
   writeBatch,
 } from 'firebase/firestore';
-import type { Session } from '../domain';
-import { sessionSchema } from '../domain';
+import type { Problem, Session } from '../domain';
+import { languages, problemSchema, sessionSchema } from '../domain';
 import {
   validateSessionMetadata,
   type SessionMetadata,
 } from '../session-metadata';
+import { todayCalendarDate } from '../calendar-date';
 import { getOfficerAuth } from './auth';
 import { getFirestoreDb } from './client';
 import {
   approachCollectionPath,
+  approachSolutionPath,
   bankProblemPath,
   problemPath,
   sessionPath,
 } from './paths';
 import { appendProblemDeletion } from './problems';
+import { getApproaches } from './solutions';
 
 export interface SessionRecord {
   id: string;
@@ -63,6 +66,125 @@ export async function createSession(
     updatedAt: serverTimestamp(),
   });
   return reference.id;
+}
+
+export async function duplicateSession(id: string): Promise<string> {
+  const db = officerDb();
+  const sourceReference = doc(db, sessionPath(id));
+  const sourceSnapshot = await getDocFromServer(sourceReference);
+  if (!sourceSnapshot.exists())
+    throw new Error('This Session no longer exists.');
+  if (sourceSnapshot.metadata.hasPendingWrites)
+    throw new Error('Session changes are awaiting confirmation.');
+  const parsed = sessionSchema.safeParse(sourceSnapshot.data());
+  if (!parsed.success)
+    throw new Error(
+      'This Session has invalid saved metadata and cannot be copied.',
+    );
+
+  const sourceProblems = await getDocsFromServer(
+    collection(db, `${sessionPath(id)}/problems`),
+  );
+  if (sourceProblems.docs.some((problem) => problem.metadata.hasPendingWrites))
+    throw new Error('Problem changes are awaiting confirmation.');
+  const problems = sourceProblems.docs.map((problem) => {
+    const result = problemSchema.safeParse(problem.data());
+    if (!result.success)
+      throw new Error('A saved Problem is invalid and cannot be copied.');
+    return { id: problem.id, problem: result.data };
+  });
+  const prepared = await Promise.all(
+    problems.map(async ({ id: problemId, problem }) => ({
+      problem,
+      approaches: await getApproaches(problemPath(id, problemId)),
+    })),
+  );
+  const writeCount =
+    1 +
+    prepared.reduce(
+      (total, entry) => total + 1 + entry.approaches.length * 4,
+      0,
+    );
+  if (writeCount > 500)
+    throw new Error(
+      'This Session is too large to duplicate in one Firestore batch.',
+    );
+
+  const duplicateReference = doc(collection(db, 'sessions'));
+  const batch = writeBatch(db);
+  const bankProblemIds = [
+    ...new Set(
+      prepared.flatMap(({ problem }) =>
+        problem.bankCopyPending === true || !problem.bankProblemId
+          ? []
+          : [problem.bankProblemId],
+      ),
+    ),
+  ];
+  batch.set(duplicateReference, {
+    branch: parsed.data.branch,
+    title: `${parsed.data.title} Copy`,
+    date: todayCalendarDate(),
+    status: 'draft',
+    bankProblemIds,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+  for (const [order, entry] of prepared.entries()) {
+    const problemReference = doc(
+      collection(db, `${sessionPath(duplicateReference.id)}/problems`),
+    );
+    const copiedProblem: Problem = {
+      ...entry.problem,
+      order,
+      answersVisible: false,
+    };
+    for (const field of [
+      'leetcodeUrl',
+      'difficulty',
+      'bankProblemId',
+      'bankOrigin',
+      'bankCopyPending',
+    ] as const) {
+      if (copiedProblem[field] === undefined) delete copiedProblem[field];
+    }
+    if (copiedProblem.bankCopyPending === true) {
+      delete copiedProblem.bankCopyPending;
+      delete copiedProblem.bankProblemId;
+      delete copiedProblem.bankOrigin;
+    }
+    batch.set(problemReference, { ...copiedProblem, approachesEnabled: true });
+    for (const [approachOrder, approach] of entry.approaches.entries()) {
+      const approachReference = doc(
+        collection(
+          db,
+          approachCollectionPath(
+            problemPath(duplicateReference.id, problemReference.id),
+          ),
+        ),
+      );
+      batch.set(approachReference, {
+        name: approach.name,
+        tags: approach.tags,
+        order: approachOrder,
+      });
+      for (const language of languages) {
+        batch.set(
+          doc(
+            db,
+            approachSolutionPath(
+              problemPath(duplicateReference.id, problemReference.id),
+              approachReference.id,
+              language,
+            ),
+          ),
+          approach.solutions[language],
+        );
+      }
+    }
+  }
+  await batch.commit();
+  return duplicateReference.id;
 }
 
 export async function listSessions(): Promise<SessionRecord[]> {

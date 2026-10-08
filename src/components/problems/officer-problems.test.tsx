@@ -15,6 +15,7 @@ const api = vi.hoisted(() => ({
   reorderProblems: vi.fn(),
   setAnswersVisible: vi.fn(),
   deleteProblem: vi.fn(),
+  duplicateProblem: vi.fn(),
   getSolutionsForProblem: vi.fn(),
   updateSolution: vi.fn(),
   getApproaches: vi.fn(),
@@ -122,6 +123,15 @@ beforeEach(() => {
   api.reorderProblems.mockResolvedValue(undefined);
   api.setAnswersVisible.mockResolvedValue(undefined);
   api.deleteProblem.mockResolvedValue(undefined);
+  api.duplicateProblem.mockResolvedValue({
+    id: 'duplicate',
+    problem: {
+      ...first.problem,
+      title: 'Two Sum Copy',
+      order: 1,
+      answersVisible: false,
+    },
+  });
   api.getSolutionsForProblem.mockResolvedValue({
     python: { code: 'python source' },
     java: { code: 'java source' },
@@ -164,6 +174,63 @@ function actions() {
   fireEvent.click(screen.getByRole('button', { name: 'Manage Two Sum' }));
 }
 describe('Officer Problem workspace', () => {
+  it('duplicates a saved draft Problem from its actions and selects the adjacent copy', async () => {
+    await loaded();
+    actions();
+    fireEvent.click(screen.getByRole('button', { name: 'Duplicate problem' }));
+
+    expect(api.duplicateProblem).toHaveBeenCalledWith('session', 'first');
+    expect(
+      (await screen.findByRole('tab', { name: 'Two Sum Copy' })).getAttribute(
+        'aria-selected',
+      ),
+    ).toBe('true');
+  });
+
+  it('keeps the list unchanged and reports a failed Problem duplicate', async () => {
+    await loaded();
+    api.duplicateProblem.mockRejectedValue(new Error('offline'));
+    actions();
+    fireEvent.click(screen.getByRole('button', { name: 'Duplicate problem' }));
+
+    expect((await screen.findByRole('alert')).textContent).toContain(
+      'Duplicating problem failed.',
+    );
+    expect(screen.queryByRole('tab', { name: 'Two Sum Copy' })).toBeNull();
+  });
+
+  it('does not expose structural duplication in live Sessions', async () => {
+    start('live');
+    await screen.findByRole('tab', { name: 'Two Sum' });
+    actions();
+
+    expect(
+      (
+        screen.getByRole('button', {
+          name: 'Duplicate problem',
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Duplicate problem' }));
+    expect(api.duplicateProblem).not.toHaveBeenCalled();
+  });
+
+  it('blocks opening Problem actions while the selected editor is unsaved', async () => {
+    await loaded();
+    const title = screen.getByRole('textbox', { name: 'Problem title' });
+    fireEvent.change(title, { target: { value: 'Unsaved Two Sum' } });
+
+    expect(
+      (
+        screen.getByRole('button', {
+          name: 'Manage Two Sum',
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(true);
+    expect(screen.getByText(/Unsaved changes\. Save or revert/)).toBeTruthy();
+    expect(api.duplicateProblem).not.toHaveBeenCalled();
+  });
+
   it('materializes a direct-created Bank copy after the explicit metadata and Solution saves', async () => {
     const pendingProblem = {
       ...first,
