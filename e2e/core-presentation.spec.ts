@@ -101,6 +101,19 @@ test('Officer prepares and presents a Session through its public lifecycle', asy
     await officer.getByRole('button', { name: 'Save changes' }).click();
     await expect(officer.getByText('Saved ✓')).toBeVisible();
 
+    // Session-created reusable Bank copies stay unpublished until an Officer
+    // explicitly publishes them.
+    await officer.goto('/officer/problem-bank');
+    await officer.getByRole('button', { name: problemTitle }).click();
+    await expect(officer.getByText('Publication: Unpublished')).toBeVisible();
+    await officer.getByRole('button', { name: 'Publish' }).click();
+    await expect(officer.getByText('Publication: Published')).toBeVisible();
+    await officer.goto('/officer');
+    await officer
+      .getByRole('button', { name: new RegExp(sessionTitle) })
+      .click();
+    await officer.getByRole('button', { name: 'Manage problems' }).click();
+
     await member.goto('/');
     await expect(
       member.getByRole('heading', { name: 'Sessions' }),

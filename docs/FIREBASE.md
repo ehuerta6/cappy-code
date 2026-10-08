@@ -177,12 +177,14 @@ responses. Firestore Security Rules independently enforce backend access.
 
 `src/lib/domain.ts` defines document fields, with IDs held in document paths rather than duplicated inside records:
 
-| Path                                                             | Type       | Fields                                                                                                                    |
-| ---------------------------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `sessions/{sessionId}`                                           | `Session`  | `title`, `date`, `status`, `createdAt`, `updatedAt`                                                                       |
-| `sessions/{sessionId}/problems/{problemId}`                      | `Problem`  | `title`, `description`, `exampleInput`, `exampleOutput`, `constraints`, `order`, `answersVisible`, optional `leetcodeUrl` |
-| `sessionControl/liveSession`                                     | control    | `sessionId` (active Session ID, or `null` when no Session is live)                                                        |
-| `sessions/{sessionId}/problems/{problemId}/solutions/{language}` | `Solution` | `code`                                                                                                                    |
+| Path                                                             | Type         | Fields                                                                                                                    |
+| ---------------------------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------- |
+| `sessions/{sessionId}`                                           | `Session`    | `title`, `date`, `status`, `createdAt`, `updatedAt`                                                                       |
+| `sessions/{sessionId}/problems/{problemId}`                      | `Problem`    | `title`, `description`, `exampleInput`, `exampleOutput`, `constraints`, `order`, `answersVisible`, optional `leetcodeUrl` |
+| `sessionControl/liveSession`                                     | control      | `sessionId` (active Session ID, or `null` when no Session is live)                                                        |
+| `sessions/{sessionId}/problems/{problemId}/solutions/{language}` | `Solution`   | `code`                                                                                                                    |
+| `problemBank/{problemId}`                                        | Bank Problem | Problem content, `isPublished`, `hiddenByLiveSessionId`                                                                   |
+| `problemBank/{problemId}/solutions/{language}`                   | `Solution`   | `code`                                                                                                                    |
 
 - `Language` is exactly `python | java | cpp`; each language identifies its own Solution document.
 - `SessionStatus` is `draft | live | ended`.
@@ -197,6 +199,27 @@ responses. Firestore Security Rules independently enforce backend access.
 Problem documents hold member-facing metadata, the shared example input and expected output, and `answersVisible`. Prepared code exists only in the separate Solution subcollection, consistent with [Firestore's hierarchical data model](https://firebase.google.com/docs/firestore/data-model). Draft Sessions are officer-only; anonymous members can read metadata under `live` and `ended` Sessions. Existing Solution documents may still contain a legacy `output` field; current readers ignore it and current writes omit it.
 
 Anonymous Solution reads for live Sessions require the parent Problem's `answersVisible` to be true. For ended Sessions, all fixed-language Solution documents are public regardless of that field. Draft Solutions remain officer-only. Hiding live answers in the UI alone provides no protection; Firestore Rules deny those reads.
+
+### Problem Bank publication (#121)
+
+Bank documents store Officer publication intent in `isPublished`. New direct Bank
+entries and Bank copies materialized from Session Problems start with
+`isPublished: false`. `hiddenByLiveSessionId` stores only temporary live-session
+hiding; lifecycle transitions set it to the active Session ID and clear it to
+`null` when that Session becomes draft, ends, or is deleted. Effective Member
+visibility requires publication intent and no temporary hide. Firestore Rules
+also check the active Session's `bankProblemIds`, so direct document and Solution
+reads remain denied if a lifecycle write misses the temporary marker. Member
+listings query published, unhidden documents; Rules remain the authorization
+boundary.
+
+For compatibility, records without `isPublished` use legacy `isPublic: true` as
+published and any other or missing value as unpublished. A legacy false value
+cannot safely be inferred as previously published because the old live lifecycle
+also wrote false to hide entries. When a lifecycle operation touches a legacy
+Bank record, it copies that conservative intent into `isPublished`, removes
+`isPublic`, and updates only the temporary hiding marker. No collection migration
+is required.
 
 ## Officer Session preparation (#38)
 

@@ -13,6 +13,7 @@ import {
   createBankProblem,
   getBankProblem,
   listOfficerBankProblems,
+  updateBankPublication,
   updateBankProblem,
   updateBankSolution,
   type BankProblemContent,
@@ -42,6 +43,10 @@ export default function OfficerProblemBank() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [publicationSaving, setPublicationSaving] = useState(false);
+  const [publicationError, setPublicationError] = useState<boolean | null>(
+    null,
+  );
   const [revision, setRevision] = useState(0);
   const selected = records.find(({ id }) => id === selectedId);
   const dirty =
@@ -135,7 +140,12 @@ export default function OfficerProblemBank() {
           return;
         }
         const fields = Object.fromEntries(
-          Object.entries(result.problem).filter(([key]) => key !== 'id'),
+          Object.entries(result.problem).filter(
+            ([key]) =>
+              key !== 'id' &&
+              key !== 'isPublished' &&
+              key !== 'isTemporarilyHidden',
+          ),
         ) as BankProblemContent;
         setContent(fields);
         setSavedContent(fields);
@@ -201,6 +211,24 @@ export default function OfficerProblemBank() {
       setError('Problem Bank entry could not be created.');
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function changePublication(isPublished: boolean) {
+    if (!selectedId || publicationSaving) return;
+    setPublicationSaving(true);
+    setPublicationError(null);
+    try {
+      await updateBankPublication(selectedId, isPublished);
+      setRecords((items) =>
+        items.map((item) =>
+          item.id === selectedId ? { ...item, isPublished } : item,
+        ),
+      );
+    } catch {
+      setPublicationError(isPublished);
+    } finally {
+      setPublicationSaving(false);
     }
   }
 
@@ -285,10 +313,24 @@ export default function OfficerProblemBank() {
           {selected && content && solutions ? (
             <section className="min-w-0" aria-label={`Edit ${selected.title}`}>
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                <p className="m-0 text-sm text-muted">
-                  Visible to Members immediately after each save, unless used by
-                  the live Session.
+                <p className="m-0 text-sm text-muted" role="status">
+                  Publication:{' '}
+                  {selected.isPublished ? 'Published' : 'Unpublished'}
+                  {selected.isPublished && selected.isTemporarilyHidden
+                    ? ' · temporarily hidden during the live Session'
+                    : ''}
                 </p>
+                <button
+                  className={buttonClass}
+                  disabled={publicationSaving}
+                  onClick={() => void changePublication(!selected.isPublished)}
+                >
+                  {publicationSaving
+                    ? 'Saving publication…'
+                    : selected.isPublished
+                      ? 'Unpublish'
+                      : 'Publish'}
+                </button>
                 <button
                   className={buttonClass}
                   disabled={!dirty || saving}
@@ -297,6 +339,19 @@ export default function OfficerProblemBank() {
                   {saving ? 'Saving…' : 'Save changes'}
                 </button>
               </div>
+              {publicationError !== null && (
+                <p role="alert">
+                  Publication update failed. Retry to confirm the selected
+                  state.{' '}
+                  <button
+                    className={buttonClass}
+                    disabled={publicationSaving}
+                    onClick={() => void changePublication(publicationError)}
+                  >
+                    Retry {publicationError ? 'Publish' : 'Unpublish'}
+                  </button>
+                </p>
+              )}
               <p
                 className="mb-4 mt-0 text-sm text-muted"
                 role="status"

@@ -83,24 +83,54 @@ service cloud.firestore {
       ]);
     }
 
-    function bankProblemUsedLiveAfter(problemId) {
-      return existsAfter(liveSessionPath())
-        ? bankProblemUsedLiveWithPointer(problemId)
+    function bankProblemUsedByActiveSession(problemId) {
+      return exists(liveSessionPath())
+        ? (get(liveSessionPath()).data.get('sessionId', null) is string
+            ? activeSessionUsesBankProblem(
+                get(liveSessionPath()).data.sessionId,
+                problemId
+              )
+            : false)
         : false;
     }
 
-    function bankProblemUsedLiveWithPointer(problemId) {
-      let liveSessionId = getAfter(liveSessionPath()).data.sessionId;
-      return liveSessionId != null
-        && getAfter(
-          /databases/$(database)/documents/sessions/$(liveSessionId)
-        ).data.status == 'live'
-        && getAfter(
-          /databases/$(database)/documents/sessions/$(liveSessionId)
-        ).data.bankProblemIds is list
-        && getAfter(
-          /databases/$(database)/documents/sessions/$(liveSessionId)
-        ).data.bankProblemIds.hasAny([problemId]);
+    function activeSessionUsesBankProblem(sessionId, problemId) {
+      return exists(/databases/$(database)/documents/sessions/$(sessionId))
+        ? (get(/databases/$(database)/documents/sessions/$(sessionId)).data.status == 'live'
+            ? (get(/databases/$(database)/documents/sessions/$(sessionId)).data.get('bankProblemIds', []) is list
+                ? get(/databases/$(database)/documents/sessions/$(sessionId)).data.get('bankProblemIds', []).hasAny([problemId])
+                : false)
+            : false)
+        : false;
+    }
+
+    function bankProblemDataIsPublished(data) {
+      return data.get('isPublished', data.get('isPublic', false)) == true;
+    }
+
+    function bankProblemDataIsNotHidden(data) {
+      return !data.keys().hasAny(['hiddenByLiveSessionId'])
+        || data.hiddenByLiveSessionId == null;
+    }
+
+    function bankProblemIsEffectivelyVisible(problemId) {
+      return bankProblemDataIsPublished(resource.data)
+        && bankProblemDataIsNotHidden(resource.data)
+        && !bankProblemUsedByActiveSession(problemId);
+    }
+
+    function bankProblemIsListVisible() {
+      return bankProblemDataIsPublished(resource.data)
+        && bankProblemDataIsNotHidden(resource.data);
+    }
+
+    function bankSolutionParentIsEffectivelyVisible(problemId) {
+      let bankProblem = get(
+        /databases/$(database)/documents/problemBank/$(problemId)
+      ).data;
+      return bankProblemDataIsPublished(bankProblem)
+        && bankProblemDataIsNotHidden(bankProblem)
+        && !bankProblemUsedByActiveSession(problemId);
     }
 
     match /sessions/{sessionId} {
@@ -170,21 +200,25 @@ service cloud.firestore {
     }
 
     match /problemBank/{problemId} {
-      allow get, list: if isOfficer() || resource.data.isPublic == true;
+      allow get: if isOfficer()
+        || bankProblemIsEffectivelyVisible(problemId);
+      allow list: if isOfficer() || bankProblemIsListVisible();
       allow create: if isOfficer()
         && hasSupportedProblemCategory(request.resource.data)
-        && request.resource.data.isPublic == true
-        && !bankProblemUsedLiveAfter(problemId);
+        && request.resource.data.isPublished == false
+        && request.resource.data.hiddenByLiveSessionId == null;
       allow update: if isOfficer()
         && hasSupportedProblemCategory(request.resource.data)
-        && (!bankProblemUsedLiveAfter(problemId)
-          || request.resource.data.isPublic == false);
+        && (request.resource.data.isPublished is bool
+          || (!request.resource.data.keys().hasAny(['isPublished'])
+            && request.resource.data.keys().hasAny(['isPublic'])
+            && request.resource.data.isPublic is bool));
       allow delete: if isOfficer();
 
       match /solutions/{language} {
         allow read: if isOfficer()
           || (language in ['python', 'java', 'cpp']
-            && get(/databases/$(database)/documents/problemBank/$(problemId)).data.isPublic == true);
+            && bankSolutionParentIsEffectivelyVisible(problemId));
         allow write: if isOfficer() && language in ['python', 'java', 'cpp'];
       }
     }

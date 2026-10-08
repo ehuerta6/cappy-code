@@ -48,6 +48,8 @@ export interface BankProblemContent {
 
 export interface BankProblemRecord extends BankProblemContent {
   id: string;
+  isPublished: boolean;
+  isTemporarilyHidden: boolean;
 }
 
 export type BankSolutions = Record<(typeof languages)[number], Solution>;
@@ -109,6 +111,14 @@ function sorted(records: BankProblemRecord[]) {
   );
 }
 
+function publicationIntent(data: Record<string, unknown>): boolean {
+  // isPublic is the legacy field. A false legacy value is ambiguous because
+  // the old live lifecycle also wrote false, so preserve it conservatively.
+  return typeof data.isPublished === 'boolean'
+    ? data.isPublished
+    : data.isPublic === true;
+}
+
 function mapBankSnapshot(snapshot: {
   docs: Array<{
     id: string;
@@ -119,7 +129,15 @@ function mapBankSnapshot(snapshot: {
   return snapshot.docs.map((document) => {
     if (document.metadata.hasPendingWrites)
       throw new Error('Problem Bank changes are awaiting confirmation.');
-    return { id: document.id, ...validateContent(document.data()) };
+    const data = document.data();
+    return {
+      id: document.id,
+      ...validateContent(data),
+      isPublished: publicationIntent(data),
+      isTemporarilyHidden:
+        typeof data.hiddenByLiveSessionId === 'string' &&
+        data.hiddenByLiveSessionId.length > 0,
+    };
   });
 }
 
@@ -132,10 +150,28 @@ export async function listOfficerBankProblems(): Promise<BankProblemRecord[]> {
 
 export async function listMemberBankProblems(): Promise<BankProblemRecord[]> {
   const db = getFirestoreDb();
-  const snapshot = await getDocsFromServer(
-    query(collection(db, 'problemBank'), where('isPublic', '==', true)),
+  const bank = collection(db, 'problemBank');
+  const [published, legacyPublic] = await Promise.all([
+    getDocsFromServer(
+      query(
+        bank,
+        where('isPublished', '==', true),
+        where('hiddenByLiveSessionId', '==', null),
+      ),
+    ),
+    getDocsFromServer(query(bank, where('isPublic', '==', true))),
+  ]);
+  const documents = new Map(
+    [...published.docs, ...legacyPublic.docs].map((document) => [
+      document.id,
+      document,
+    ]),
   );
-  return sorted(mapBankSnapshot(snapshot));
+  return sorted(
+    mapBankSnapshot({ docs: [...documents.values()] }).filter(
+      (problem) => problem.isPublished,
+    ),
+  );
 }
 
 export async function getBankProblem(
@@ -145,7 +181,15 @@ export async function getBankProblem(
   const db = officer ? officerDb() : getFirestoreDb();
   const parent = await getDocFromServer(doc(db, bankProblemPath(problemId)));
   if (!parent.exists()) return null;
-  const problem = { id: parent.id, ...validateContent(parent.data()) };
+  const parentData = parent.data();
+  const problem = {
+    id: parent.id,
+    ...validateContent(parentData),
+    isPublished: publicationIntent(parentData),
+    isTemporarilyHidden:
+      typeof parentData.hiddenByLiveSessionId === 'string' &&
+      parentData.hiddenByLiveSessionId.length > 0,
+  };
   const entries = await Promise.all(
     languages.map(async (language) => {
       const snapshot = await getDocFromServer(
@@ -174,11 +218,20 @@ export async function createBankProblem(): Promise<BankProblemRecord> {
     category: 'custom',
   };
   const batch = writeBatch(db);
-  batch.set(reference, { ...problem, isPublic: true });
+  batch.set(reference, {
+    ...problem,
+    isPublished: false,
+    hiddenByLiveSessionId: null,
+  });
   for (const language of languages)
     batch.set(doc(db, bankSolutionPath(reference.id, language)), { code: '' });
   await batch.commit();
-  return { id: reference.id, ...problem };
+  return {
+    id: reference.id,
+    ...problem,
+    isPublished: false,
+    isTemporarilyHidden: false,
+  };
 }
 
 export async function updateBankProblem(
@@ -190,6 +243,21 @@ export async function updateBankProblem(
   updates.difficulty = validated.difficulty ?? deleteField();
   updates.leetcodeUrl = validated.leetcodeUrl ?? deleteField();
   await updateDoc(doc(officerDb(), bankProblemPath(problemId)), updates);
+}
+
+export async function updateBankPublication(
+  problemId: string,
+  isPublished: boolean,
+): Promise<void> {
+  const db = officerDb();
+  const reference = doc(db, bankProblemPath(problemId));
+  const snapshot = await getDocFromServer(reference);
+  if (!snapshot.exists())
+    throw new Error('This bank Problem no longer exists.');
+  await updateDoc(reference, {
+    isPublished,
+    isPublic: deleteField(),
+  });
 }
 
 export async function updateBankSolution(
@@ -297,7 +365,11 @@ export async function materializeSessionProblemInBank(
     ...(problem.leetcodeUrl ? { leetcodeUrl: problem.leetcodeUrl } : {}),
   };
   const batch = writeBatch(db);
-  batch.set(bankReference, { ...bankContent, isPublic: true });
+  batch.set(bankReference, {
+    ...bankContent,
+    isPublished: false,
+    hiddenByLiveSessionId: null,
+  });
   for (const [language, solution] of solutionEntries)
     batch.set(doc(db, bankSolutionPath(bankProblemId, language)), solution);
   batch.update(problemReference, {
