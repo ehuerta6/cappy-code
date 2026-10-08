@@ -28,8 +28,13 @@ test('Officer edits and reuses a bank Problem as an independent Session snapshot
     await officer
       .getByRole('button', { name: /CIC Intro — Hash Maps & Arrays/ })
       .click();
+    await expect(officer).toHaveURL(/\/officer\/sessions\/[^/]+$/);
+    await expect(
+      officer.getByRole('region', { name: 'Session metadata' }),
+    ).toBeVisible();
     await officer.getByRole('button', { name: 'Not Live' }).click();
     await officer.getByRole('button', { name: 'Back to Sessions' }).click();
+    await expect(officer).toHaveURL('/officer');
 
     await officer.getByRole('link', { name: 'Problem Bank' }).click();
     await officer.getByRole('button', { name: bankTitle }).click();
@@ -71,9 +76,15 @@ test('Officer edits and reuses a bank Problem as an independent Session snapshot
     await officer.goto('/officer');
     await officer.getByLabel('Branch for new session').selectOption('general');
     await officer.getByRole('button', { name: '+ New session' }).click();
+    await expect(officer).toHaveURL(/\/officer\/sessions\/[^/]+$/);
+    await expect(
+      officer.getByRole('region', { name: 'Session metadata' }),
+    ).toBeVisible();
     await officer.getByLabel('Session title').fill(sessionTitle);
     await officer.getByLabel('Session date').fill('2026-10-21');
-    await officer.getByRole('button', { name: 'Save changes' }).click();
+    await officer
+      .getByRole('button', { name: 'Save Changes', exact: true })
+      .click();
     await officer.getByRole('button', { name: 'Manage problems' }).click();
     await officer
       .getByRole('button', { name: 'Add from Problem Bank' })
@@ -114,6 +125,10 @@ test('Officer edits and reuses a bank Problem as an independent Session snapshot
 
     await officer.goto('/officer');
     await officer.getByRole('button', { name: sessionTitle }).click();
+    await expect(officer).toHaveURL(/\/officer\/sessions\/[^/]+$/);
+    await expect(
+      officer.getByRole('region', { name: 'Session metadata' }),
+    ).toBeVisible();
     await officer.getByRole('button', { name: 'Manage problems' }).click();
     await expect(officer.getByLabel('Description')).toHaveValue(
       originalStatement,
