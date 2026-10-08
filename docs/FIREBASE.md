@@ -116,6 +116,25 @@ archive, Monaco languages, and themes. Use only approved temporary smoke data
 and remove it when finished. Do not treat emulator or preview-deployment
 results as production verification.
 
+## Verified production Firestore target (#134)
+
+Verified on October 8, 2026 against Vercel and Firebase configuration:
+
+- Vercel project: `cappycode`, connected to `ehuerta6/cappy-code`.
+- Current production deployment: READY, built from `main` at
+  `484656a02a79abcf13d620f2095090a37bca3dc0`.
+- The Vercel Production environment's `NEXT_PUBLIC_FIREBASE_PROJECT_ID` is
+  `cappycode-f133c`; `NEXT_PUBLIC_USE_FIREBASE_EMULATORS` is `false`.
+- The deployed client calls Firebase's default `getFirestore` instance. The
+  active Firebase project `cappycode-f133c` has the native Firestore database
+  `projects/cappycode-f133c/databases/(default)`.
+
+Therefore the deployed CappyCode app and the intended #131 import target are
+`cappycode-f133c` / `(default)`. This verification used the Vercel Production
+deployment and environment configuration plus Firebase project/database
+metadata, not `.firebaserc` or local emulator settings. No secret values are
+recorded here. No production data was written during verification.
+
 ## Local setup
 
 1. Create or select a Firebase project in the [Firebase Console](https://console.firebase.google.com/).
