@@ -610,6 +610,64 @@ describe('Firestore security rules', () => {
     );
   });
 
+  it('denies Member Bank deletion and preserves Session snapshots when an Officer deletes the Bank hierarchy', async () => {
+    await environment.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await Promise.all([
+        setDoc(doc(db, 'sessions/ended'), {
+          status: 'ended',
+          bankProblemIds: ['public'],
+        }),
+        setDoc(doc(db, 'sessions/ended/problems/hidden'), {
+          title: 'Historical snapshot',
+          description: 'Copied statement',
+          exampleInput: '1',
+          exampleOutput: '2',
+          bankProblemId: 'public',
+        }),
+      ]);
+    });
+
+    await assertFails(deleteDoc(doc(anonymousDb(), 'problemBank/public')));
+
+    const db = officerDb();
+    const batch = writeBatch(db);
+    for (const language of ['python', 'java', 'cpp']) {
+      batch.delete(doc(db, `problemBank/public/solutions/${language}`));
+      batch.delete(
+        doc(db, `problemBank/public/approaches/primary/solutions/${language}`),
+      );
+    }
+    batch.delete(doc(db, 'problemBank/public/approaches/primary'));
+    batch.delete(doc(db, 'problemBank/public'));
+    await assertSucceeds(batch.commit());
+
+    await assertFails(getDoc(doc(anonymousDb(), 'problemBank/public')));
+    expect(
+      (await getDoc(doc(db, 'sessions/ended/problems/hidden'))).data(),
+    ).toMatchObject({
+      title: 'Historical snapshot',
+      description: 'Copied statement',
+      bankProblemId: 'public',
+    });
+    expect(
+      (await getDoc(doc(db, 'sessions/ended'))).data()?.bankProblemIds,
+    ).toEqual(['public']);
+    for (const language of ['python', 'java', 'cpp']) {
+      await assertSucceeds(
+        getDoc(doc(db, `sessions/ended/problems/hidden/solutions/${language}`)),
+      );
+      await assertSucceeds(
+        getDoc(
+          doc(
+            db,
+            `sessions/ended/problems/hidden/approaches/primary/solutions/${language}`,
+          ),
+        ),
+      );
+    }
+  });
+
   it('allows a public bank entry before the first live Session exists', async () => {
     await environment.withSecurityRulesDisabled(async (context) => {
       await deleteDoc(doc(context.firestore(), 'sessionControl/liveSession'));

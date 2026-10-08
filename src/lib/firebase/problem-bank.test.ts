@@ -47,6 +47,7 @@ vi.mock('firebase/firestore', async (importOriginal) => ({
 import {
   addBankProblemToSession,
   createBankProblem,
+  deleteBankProblem,
   listMemberBankProblems,
   listBankProblemApproachTags,
   materializeSessionProblemInBank,
@@ -108,6 +109,81 @@ beforeEach(() => {
 });
 
 describe('Problem Bank snapshots', () => {
+  it('deletes the Bank hierarchy in one batch and leaves Session references alone', async () => {
+    const snapshot = (paths: string[]) => ({
+      docs: paths.map((path) => ({
+        id: path.split('/').at(-1),
+        ref: { path },
+      })),
+    });
+    sdk.getDocFromServer.mockResolvedValueOnce({
+      exists: () => true,
+      ref: { path: 'problemBank/source' },
+    });
+    sdk.getDocsFromServer.mockImplementation(
+      async ({ path }: { path: string }) =>
+        path === 'problemBank/source/solutions'
+          ? snapshot([
+              'problemBank/source/solutions/python',
+              'problemBank/source/solutions/java',
+            ])
+          : path === 'problemBank/source/approaches'
+            ? snapshot(['problemBank/source/approaches/primary'])
+            : path === 'problemBank/source/approaches/primary/solutions'
+              ? snapshot([
+                  'problemBank/source/approaches/primary/solutions/python',
+                  'problemBank/source/approaches/primary/solutions/java',
+                  'problemBank/source/approaches/primary/solutions/cpp',
+                ])
+              : snapshot([]),
+    );
+
+    await deleteBankProblem('source');
+
+    expect(
+      sdk.batchDelete.mock.calls.map(([reference]) => reference.path),
+    ).toEqual([
+      'problemBank/source/solutions/python',
+      'problemBank/source/solutions/java',
+      'problemBank/source/approaches/primary/solutions/python',
+      'problemBank/source/approaches/primary/solutions/java',
+      'problemBank/source/approaches/primary/solutions/cpp',
+      'problemBank/source/approaches/primary',
+      'problemBank/source',
+    ]);
+    expect(sdk.commit).toHaveBeenCalledOnce();
+    expect(sdk.batchUpdate).not.toHaveBeenCalled();
+  });
+
+  it('rejects a hierarchy over the Firestore batch limit before queuing writes', async () => {
+    sdk.getDocFromServer.mockResolvedValueOnce({ exists: () => true });
+    sdk.getDocsFromServer.mockImplementation(
+      async ({ path }: { path: string }) =>
+        path === 'problemBank/source/approaches'
+          ? {
+              docs: Array.from({ length: 167 }, (_, index) => ({
+                id: `approach-${index}`,
+                ref: {
+                  path: `problemBank/source/approaches/approach-${index}`,
+                },
+              })),
+            }
+          : path.endsWith('/solutions') && path.includes('/approaches/')
+            ? {
+                docs: Array.from({ length: 3 }, (_, index) => ({
+                  ref: { path: `${path}/solution-${index}` },
+                })),
+              }
+            : { docs: [] },
+    );
+
+    await expect(deleteBankProblem('source')).rejects.toThrow(
+      'too much stored content',
+    );
+    expect(sdk.batchDelete).not.toHaveBeenCalled();
+    expect(sdk.commit).not.toHaveBeenCalled();
+  });
+
   it('derives tag options from every Bank Approach using the supported taxonomy', async () => {
     sdk.getDocsFromServer.mockResolvedValueOnce({
       docs: [
