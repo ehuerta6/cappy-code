@@ -42,12 +42,21 @@ test('Officer prepares and presents a Session through its public lifecycle', asy
     await officer
       .getByRole('button', { name: /CIC Intro — Hash Maps & Arrays/ })
       .click();
+    await expect(officer).toHaveURL(/\/officer\/sessions\/[^/]+$/);
+    await expect(
+      officer.getByRole('region', { name: 'Session metadata' }),
+    ).toBeVisible();
     await officer.getByRole('button', { name: 'Not Live' }).click();
     await expect(officer.getByText('draft', { exact: true })).toBeVisible();
     await officer.getByRole('button', { name: 'Back to Sessions' }).click();
+    await expect(officer).toHaveURL('/officer');
 
     await officer.getByLabel('Branch for new session').selectOption('general');
     await officer.getByRole('button', { name: '+ New session' }).click();
+    await expect(officer).toHaveURL(/\/officer\/sessions\/[^/]+$/);
+    await expect(
+      officer.getByRole('region', { name: 'Session metadata' }),
+    ).toBeVisible();
     await officer.getByLabel('Session title').fill(sessionTitle);
     await officer.getByLabel('Session date').fill('2026-10-20');
     await officer.getByLabel('Session branch').selectOption('general');
@@ -55,8 +64,8 @@ test('Officer prepares and presents a Session through its public lifecycle', asy
       .getByRole('button', { name: 'Save Changes', exact: true })
       .click();
     await expect(officer.getByText('Saved ✓')).toBeVisible();
-    const officerSessionURL = officer.url();
     await expect(officer).toHaveURL(/\/officer\/sessions\/[^/]+$/);
+    const officerSessionURL = officer.url();
     await officer.reload();
     await expect(officer).toHaveURL(officerSessionURL);
     await expect(officer.getByLabel('Session title')).toHaveValue(sessionTitle);
@@ -155,6 +164,10 @@ test('Officer prepares and presents a Session through its public lifecycle', asy
     await officer
       .getByRole('button', { name: new RegExp(sessionTitle) })
       .click();
+    await expect(officer).toHaveURL(officerSessionURL);
+    await expect(
+      officer.getByRole('region', { name: 'Session metadata' }),
+    ).toBeVisible();
     await officer.getByRole('button', { name: 'Manage problems' }).click();
     await expect(
       officer.getByRole('button', { name: 'New Approach' }),

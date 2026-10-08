@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   createSession,
@@ -24,10 +24,7 @@ export default function OfficerSessions({ sessionId }: { sessionId?: string }) {
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState(false);
   const [createBranch, setCreateBranch] = useState<SessionBranch>('intro');
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [dismissedRoute, setDismissedRoute] = useState(false);
   const [revision, setRevision] = useState(0);
-  const openAfterLoad = useRef<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -36,13 +33,6 @@ export default function OfficerSessions({ sessionId }: { sessionId?: string }) {
         if (cancelled) return;
         setRecords(sessions);
         setLoading(false);
-        if (
-          openAfterLoad.current &&
-          sessions.some((record) => record.id === openAfterLoad.current)
-        ) {
-          setSelectedId(openAfterLoad.current);
-        }
-        openAfterLoad.current = null;
       },
       () => {
         if (cancelled) return;
@@ -70,9 +60,7 @@ export default function OfficerSessions({ sessionId }: { sessionId?: string }) {
         title: 'Untitled Session',
         date: todayCalendarDate(),
       });
-      openAfterLoad.current = id;
       router.push(`/officer/sessions/${encodeURIComponent(id)}`);
-      reload();
     } catch {
       setCreateError(true);
     } finally {
@@ -80,24 +68,19 @@ export default function OfficerSessions({ sessionId }: { sessionId?: string }) {
     }
   }
 
-  const activeId = sessionId && !dismissedRoute ? sessionId : selectedId;
-  const selected = records.find((record) => record.id === activeId);
+  const selected = sessionId
+    ? records.find((record) => record.id === sessionId)
+    : undefined;
   if (selected) {
     return (
       <SessionEditor
         key={selected.id}
         record={selected}
         onDuplicated={(id) => {
-          openAfterLoad.current = id;
-          setSelectedId(null);
           router.push(`/officer/sessions/${encodeURIComponent(id)}`);
-          reload();
         }}
         onClose={() => {
-          setSelectedId(null);
-          setDismissedRoute(true);
           router.push('/officer');
-          reload();
         }}
       />
     );
@@ -219,8 +202,6 @@ export default function OfficerSessions({ sessionId }: { sessionId?: string }) {
                               <button
                                 className="flex min-h-14 w-full flex-wrap items-center justify-start gap-x-3 gap-y-1 rounded px-2 py-3 text-left text-ink hover:bg-hover focus-visible:relative focus-visible:z-10 disabled:cursor-default disabled:bg-raised disabled:text-muted max-sm:items-start max-sm:flex-col"
                                 onClick={() => {
-                                  setDismissedRoute(false);
-                                  setSelectedId(record.id);
                                   router.push(
                                     `/officer/sessions/${encodeURIComponent(record.id)}`,
                                   );

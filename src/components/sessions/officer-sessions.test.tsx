@@ -9,6 +9,7 @@ import {
 } from '@testing-library/react';
 import { Timestamp } from 'firebase/firestore';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { useState } from 'react';
 
 const api = vi.hoisted(() => ({
   createSession: vi.fn(),
@@ -116,9 +117,29 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-async function openEditor() {
-  render(<OfficerSessions />);
+async function openEditor(remountOnNavigation = false) {
+  render(<RoutedOfficerSessions remountOnNavigation={remountOnNavigation} />);
   fireEvent.click(await screen.findByRole('button', { name: /Arrays/ }));
+  await screen.findByRole('region', { name: 'Session metadata' });
+}
+
+function RoutedOfficerSessions({
+  initialSessionId,
+  remountOnNavigation = false,
+}: {
+  initialSessionId?: string;
+  remountOnNavigation?: boolean;
+}) {
+  const [sessionId, setSessionId] = useState(initialSessionId);
+  navigation.push.mockImplementation((url: string) => {
+    const match = url.match(/^\/officer\/sessions\/([^/]+)$/);
+    setSessionId(match ? decodeURIComponent(match[1]) : undefined);
+  });
+  return remountOnNavigation ? (
+    <OfficerSessions key={sessionId ?? 'session-list'} sessionId={sessionId} />
+  ) : (
+    <OfficerSessions sessionId={sessionId} />
+  );
 }
 
 describe('Officer Sessions surface', () => {
@@ -190,7 +211,7 @@ describe('Officer Sessions surface', () => {
         session: { ...record.session, title: 'Untitled Session' },
       },
     ]);
-    render(<OfficerSessions />);
+    render(<RoutedOfficerSessions remountOnNavigation />);
     await screen.findByText('No Sessions yet');
     fireEvent.change(screen.getByLabelText('Branch for new session'), {
       target: { value: 'general' },
@@ -204,12 +225,49 @@ describe('Officer Sessions surface', () => {
       title: 'Untitled Session',
       date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
     });
+    expect(navigation.push).toHaveBeenCalledWith(
+      '/officer/sessions/new-session',
+    );
+  });
+
+  it('navigates from the list without rendering an editor before the route changes', async () => {
+    render(<OfficerSessions />);
+    fireEvent.click(await screen.findByRole('button', { name: /Arrays/ }));
+
+    expect(navigation.push).toHaveBeenCalledWith(
+      '/officer/sessions/session-id',
+    );
+    expect(
+      screen.queryByRole('region', { name: 'Session metadata' }),
+    ).toBeNull();
+    expect(screen.getByRole('button', { name: /Arrays/ })).toBeTruthy();
+  });
+
+  it('routes a successful duplicate to its stable Session URL', async () => {
+    api.listSessions.mockResolvedValueOnce([record]).mockResolvedValue([
+      record,
+      {
+        ...record,
+        id: 'copied-session',
+        session: { ...record.session, title: 'Arrays copy' },
+      },
+    ]);
+    await openEditor(true);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Duplicate session' }));
+
+    expect(
+      await screen.findByRole('heading', { name: 'Arrays copy' }),
+    ).toBeTruthy();
+    expect(navigation.push).toHaveBeenCalledWith(
+      '/officer/sessions/copied-session',
+    );
   });
 
   it('shows create errors without adding a fake row', async () => {
     api.listSessions.mockResolvedValue([]);
     api.createSession.mockRejectedValue(new Error('denied'));
-    render(<OfficerSessions />);
+    render(<RoutedOfficerSessions remountOnNavigation />);
     await screen.findByText('No Sessions yet');
     fireEvent.click(screen.getByRole('button', { name: '+ New session' }));
     expect((await screen.findByRole('alert')).textContent).toContain(
@@ -400,7 +458,7 @@ describe('Officer Sessions surface', () => {
           ],
     );
 
-    render(<OfficerSessions />);
+    render(<RoutedOfficerSessions />);
     const intro = await screen.findByRole('region', {
       name: 'Intro session history',
     });
@@ -718,12 +776,12 @@ describe('Officer Sessions surface', () => {
         { ...record, session: { ...record.session, status: 'live' } },
       ])
       .mockResolvedValueOnce([
-        {
-          ...record,
-          session: { ...record.session, status: 'ended' },
-        },
+        { ...record, session: { ...record.session, status: 'live' } },
+      ])
+      .mockResolvedValueOnce([
+        { ...record, session: { ...record.session, status: 'ended' } },
       ]);
-    await openEditor();
+    await openEditor(true);
     fireEvent.click(screen.getByRole('button', { name: 'End Session' }));
     expect(confirm).toHaveBeenCalledWith(
       expect.stringContaining(
@@ -765,7 +823,7 @@ describe('Officer Sessions surface', () => {
     api.listSessions
       .mockResolvedValueOnce([])
       .mockRejectedValueOnce(new Error('offline'));
-    render(<OfficerSessions />);
+    render(<RoutedOfficerSessions remountOnNavigation />);
     await screen.findByText('No Sessions yet');
     fireEvent.click(screen.getByRole('button', { name: '+ New session' }));
     expect((await screen.findByRole('alert')).textContent).toContain(
@@ -945,8 +1003,7 @@ describe('Officer Sessions surface', () => {
         },
       },
     ]);
-    render(<OfficerSessions />);
-    fireEvent.click(await screen.findByRole('button', { name: /Arrays/ }));
+    await openEditor();
     fireEvent.click(screen.getByRole('button', { name: 'Manage problems' }));
     await screen.findByLabelText('Python Solution, editable');
     const backButton = screen.getByRole('button', { name: 'Back to session' });
@@ -997,8 +1054,7 @@ describe('Officer Sessions surface', () => {
           finishSave = resolve;
         }),
     );
-    render(<OfficerSessions />);
-    fireEvent.click(await screen.findByRole('button', { name: /Arrays/ }));
+    await openEditor();
     fireEvent.click(screen.getByRole('button', { name: 'Manage problems' }));
     await screen.findByLabelText('Python Solution, editable');
 
@@ -1068,8 +1124,7 @@ describe('Officer Sessions surface', () => {
         }
       },
     );
-    render(<OfficerSessions />);
-    fireEvent.click(await screen.findByRole('button', { name: /Arrays/ }));
+    await openEditor();
     fireEvent.click(screen.getByRole('button', { name: 'Manage problems' }));
     await screen.findByLabelText('Python Solution, editable');
 
@@ -1150,8 +1205,7 @@ describe('Officer Sessions surface', () => {
       },
     ]);
     api.updateSolution.mockRejectedValueOnce(new Error('offline'));
-    render(<OfficerSessions />);
-    fireEvent.click(await screen.findByRole('button', { name: /Arrays/ }));
+    await openEditor();
     fireEvent.click(screen.getByRole('button', { name: 'Manage problems' }));
     await screen.findByLabelText('Python Solution, editable');
 
@@ -1230,6 +1284,18 @@ describe('Officer Sessions surface', () => {
     render(<OfficerSessions sessionId="deleted-session" />);
     expect(
       await screen.findByRole('region', { name: 'Session unavailable' }),
+    ).toBeTruthy();
+  });
+
+  it('navigates Back to Sessions to the list route', async () => {
+    render(<RoutedOfficerSessions initialSessionId="session-id" />);
+    await screen.findByRole('region', { name: 'Session metadata' });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Back to Sessions' }));
+
+    expect(navigation.push).toHaveBeenCalledWith('/officer');
+    expect(
+      await screen.findByRole('region', { name: 'Intro session history' }),
     ).toBeTruthy();
   });
 
@@ -1343,7 +1409,7 @@ describe('Officer Sessions surface', () => {
     api.deleteSession
       .mockRejectedValueOnce(new Error('offline'))
       .mockResolvedValueOnce(undefined);
-    await openEditor();
+    await openEditor(true);
     fireEvent.click(screen.getByRole('button', { name: 'Delete session' }));
     expect(confirm).toHaveBeenCalledWith(expect.stringContaining('Arrays'));
     expect(api.deleteSession).not.toHaveBeenCalled();
