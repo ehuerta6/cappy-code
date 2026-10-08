@@ -8,6 +8,11 @@ const sdk = vi.hoisted(() => ({
   db: {},
   getDocFromServer: vi.fn(),
   setDoc: vi.fn(),
+  getDocsFromServer: vi.fn(),
+  batchSet: vi.fn(),
+  batchUpdate: vi.fn(),
+  batchDelete: vi.fn(),
+  commit: vi.fn(),
   getFirestoreDb: vi.fn(),
 }));
 vi.mock('client-only', () => ({}));
@@ -15,17 +20,38 @@ vi.mock('./auth', () => ({ getOfficerAuth: () => sdk.user }));
 vi.mock('./client', () => ({ getFirestoreDb: sdk.getFirestoreDb }));
 vi.mock('firebase/firestore', async (importOriginal) => ({
   ...(await importOriginal<typeof import('firebase/firestore')>()),
-  doc: (_db: unknown, path: string) => ({ path }),
+  doc: (_db: unknown, path?: string) =>
+    path
+      ? { path }
+      : {
+          path: 'sessions/s/problems/p/approaches/new-approach',
+          id: 'new-approach',
+        },
+  collection: (_db: unknown, path: string) => ({ path }),
   getDocFromServer: sdk.getDocFromServer,
   setDoc: sdk.setDoc,
+  getDocsFromServer: sdk.getDocsFromServer,
+  writeBatch: () => ({
+    set: sdk.batchSet,
+    update: sdk.batchUpdate,
+    delete: sdk.batchDelete,
+    commit: sdk.commit,
+  }),
 }));
-import { getSolutionsForProblem, updateSolution } from './solutions';
+import {
+  createApproach,
+  getApproaches,
+  getSolutionsForProblem,
+  updateSolution,
+} from './solutions';
 
 beforeEach(() => {
   vi.clearAllMocks();
   sdk.user.currentUser = { isAnonymous: false };
   sdk.getFirestoreDb.mockReturnValue(sdk.db);
   sdk.setDoc.mockResolvedValue(undefined);
+  sdk.getDocsFromServer.mockResolvedValue({ docs: [] });
+  sdk.commit.mockResolvedValue(undefined);
   sdk.getDocFromServer.mockImplementation(async ({ path }) => ({
     exists: () => true,
     metadata: { hasPendingWrites: false },
@@ -163,5 +189,55 @@ describe('officer solution persistence', () => {
       updateSolution('s', 'p', 'java', { code: '' }),
     ).rejects.toThrow('offline');
     await expect(getSolutionsForProblem('s', 'p')).rejects.toThrow('offline');
+  });
+
+  it('loads explicit approaches in deterministic order with fixed language solutions', async () => {
+    sdk.getDocsFromServer.mockResolvedValue({
+      docs: [
+        {
+          id: 'z',
+          data: () => ({
+            name: 'Two Pointers',
+            tags: ['Arrays', 'Two Pointers'],
+            order: 1,
+          }),
+        },
+        {
+          id: 'a',
+          data: () => ({ name: 'Hash Map', tags: ['Hash Map'], order: 0 }),
+        },
+      ],
+    });
+    const approaches = await getApproaches('sessions/s/problems/p');
+    expect(approaches.map(({ id }) => id)).toEqual(['a', 'z']);
+    expect(approaches[0].solutions.python).toEqual({
+      code: 'sessions/s/problems/p/approaches/a/solutions/python',
+    });
+  });
+
+  it('forward materializes all legacy language documents as the stable primary Approach before adding one', async () => {
+    sdk.getDocFromServer.mockImplementation(
+      async ({ path }: { path: string }) => ({
+        exists: () => !path.endsWith('/approaches/primary'),
+        metadata: { hasPendingWrites: false },
+        data: () => ({ code: path }),
+      }),
+    );
+    await createApproach('sessions/s/problems/p');
+    expect(sdk.batchSet).toHaveBeenCalledWith(
+      { path: 'sessions/s/problems/p/approaches/primary' },
+      { name: 'Primary Approach', tags: [], order: 0 },
+    );
+    for (const language of languages)
+      expect(sdk.batchSet).toHaveBeenCalledWith(
+        {
+          path: `sessions/s/problems/p/approaches/primary/solutions/${language}`,
+        },
+        { code: `sessions/s/problems/p/solutions/${language}` },
+      );
+    expect(sdk.batchUpdate).toHaveBeenCalledWith(
+      { path: 'sessions/s/problems/p' },
+      { approachesEnabled: true },
+    );
   });
 });

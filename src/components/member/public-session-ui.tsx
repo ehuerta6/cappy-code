@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
+import type { SolutionApproach } from '@/lib/domain';
 import type { ProblemSolutions } from '@/lib/firebase/solutions';
 import type { ProblemDifficulty } from '@/lib/domain';
 import AppHeader from '@/components/app-header';
@@ -221,7 +222,9 @@ export type SessionState =
             onRetry: () => void;
           }
         | { status: 'ready'; records: PublicProblem[] };
-      loadRevealedSolutions: (problemId: string) => Promise<ProblemSolutions>;
+      loadRevealedSolutions: (
+        problemId: string,
+      ) => Promise<SolutionApproach[] | ProblemSolutions>;
     };
 
 export function PublicSessionView({ state }: { state: SessionState }) {
@@ -483,7 +486,9 @@ function ProblemContent({
 }: {
   session: PublicSessionSummary;
   problem: PublicProblem;
-  loadRevealedSolutions: (problemId: string) => Promise<ProblemSolutions>;
+  loadRevealedSolutions: (
+    problemId: string,
+  ) => Promise<SolutionApproach[] | ProblemSolutions>;
 }) {
   const [visibilityRetry, setVisibilityRetry] = useState(0);
   const isEnded = session.status === 'ended';
@@ -667,23 +672,41 @@ function RevealedSolutions({
 }: {
   sessionId: string;
   problemId: string;
-  loadRevealedSolutions: (problemId: string) => Promise<ProblemSolutions>;
+  loadRevealedSolutions: (
+    problemId: string,
+  ) => Promise<SolutionApproach[] | ProblemSolutions>;
 }) {
-  const [solutions, setSolutions] = useState<ProblemSolutions | null>(null);
+  const [approaches, setApproaches] = useState<SolutionApproach[] | null>(null);
+  const [approachId, setApproachId] = useState('primary');
   const [failed, setFailed] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
     let active = true;
-    setSolutions(null);
+    setApproaches(null);
+    setApproachId('primary');
     setFailed(false);
     void loadRevealedSolutions(problemId).then(
       (result) => {
-        if (active) setSolutions(result);
+        if (active) {
+          const records = Array.isArray(result)
+            ? result
+            : [
+                {
+                  id: 'primary',
+                  name: 'Primary Approach',
+                  tags: [],
+                  order: 0,
+                  solutions: result,
+                },
+              ];
+          setApproaches(records);
+          setApproachId(records[0]?.id ?? 'primary');
+        }
       },
       () => {
         if (active) {
-          setSolutions(null);
+          setApproaches(null);
           setFailed(true);
         }
       },
@@ -709,11 +732,37 @@ function RevealedSolutions({
       </div>
     );
   }
-  if (!solutions) return <p role="status">Loading solutions…</p>;
+  if (!approaches) return <p role="status">Loading solutions…</p>;
+  const selected =
+    approaches.find(({ id }) => id === approachId) ?? approaches[0];
+  if (!selected) return <p>No approaches are available yet.</p>;
   return (
-    <SolutionWorkspace
-      solutions={solutions}
-      modelPath={`member/${sessionId}/${problemId}`}
-    />
+    <>
+      {approaches.length > 1 && (
+        <div
+          className="mb-4 flex flex-wrap gap-2"
+          aria-label="Solution approaches"
+        >
+          {approaches.map((approach) => (
+            <button
+              key={approach.id}
+              type="button"
+              aria-pressed={approach.id === selected.id}
+              className="rounded border border-border-strong bg-surface px-3 py-2"
+              onClick={() => setApproachId(approach.id)}
+            >
+              {approach.name}
+            </button>
+          ))}
+        </div>
+      )}
+      {selected.tags.length > 0 && (
+        <p className="mb-3 text-sm text-muted">{selected.tags.join(' · ')}</p>
+      )}
+      <SolutionWorkspace
+        solutions={selected.solutions}
+        modelPath={`member/${sessionId}/${problemId}/${selected.id}`}
+      />
+    </>
   );
 }

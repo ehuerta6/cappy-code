@@ -22,6 +22,7 @@ import {
   type ProblemCategory,
   type ProblemDifficulty,
   type Solution,
+  type SolutionApproach,
 } from '../domain';
 import { validateLeetcodeProblemUrl } from '../problem-metadata';
 import { getOfficerAuth } from './auth';
@@ -34,6 +35,11 @@ import {
   solutionPath,
 } from './paths';
 import { listProblems } from './problems';
+import {
+  getApproaches,
+  saveApproach,
+  updateApproachSolution,
+} from './solutions';
 
 export interface BankProblemContent {
   title: string;
@@ -177,7 +183,11 @@ export async function listMemberBankProblems(): Promise<BankProblemRecord[]> {
 export async function getBankProblem(
   problemId: string,
   officer = false,
-): Promise<{ problem: BankProblemRecord; solutions: BankSolutions } | null> {
+): Promise<{
+  problem: BankProblemRecord;
+  solutions: BankSolutions;
+  approaches: SolutionApproach[];
+} | null> {
   const db = officer ? officerDb() : getFirestoreDb();
   const parent = await getDocFromServer(doc(db, bankProblemPath(problemId)));
   if (!parent.exists()) return null;
@@ -190,6 +200,7 @@ export async function getBankProblem(
       typeof parentData.hiddenByLiveSessionId === 'string' &&
       parentData.hiddenByLiveSessionId.length > 0,
   };
+  const approaches = await getApproaches(bankProblemPath(problemId));
   const entries = await Promise.all(
     languages.map(async (language) => {
       const snapshot = await getDocFromServer(
@@ -203,7 +214,13 @@ export async function getBankProblem(
       ] as const;
     }),
   );
-  return { problem, solutions: Object.fromEntries(entries) as BankSolutions };
+  return {
+    problem,
+    solutions:
+      approaches[0]?.solutions ??
+      (Object.fromEntries(entries) as BankSolutions),
+    approaches,
+  };
 }
 
 export async function createBankProblem(): Promise<BankProblemRecord> {
@@ -264,11 +281,30 @@ export async function updateBankSolution(
   problemId: string,
   language: (typeof languages)[number],
   solution: Solution,
+  approachId?: string,
 ): Promise<void> {
   if (!languages.includes(language))
     throw new Error('Choose Python, Java, or C++.');
   const parsed = validateSolution(solution);
-  await setDoc(doc(officerDb(), bankSolutionPath(problemId, language)), parsed);
+  if (approachId)
+    await updateApproachSolution(
+      bankProblemPath(problemId),
+      approachId,
+      language,
+      parsed,
+    );
+  else
+    await setDoc(
+      doc(officerDb(), bankSolutionPath(problemId, language)),
+      parsed,
+    );
+}
+
+export async function updateBankApproach(
+  problemId: string,
+  approach: SolutionApproach,
+): Promise<void> {
+  await saveApproach(bankProblemPath(problemId), approach);
 }
 
 export async function addBankProblemToSession(
@@ -301,12 +337,32 @@ export async function addBankProblemToSession(
   };
   const reference = doc(collection(db, `${sessionPath(sessionId)}/problems`));
   const batch = writeBatch(db);
-  batch.set(doc(db, problemPath(sessionId, reference.id)), sessionProblem);
+  batch.set(doc(db, problemPath(sessionId, reference.id)), {
+    ...sessionProblem,
+    approachesEnabled: true,
+  });
   for (const language of languages)
     batch.set(
       doc(db, solutionPath(sessionId, reference.id, language)),
       record.solutions[language],
     );
+  for (const approach of record.approaches) {
+    batch.set(
+      doc(
+        db,
+        `${problemPath(sessionId, reference.id)}/approaches/${approach.id}`,
+      ),
+      { name: approach.name, tags: approach.tags, order: approach.order },
+    );
+    for (const language of languages)
+      batch.set(
+        doc(
+          db,
+          `${problemPath(sessionId, reference.id)}/approaches/${approach.id}/solutions/${language}`,
+        ),
+        approach.solutions[language],
+      );
+  }
   batch.update(doc(db, sessionPath(sessionId)), {
     bankProblemIds: arrayUnion(problemId),
   });
@@ -352,6 +408,7 @@ export async function materializeSessionProblemInBank(
   );
 
   const bankProblemId = stored.bankProblemId;
+  const approaches = await getApproaches(problemPath(sessionId, problemId));
   const bankReference = doc(db, bankProblemPath(bankProblemId));
   const problem = parsedProblem.data;
   const bankContent: BankProblemContent = {
@@ -369,9 +426,24 @@ export async function materializeSessionProblemInBank(
     ...bankContent,
     isPublished: false,
     hiddenByLiveSessionId: null,
+    approachesEnabled: true,
   });
   for (const [language, solution] of solutionEntries)
     batch.set(doc(db, bankSolutionPath(bankProblemId, language)), solution);
+  for (const approach of approaches) {
+    batch.set(
+      doc(db, `${bankProblemPath(bankProblemId)}/approaches/${approach.id}`),
+      { name: approach.name, tags: approach.tags, order: approach.order },
+    );
+    for (const language of languages)
+      batch.set(
+        doc(
+          db,
+          `${bankProblemPath(bankProblemId)}/approaches/${approach.id}/solutions/${language}`,
+        ),
+        approach.solutions[language],
+      );
+  }
   batch.update(problemReference, {
     bankProblemId,
     bankOrigin: 'session',

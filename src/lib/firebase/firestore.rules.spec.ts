@@ -141,6 +141,23 @@ beforeEach(async () => {
           ),
         );
       }
+      writes.push(
+        setDoc(doc(database, `problemBank/${problemId}/approaches/primary`), {
+          name: 'Primary',
+          tags: ['Arrays'],
+          order: 0,
+        }),
+      );
+      for (const language of ['python', 'java', 'cpp'])
+        writes.push(
+          setDoc(
+            doc(
+              database,
+              `problemBank/${problemId}/approaches/primary/solutions/${language}`,
+            ),
+            { code: `${language} nested bank source` },
+          ),
+        );
     }
     const solutionPaths = [
       'sessions/draft/problems/revealed',
@@ -150,11 +167,27 @@ beforeEach(async () => {
       'sessions/ended/problems/revealed',
     ];
     for (const parentPath of solutionPaths) {
+      writes.push(
+        setDoc(doc(database, `${parentPath}/approaches/primary`), {
+          name: 'Primary',
+          tags: ['Arrays'],
+          order: 0,
+        }),
+      );
       for (const language of ['python', 'java', 'cpp']) {
         writes.push(
           setDoc(doc(database, `${parentPath}/solutions/${language}`), {
             code: `${language} source`,
           }),
+        );
+        writes.push(
+          setDoc(
+            doc(
+              database,
+              `${parentPath}/approaches/primary/solutions/${language}`,
+            ),
+            { code: `${language} nested source`, timeComplexity: 'O(n)' },
+          ),
         );
       }
     }
@@ -706,5 +739,120 @@ describe('Firestore security rules', () => {
     await assertSucceeds(deletion.commit());
     await assertSucceeds(getDoc(doc(member, 'problemBank/used-live')));
     await assertFails(getDoc(doc(member, 'problemBank/used-private')));
+  });
+
+  it('protects Approach metadata and Solutions with Session reveal state and lifecycle', async () => {
+    const member = anonymousDb();
+    const officer = officerDb();
+    await assertFails(
+      getDoc(doc(member, 'sessions/live/problems/hidden/approaches/primary')),
+    );
+    await assertFails(
+      getDoc(
+        doc(
+          member,
+          'sessions/live/problems/hidden/approaches/primary/solutions/python',
+        ),
+      ),
+    );
+    await assertSucceeds(
+      getDoc(doc(member, 'sessions/live/problems/revealed/approaches/primary')),
+    );
+    await assertSucceeds(
+      getDoc(
+        doc(
+          member,
+          'sessions/live/problems/revealed/approaches/primary/solutions/python',
+        ),
+      ),
+    );
+    await assertFails(
+      setDoc(doc(officer, 'sessions/live/problems/revealed/approaches/new'), {
+        name: 'New',
+        tags: [],
+        order: 1,
+      }),
+    );
+    await assertFails(
+      deleteDoc(
+        doc(officer, 'sessions/live/problems/revealed/approaches/primary'),
+      ),
+    );
+    await assertFails(
+      updateDoc(
+        doc(officer, 'sessions/live/problems/revealed/approaches/primary'),
+        { order: 2 },
+      ),
+    );
+    await assertSucceeds(
+      updateDoc(
+        doc(officer, 'sessions/live/problems/revealed/approaches/primary'),
+        { name: 'Corrected', tags: ['Tree'] },
+      ),
+    );
+    await assertSucceeds(
+      updateDoc(
+        doc(
+          officer,
+          'sessions/live/problems/revealed/approaches/primary/solutions/python',
+        ),
+        { code: 'corrected' },
+      ),
+    );
+    await assertSucceeds(
+      updateDoc(doc(officer, 'sessions/live/problems/revealed'), {
+        answersVisible: false,
+      }),
+    );
+    await assertFails(
+      getDoc(doc(member, 'sessions/live/problems/revealed/approaches/primary')),
+    );
+    await assertFails(
+      getDoc(
+        doc(
+          member,
+          'sessions/live/problems/revealed/approaches/primary/solutions/python',
+        ),
+      ),
+    );
+    await assertSucceeds(
+      getDoc(doc(member, 'sessions/ended/problems/hidden/approaches/primary')),
+    );
+    await assertSucceeds(
+      getDoc(
+        doc(
+          member,
+          'sessions/ended/problems/hidden/approaches/primary/solutions/cpp',
+        ),
+      ),
+    );
+    await assertFails(
+      getDoc(
+        doc(member, 'sessions/draft/problems/revealed/approaches/primary'),
+      ),
+    );
+  });
+
+  it('allows Bank Approach reads only under effectively published parents', async () => {
+    const member = anonymousDb();
+    await assertSucceeds(
+      getDoc(doc(member, 'problemBank/public/approaches/primary')),
+    );
+    await assertSucceeds(
+      getDoc(
+        doc(member, 'problemBank/public/approaches/primary/solutions/java'),
+      ),
+    );
+    await assertFails(
+      getDoc(doc(member, 'problemBank/used-live/approaches/primary')),
+    );
+    await assertFails(
+      getDoc(
+        doc(member, 'problemBank/used-live/approaches/primary/solutions/java'),
+      ),
+    );
+    await assertFails(
+      getDoc(doc(member, 'problemBank/used-private/approaches/primary')),
+    );
   });
 });

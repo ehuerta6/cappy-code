@@ -137,7 +137,7 @@ test('Officer edits and reuses a bank Problem as an independent Session snapshot
     const bankProblemId = new URL(member.url()).pathname.split('/').at(-1);
     for (const [index, language] of ['python', 'java', 'cpp'].entries()) {
       const response = await member.request.get(
-        `http://127.0.0.1:8080/v1/projects/demo-cappycode-local/databases/(default)/documents/problemBank/${bankProblemId}/solutions/${language}`,
+        `http://127.0.0.1:8080/v1/projects/demo-cappycode-local/databases/(default)/documents/problemBank/${bankProblemId}/approaches/primary/solutions/${language}`,
       );
       const payload = (await response.json()) as {
         fields?: { code?: { stringValue?: string } };

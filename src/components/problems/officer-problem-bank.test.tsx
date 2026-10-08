@@ -9,10 +9,20 @@ const api = vi.hoisted(() => ({
   updateBankProblem: vi.fn(),
   updateBankPublication: vi.fn(),
   updateBankSolution: vi.fn(),
+  updateBankApproach: vi.fn(),
 }));
 
 vi.mock('client-only', () => ({}));
 vi.mock('@/lib/firebase/problem-bank', () => api);
+vi.mock('@/lib/firebase/solutions', () => ({
+  createApproach: vi.fn(),
+  deleteApproach: vi.fn(),
+  reorderApproaches: vi.fn(),
+}));
+vi.mock('@/lib/firebase/paths', async (original) => ({
+  ...(await original<typeof import('@/lib/firebase/paths')>()),
+  bankProblemPath: (id: string) => `problemBank/${id}`,
+}));
 vi.mock('@monaco-editor/react', () => ({
   default: ({
     value,
@@ -51,6 +61,19 @@ beforeEach(() => {
   api.listOfficerBankProblems.mockResolvedValue([record]);
   api.getBankProblem.mockResolvedValue({
     problem: record,
+    approaches: [
+      {
+        id: 'primary',
+        name: 'Primary Approach',
+        tags: [],
+        order: 0,
+        solutions: {
+          python: { code: 'def two_sum(): pass' },
+          java: { code: 'class Solution {}' },
+          cpp: { code: 'class Solution {};' },
+        },
+      },
+    ],
     solutions: {
       python: { code: 'def two_sum(): pass' },
       java: { code: 'class Solution {}' },
@@ -60,6 +83,7 @@ beforeEach(() => {
   api.updateBankProblem.mockResolvedValue(undefined);
   api.updateBankPublication.mockResolvedValue(undefined);
   api.updateBankSolution.mockResolvedValue(undefined);
+  api.updateBankApproach.mockResolvedValue(undefined);
 });
 
 afterEach(() => cleanup());

@@ -33,3 +33,34 @@ export function solutionPath(
 ): string {
   return `${problemPath(sessionId, problemId)}/solutions/${language}`;
 }
+
+export function approachCollectionPath(parentPath: string): string {
+  return `${parentPath}/approaches`;
+}
+
+export function approachPath(parentPath: string, approachId: string): string {
+  return `${approachCollectionPath(parentPath)}/${documentId(approachId)}`;
+}
+
+export function approachSolutionPath(
+  parentPath: string,
+  approachId: string,
+  language: Language,
+): string {
+  return `${approachPath(parentPath, approachId)}/solutions/${language}`;
+}
+
+export function bankApproachPath(
+  problemId: string,
+  approachId: string,
+): string {
+  return approachPath(bankProblemPath(problemId), approachId);
+}
+
+export function sessionApproachPath(
+  sessionId: string,
+  problemId: string,
+  approachId: string,
+): string {
+  return approachPath(problemPath(sessionId, problemId), approachId);
+}

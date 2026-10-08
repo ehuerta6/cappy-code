@@ -14,6 +14,22 @@ const persistence = vi.hoisted(() => ({ load: vi.fn(), save: vi.fn() }));
 vi.mock('@/lib/firebase/solutions', () => ({
   getSolutionsForProblem: persistence.load,
   updateSolution: persistence.save,
+  getApproaches: vi.fn(async (parentPath: string) => {
+    const [, sessionId, , problemId] = parentPath.split('/');
+    return [
+      {
+        id: 'primary',
+        name: 'Primary Approach',
+        tags: [],
+        order: 0,
+        solutions: await persistence.load(sessionId, problemId),
+      },
+    ];
+  }),
+  createApproach: vi.fn(),
+  deleteApproach: vi.fn(),
+  reorderApproaches: vi.fn(),
+  saveApproach: vi.fn(),
 }));
 vi.mock('@monaco-editor/react', () => ({
   default: ({
@@ -113,9 +129,13 @@ describe('solution workspace', () => {
     expect(persistence.save).not.toHaveBeenCalled();
     expect(saveState.mock.calls.at(-1)?.[0]).toMatchObject({ dirty: true });
     await act(async () => saveState.mock.calls.at(-1)?.[0].save());
-    expect(persistence.save).toHaveBeenCalledExactlyOnceWith('s', 'p', 'java', {
-      code: 'new java',
-    });
+    expect(persistence.save).toHaveBeenCalledExactlyOnceWith(
+      's',
+      'p',
+      'java',
+      { code: 'new java' },
+      'primary',
+    );
     expect(onPending).toHaveBeenLastCalledWith(false);
   });
   it('edits and explicitly saves complexity with its language Solution', async () => {
@@ -146,6 +166,7 @@ describe('solution workspace', () => {
         spaceComplexity: 'O(1)',
         spaceComplexityReason: 'Only a fixed number of variables are stored.',
       },
+      'primary',
     );
   });
   it('shows optional analysis outside the read-only Monaco editor', () => {
@@ -247,9 +268,13 @@ describe('solution workspace', () => {
         .value,
     ).toBe('second');
     await act(async () => saveState.mock.calls.at(-1)?.[0].save());
-    expect(persistence.save).toHaveBeenLastCalledWith('s', 'p', 'cpp', {
-      code: 'second',
-    });
+    expect(persistence.save).toHaveBeenLastCalledWith(
+      's',
+      'p',
+      'cpp',
+      { code: 'second' },
+      'primary',
+    );
     expect(onPending).toHaveBeenLastCalledWith(false);
   });
   it('locks code during a parent operation', async () => {

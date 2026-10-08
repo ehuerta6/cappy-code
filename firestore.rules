@@ -56,6 +56,16 @@ service cloud.firestore {
         && data.category in ['custom', 'interview-style', 'competitive-programming'];
     }
 
+    function validApproachSolution(data) {
+      return data.keys().hasAll(['code'])
+        && data.keys().hasOnly(['code', 'timeComplexity', 'timeComplexityReason', 'spaceComplexity', 'spaceComplexityReason'])
+        && data.code is string
+        && (!data.keys().hasAny(['timeComplexity']) || data.timeComplexity is string)
+        && (!data.keys().hasAny(['timeComplexityReason']) || data.timeComplexityReason is string)
+        && (!data.keys().hasAny(['spaceComplexity']) || data.spaceComplexity is string)
+        && (!data.keys().hasAny(['spaceComplexityReason']) || data.spaceComplexityReason is string);
+    }
+
     function changesOnlyProblemContent() {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
         'title',
@@ -176,6 +186,32 @@ service cloud.firestore {
               answersAreVisible(sessionId, problemId)));
           allow write: if isOfficer() && language in ['python', 'java', 'cpp'];
         }
+
+        match /approaches/{approachId} {
+          function sessionState() { return get(/databases/$(database)/documents/sessions/$(sessionId)).data.status; }
+          allow read: if isOfficer() || (sessionIsPublic(sessionId) &&
+            (sessionIsEnded(sessionId) || answersAreVisible(sessionId, problemId)));
+          allow create: if isOfficer() && sessionState() == 'draft'
+            && request.resource.data.keys().hasAll(['name', 'tags', 'order']) && request.resource.data.keys().hasOnly(['name', 'tags', 'order'])
+            && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.tags is list
+            && request.resource.data.tags.hasOnly(['Arrays', 'Hash Map', 'Two Pointers', 'Binary Search', 'Stack', 'Queue', 'Linked List', 'Tree', 'Graph', 'DFS', 'BFS', 'Dynamic Programming', 'Greedy', 'Backtracking', 'Union Find', 'Shortest Path'])
+            && request.resource.data.order is int && request.resource.data.order >= 0;
+          allow delete: if isOfficer() && sessionState() == 'draft';
+          allow update: if isOfficer() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'tags', 'order'])
+            && request.resource.data.keys().hasAll(['name', 'tags', 'order']) && request.resource.data.keys().hasOnly(['name', 'tags', 'order'])
+            && request.resource.data.name is string && request.resource.data.name.size() > 0
+            && request.resource.data.tags is list && request.resource.data.tags.hasOnly(['Arrays', 'Hash Map', 'Two Pointers', 'Binary Search', 'Stack', 'Queue', 'Linked List', 'Tree', 'Graph', 'DFS', 'BFS', 'Dynamic Programming', 'Greedy', 'Backtracking', 'Union Find', 'Shortest Path'])
+            && request.resource.data.order is int && request.resource.data.order >= 0
+            && ((sessionState() == 'draft') ||
+              (sessionState() in ['live', 'ended'] && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['order'])));
+          match /solutions/{language} {
+            allow read: if (isOfficer() && language in ['python', 'java', 'cpp']) ||
+              (language in ['python', 'java', 'cpp'] && sessionIsPublic(sessionId) &&
+                (sessionIsEnded(sessionId) || answersAreVisible(sessionId, problemId)));
+            allow create, update: if isOfficer() && language in ['python', 'java', 'cpp'] && validApproachSolution(request.resource.data);
+            allow delete: if isOfficer() && language in ['python', 'java', 'cpp'];
+          }
+        }
       }
     }
 
@@ -220,6 +256,19 @@ service cloud.firestore {
           || (language in ['python', 'java', 'cpp']
             && bankSolutionParentIsEffectivelyVisible(problemId));
         allow write: if isOfficer() && language in ['python', 'java', 'cpp'];
+      }
+
+      match /approaches/{approachId} {
+        allow read: if isOfficer() || bankSolutionParentIsEffectivelyVisible(problemId);
+        allow create: if isOfficer() && request.resource.data.keys().hasAll(['name', 'tags', 'order']) && request.resource.data.keys().hasOnly(['name', 'tags', 'order']) && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.tags is list && request.resource.data.tags.hasOnly(['Arrays', 'Hash Map', 'Two Pointers', 'Binary Search', 'Stack', 'Queue', 'Linked List', 'Tree', 'Graph', 'DFS', 'BFS', 'Dynamic Programming', 'Greedy', 'Backtracking', 'Union Find', 'Shortest Path']) && request.resource.data.order is int && request.resource.data.order >= 0;
+        allow update: if isOfficer() && request.resource.data.keys().hasAll(['name', 'tags', 'order']) && request.resource.data.keys().hasOnly(['name', 'tags', 'order']) && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.tags is list && request.resource.data.tags.hasOnly(['Arrays', 'Hash Map', 'Two Pointers', 'Binary Search', 'Stack', 'Queue', 'Linked List', 'Tree', 'Graph', 'DFS', 'BFS', 'Dynamic Programming', 'Greedy', 'Backtracking', 'Union Find', 'Shortest Path']) && request.resource.data.order is int && request.resource.data.order >= 0;
+        allow delete: if isOfficer();
+        match /solutions/{language} {
+          allow read: if (isOfficer() && language in ['python', 'java', 'cpp']) ||
+            (language in ['python', 'java', 'cpp'] && bankSolutionParentIsEffectivelyVisible(problemId));
+          allow create, update: if isOfficer() && language in ['python', 'java', 'cpp'] && validApproachSolution(request.resource.data);
+          allow delete: if isOfficer() && language in ['python', 'java', 'cpp'];
+        }
       }
     }
   }

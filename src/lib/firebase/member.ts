@@ -18,10 +18,12 @@ import {
   type SessionStatus,
   type SessionBranch,
   type Solution,
+  type SolutionApproach,
 } from '../domain';
 import { getFirestoreDb } from './client';
 import { isPermissionDenied } from './errors';
 import { sessionPath, solutionPath } from './paths';
+import { getApproaches } from './solutions';
 
 export interface MemberSessionRecord {
   id: string;
@@ -39,6 +41,13 @@ export interface MemberProblemRecord {
 }
 
 export type MemberSolutions = Record<(typeof languages)[number], Solution>;
+
+export async function getMemberApproaches(
+  sessionId: string,
+  problemId: string,
+): Promise<SolutionApproach[]> {
+  return getApproaches(`${sessionPath(sessionId)}/problems/${problemId}`);
+}
 
 export function memberReadFailureKind(
   error: unknown,
@@ -207,10 +216,11 @@ export async function getMemberSolutions(
   sessionId: string,
   problemId: string,
 ): Promise<MemberSolutions> {
+  const db = getFirestoreDb();
   const results = await Promise.all(
     languages.map(async (language) => {
       const snapshot = await getDocFromServer(
-        doc(getFirestoreDb(), solutionPath(sessionId, problemId, language)),
+        doc(db, solutionPath(sessionId, problemId, language)),
       );
       if (snapshot.metadata.hasPendingWrites)
         throw new Error('Solution changes are awaiting confirmation.');

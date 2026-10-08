@@ -7,13 +7,17 @@ const problemTitle = 'Playwright Hidden Answers Problem';
 const pythonSolution = 'PYTHON_E2E_SECRET = "python-answer-secret"';
 const javaSolution = 'String answer = "java-answer-secret";';
 const cppSolution = 'std::string answer = "cpp-answer-secret";';
+const alternatePythonSolution =
+  'PYTHON_E2E_ALTERNATE = "alternate-python-secret"';
+const alternateJavaSolution = 'String alternate = "alternate-java-secret";';
+const alternateCppSolution = 'std::string alternate = "alternate-cpp-secret";';
 const correctedPythonSolution =
   'PYTHON_E2E_SECRET = "python-corrected-answer-secret"';
 
 test('Officer prepares and presents a Session through its public lifecycle', async ({
   browser,
 }) => {
-  test.setTimeout(60_000);
+  test.setTimeout(120_000);
   execFileSync(process.execPath, ['scripts/reset-emulator.mjs'], {
     cwd: process.cwd(),
     stdio: 'inherit',
@@ -49,6 +53,7 @@ test('Officer prepares and presents a Session through its public lifecycle', asy
     await officer.getByLabel('Session branch').selectOption('general');
     await officer.getByRole('button', { name: 'Save changes' }).click();
     await expect(officer.getByText('Saved ✓')).toBeVisible();
+
     await officer.getByRole('button', { name: 'Manage problems' }).click();
     await officer.getByRole('button', { name: 'Add problem' }).click();
 
@@ -100,6 +105,27 @@ test('Officer prepares and presents a Session through its public lifecycle', asy
     }
     await officer.getByRole('button', { name: 'Save changes' }).click();
     await expect(officer.getByText('Saved ✓')).toBeVisible();
+    await officer.getByRole('button', { name: 'Add Approach' }).click();
+    await expect(
+      officer.getByRole('button', { name: 'New Approach' }),
+    ).toBeVisible();
+    for (const [index, language] of ['Python', 'Java', 'C++'].entries()) {
+      const editor = officer
+        .getByRole('region', { name: language })
+        .locator('.monaco-editor');
+      await editor.click();
+      await officer.keyboard.press('ControlOrMeta+A');
+      await officer.keyboard.insertText(
+        [alternatePythonSolution, alternateJavaSolution, alternateCppSolution][
+          index
+        ],
+      );
+    }
+    await officer.getByRole('button', { name: 'Save changes' }).click();
+    await expect(officer.getByText('Saved ✓')).toBeVisible();
+    await expect(
+      officer.getByRole('button', { name: 'New Approach' }),
+    ).toBeVisible();
 
     // Session-created reusable Bank copies stay unpublished until an Officer
     // explicitly publishes them.
@@ -113,6 +139,9 @@ test('Officer prepares and presents a Session through its public lifecycle', asy
       .getByRole('button', { name: new RegExp(sessionTitle) })
       .click();
     await officer.getByRole('button', { name: 'Manage problems' }).click();
+    await expect(
+      officer.getByRole('button', { name: 'New Approach' }),
+    ).toBeVisible();
 
     await member.goto('/');
     await expect(
@@ -148,6 +177,9 @@ test('Officer prepares and presents a Session through its public lifecycle', asy
     await expect(member.getByText('python-answer-secret')).toBeVisible();
     await expect(member.getByText('java-answer-secret')).toBeVisible();
     await expect(member.getByText('cpp-answer-secret')).toBeVisible();
+    await expect(
+      member.getByRole('button', { name: 'New Approach' }),
+    ).toHaveCount(0);
     await expect(member.getByText('Time: O(n)', { exact: true })).toHaveCount(
       2,
     );
@@ -294,6 +326,14 @@ test('Officer prepares and presents a Session through its public lifecycle', asy
     await expect(member.getByText('Python space analysis.')).toBeVisible();
     await expect(member.getByText('Java space analysis.')).toBeVisible();
     await expect(member.getByText('C++ space analysis.')).toBeVisible();
+    await expect(
+      member.getByRole('button', { name: 'New Approach' }),
+    ).toBeVisible();
+    await member.getByRole('button', { name: 'New Approach' }).click();
+    await expect(member.getByText('alternate-python-secret')).toBeVisible();
+    await expect(member.getByText('alternate-java-secret')).toBeVisible();
+    await expect(member.getByText('alternate-cpp-secret')).toBeVisible();
+    await member.getByRole('button', { name: 'Primary Approach' }).click();
     const revealedLiveUrl = member.url();
     await member.reload();
     await expect(member).toHaveURL(revealedLiveUrl);
