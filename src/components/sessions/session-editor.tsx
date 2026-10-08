@@ -385,8 +385,7 @@ export default function SessionEditor({
         {readinessWarnings && (
           <div
             className="my-4 rounded-md border border-warning/50 bg-surface p-4"
-            role="alertdialog"
-            aria-modal="true"
+            role="group"
             aria-labelledby="readiness-warning-heading"
             tabIndex={-1}
             ref={readinessDialog}
@@ -493,8 +492,7 @@ export default function SessionEditor({
       {readinessWarnings && (
         <div
           className="my-4 rounded-md border border-warning/50 bg-surface p-4"
-          role="alertdialog"
-          aria-modal="true"
+          role="group"
           aria-labelledby="readiness-warning-heading"
           tabIndex={-1}
           ref={readinessDialog}

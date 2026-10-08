@@ -569,8 +569,14 @@ describe('Officer Sessions surface', () => {
     expect(
       await screen.findByText('Pair Sum: Hash Map: C++ not prepared'),
     ).toBeTruthy();
+    const readinessGroup = screen.getByRole('group', {
+      name: 'Preparation warnings',
+    });
+    expect(readinessGroup.hasAttribute('aria-modal')).toBe(false);
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-    expect(screen.queryByRole('alertdialog')).toBeNull();
+    expect(
+      screen.queryByRole('group', { name: 'Preparation warnings' }),
+    ).toBeNull();
     api.listProblems.mockResolvedValueOnce([
       {
         id: 'p1',
