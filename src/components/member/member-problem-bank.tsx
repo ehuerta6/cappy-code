@@ -13,12 +13,19 @@ import { problemCategories } from '@/lib/domain';
 import type { SolutionApproach } from '@/lib/domain';
 import {
   getBankProblem,
+  listBankProblemApproachTags,
   listMemberBankProblems,
   type BankProblemRecord,
   type BankSolutions,
 } from '@/lib/firebase/problem-bank';
 import { listProblemUsageSummaries } from '@/lib/firebase/problem-usage';
 import type { ProblemUsageSummary } from '@/lib/problem-usage';
+import ProblemBankFilters from '@/components/problems/problem-bank-filters';
+import {
+  emptyProblemBankFilters,
+  filterProblemBank,
+  type ProblemBankFilters as Filters,
+} from '@/lib/problem-bank-filters';
 
 const labels = {
   custom: 'Custom',
@@ -35,11 +42,21 @@ export function MemberProblemBank() {
   const [retry, setRetry] = useState(0);
   const [usage, setUsage] = useState<Record<string, ProblemUsageSummary>>({});
   const [usageFailed, setUsageFailed] = useState(false);
+  const [tagsByProblem, setTagsByProblem] = useState<Record<string, string[]>>(
+    {},
+  );
+  const [filters, setFilters] = useState<Filters>(emptyProblemBankFilters);
+  const filteredRecords =
+    state.status === 'ready'
+      ? filterProblemBank(state.records, filters, tagsByProblem, usage)
+      : [];
   useEffect(() => {
     let active = true;
     setState({ status: 'loading' });
     setUsage({});
+    setTagsByProblem({});
     setUsageFailed(false);
+    setFilters(emptyProblemBankFilters);
     listMemberBankProblems().then(
       (records) => {
         if (!active) return;
@@ -47,8 +64,17 @@ export function MemberProblemBank() {
         setUsageFailed(false);
         if (records.length === 0) {
           setUsage({});
+          setTagsByProblem({});
           return;
         }
+        listBankProblemApproachTags(records.map(({ id }) => id)).then(
+          (tags) => {
+            if (active) setTagsByProblem(tags);
+          },
+          () => {
+            if (active) setState({ status: 'error' });
+          },
+        );
         listProblemUsageSummaries(records.map(({ id }) => id)).then(
           (summaries) => {
             if (active) setUsage(summaries);
@@ -105,8 +131,22 @@ export function MemberProblemBank() {
           <p>No public Problems are available right now.</p>
         ) : (
           <div className="grid gap-7 md:grid-cols-3">
+            <div className="md:col-span-3">
+              <ProblemBankFilters value={filters} onChange={setFilters} />
+              {filteredRecords.length === 0 && (
+                <p role="status">
+                  No Problems match these filters.{' '}
+                  <button
+                    className="min-h-11 rounded border border-border-strong bg-surface px-3 py-2"
+                    onClick={() => setFilters(emptyProblemBankFilters)}
+                  >
+                    Clear filters
+                  </button>
+                </p>
+              )}
+            </div>
             {problemCategories.map((category) => {
-              const records = state.records.filter(
+              const records = filteredRecords.filter(
                 (record) => record.category === category,
               );
               return (
@@ -137,6 +177,17 @@ export function MemberProblemBank() {
                             summary={usage[record.id]}
                             failed={usageFailed}
                           />
+                          <p className="mb-2 px-3 text-xs text-muted">
+                            {record.difficulty
+                              ? `${record.difficulty[0].toUpperCase()}${record.difficulty.slice(1)}`
+                              : ''}
+                            {tagsByProblem[record.id]?.length
+                              ? ` · ${tagsByProblem[record.id].join(' · ')}`
+                              : ''}
+                            {usage[record.id]?.branches.length
+                              ? ` · ${usage[record.id].branches.map((branch) => (branch === 'intro' ? 'Intro' : branch === 'general' ? 'General' : 'ICPC')).join(', ')}`
+                              : ''}
+                          </p>
                         </li>
                       ))}
                     </ul>

@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const api = vi.hoisted(() => ({
   createBankProblem: vi.fn(),
   getBankProblem: vi.fn(),
+  listBankProblemApproachTags: vi.fn(),
   listOfficerBankProblems: vi.fn(),
   updateBankProblem: vi.fn(),
   updateBankPublication: vi.fn(),
@@ -76,6 +77,9 @@ function deferred<T>() {
 beforeEach(() => {
   vi.resetAllMocks();
   api.listOfficerBankProblems.mockResolvedValue([record]);
+  api.listBankProblemApproachTags.mockResolvedValue({
+    'two-sum': ['Arrays', 'Hash Map', 'Two Pointers'],
+  });
   api.getBankProblem.mockResolvedValue({
     problem: record,
     approaches: [
@@ -106,6 +110,23 @@ beforeEach(() => {
 afterEach(() => cleanup());
 
 describe('Officer Problem Bank publication', () => {
+  it('filters tag and branch results without reloading and presents a clearable empty state', async () => {
+    render(<OfficerProblemBank />);
+    await screen.findByRole('button', { name: 'Two Sum' });
+    fireEvent.click(screen.getByText('DSA / algorithm'));
+    fireEvent.click(screen.getByLabelText('Two Pointers'));
+    expect(screen.getByRole('button', { name: 'Two Sum' })).toBeTruthy();
+    expect(api.listOfficerBankProblems).toHaveBeenCalledOnce();
+
+    fireEvent.click(screen.getByText('CIC branch'));
+    fireEvent.click(screen.getByLabelText('ICPC'));
+    expect(
+      await screen.findByText(/No Problems match these filters/),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
+    expect(await screen.findByRole('button', { name: 'Two Sum' })).toBeTruthy();
+  });
+
   it('preserves dirty active Approach edits until Save and switches only after persistence', async () => {
     const primary = {
       id: 'primary',

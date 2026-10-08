@@ -15,6 +15,7 @@ import {
 } from 'firebase/firestore';
 import {
   languages,
+  approachTags,
   problemCategorySchema,
   problemDifficultySchema,
   problemSchema,
@@ -25,6 +26,7 @@ import {
   type SolutionApproach,
 } from '../domain';
 import { validateLeetcodeProblemUrl } from '../problem-metadata';
+import { problemApproachTags } from '../problem-bank-filters';
 import { getOfficerAuth } from './auth';
 import { getFirestoreDb } from './client';
 import {
@@ -152,6 +154,36 @@ export async function listOfficerBankProblems(): Promise<BankProblemRecord[]> {
     collection(officerDb(), 'problemBank'),
   );
   return sorted(mapBankSnapshot(snapshot));
+}
+
+export async function listBankProblemApproachTags(
+  problemIds: string[],
+  officer = false,
+): Promise<Record<string, string[]>> {
+  const db = officer ? officerDb() : getFirestoreDb();
+  const supportedTags = new Set<string>(approachTags);
+  const entries = await Promise.all(
+    problemIds.map(async (problemId) => {
+      const snapshot = await getDocsFromServer(
+        collection(db, `${bankProblemPath(problemId)}/approaches`),
+      );
+      const approaches = snapshot.docs.map((approach) => {
+        if (approach.metadata.hasPendingWrites)
+          throw new Error('Approach changes are awaiting confirmation.');
+        const value = approach.data().tags;
+        return {
+          tags: Array.isArray(value)
+            ? value.filter(
+                (tag): tag is string =>
+                  typeof tag === 'string' && supportedTags.has(tag),
+              )
+            : [],
+        };
+      });
+      return [problemId, problemApproachTags(approaches)];
+    }),
+  );
+  return Object.fromEntries(entries);
 }
 
 export async function listMemberBankProblems(): Promise<BankProblemRecord[]> {
