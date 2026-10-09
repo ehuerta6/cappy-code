@@ -37,8 +37,7 @@ import type {
 } from '@/components/officer-save-state';
 import { sessionProblemWorkspaceClass } from './session-problem-workspace';
 
-const buttonClass =
-  'min-h-11 rounded border border-border-strong bg-surface px-3 py-2 text-ink hover:bg-hover disabled:cursor-default disabled:bg-raised disabled:text-muted';
+const buttonClass = 'ui-button ui-button--secondary';
 
 export default function OfficerProblems({
   sessionId,
@@ -442,7 +441,7 @@ export default function OfficerProblems({
                   ? 'Saving…'
                   : workspaceError
                     ? 'Retry'
-                    : 'Save changes'}
+                    : 'Save Problem and Solution changes'}
               </button>
             )}
         </div>

@@ -16,6 +16,7 @@ import { sessionProblemWorkspaceClass } from '@/components/problems/session-prob
 import { formatCalendarDate } from '@/lib/calendar-date';
 import MemberSolutionViewer from '@/components/solutions/member-solution-viewer';
 import { useAnswersVisible } from '@/hooks/use-answer-visibility';
+import { Button, StateMessage } from '@/components/ui/primitives';
 import {
   sessionBranches,
   sessionBranchLabels,
@@ -62,12 +63,9 @@ export function PublicSessionDiscovery({ state }: { state: DiscoveryState }) {
       : [];
   return (
     <main className="min-h-screen bg-canvas text-ink">
-      <AppHeader>
-        <Link href="/problem-bank">Problem Bank</Link>
-        <Link href="/officer">Officer login</Link>
-      </AppHeader>
+      <AppHeader current="sessions" />
       <section
-        className="mx-auto w-[calc(100%-32px)] max-w-[1440px] py-5 pb-12 leading-relaxed sm:w-[calc(100%-48px)] sm:pt-6"
+        className="ui-page-shell leading-relaxed"
         aria-labelledby="sessions-heading"
       >
         <h1
@@ -77,7 +75,7 @@ export function PublicSessionDiscovery({ state }: { state: DiscoveryState }) {
           Sessions
         </h1>
         {state.status === 'loading' ? (
-          <p role="status">Loading sessions…</p>
+          <LoadingBranchDiscovery />
         ) : state.status === 'error' ? (
           <div
             className="mt-4 rounded-md border border-border-strong bg-surface p-4"
@@ -88,13 +86,7 @@ export function PublicSessionDiscovery({ state }: { state: DiscoveryState }) {
                 ? 'You do not have permission to view these Sessions.'
                 : 'Sessions could not be loaded. Check your connection and retry.'}
             </p>
-            <button
-              className="min-h-11 rounded border border-border-strong bg-surface px-3 py-2 text-ink hover:bg-hover"
-              type="button"
-              onClick={state.onRetry}
-            >
-              Retry sessions
-            </button>
+            <Button onClick={state.onRetry}>Retry sessions</Button>
           </div>
         ) : state.status === 'empty' ? (
           <BranchDiscovery sessions={[]} />
@@ -103,6 +95,28 @@ export function PublicSessionDiscovery({ state }: { state: DiscoveryState }) {
         )}
       </section>
     </main>
+  );
+}
+
+function LoadingBranchDiscovery() {
+  return (
+    <div
+      className="mt-6 grid gap-7 md:mt-8 md:grid-cols-3 md:gap-5"
+      aria-busy="true"
+    >
+      <StateMessage className="sr-only">Loading sessions…</StateMessage>
+      {sessionBranches.map((branch) => (
+        <section
+          aria-hidden="true"
+          className="min-w-0 border-t border-border-soft pt-3"
+          key={branch}
+        >
+          <div className="ui-skeleton mb-5 h-6 w-24" />
+          <div className="ui-skeleton mb-3 h-4 w-14" />
+          <div className="ui-skeleton h-12 w-full" />
+        </section>
+      ))}
+    </div>
   );
 }
 
@@ -179,23 +193,18 @@ function SessionGroup({
           {sessions.map((session) => (
             <li className="border-b border-border-soft" key={session.id}>
               <Link
-                className="flex min-h-[52px] flex-wrap items-center gap-x-3 gap-y-2 rounded px-2 py-3 text-ink no-underline hover:bg-hover focus-visible:relative focus-visible:z-10 [&:hover_.session-title]:text-accent-hover [&:hover_.session-title]:underline"
+                className="grid min-h-[52px] grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 rounded px-2 py-3 text-ink no-underline hover:bg-hover focus-visible:relative focus-visible:z-10 [&:hover_.session-title]:text-accent-hover [&:hover_.session-title]:underline"
                 href={`/sessions/${encodeURIComponent(session.id)}`}
               >
+                <span className="session-title min-w-0 break-words font-semibold">
+                  {session.title}
+                </span>
                 <time
-                  className="shrink-0 text-sm text-muted"
+                  className="col-start-2 row-start-1 shrink-0 text-right text-sm text-muted"
                   dateTime={session.date}
                 >
                   {formatCalendarDate(session.date)}
                 </time>
-                <span className="session-title min-w-0 break-words font-semibold">
-                  {session.title}
-                </span>
-                <span
-                  className={`text-sm font-semibold ${session.status === 'live' ? 'text-success' : 'text-muted'}`}
-                >
-                  {session.status === 'live' ? 'Live' : 'Past'}
-                </span>
               </Link>
             </li>
           ))}
@@ -235,10 +244,7 @@ export type SessionState =
 export function PublicSessionView({ state }: { state: SessionState }) {
   return (
     <main className="min-h-screen bg-canvas text-ink">
-      <AppHeader>
-        <Link href="/problem-bank">Problem Bank</Link>
-        <Link href="/officer">Officer login</Link>
-      </AppHeader>
+      <AppHeader current="sessions" />
       {state.status === 'loading' ? (
         <p
           className="mx-auto w-[calc(100%-32px)] max-w-[1440px] py-6 text-muted sm:w-[calc(100%-48px)]"

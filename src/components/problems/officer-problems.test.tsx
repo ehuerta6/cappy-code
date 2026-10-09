@@ -295,7 +295,7 @@ describe('Officer Problem workspace', () => {
     fireEvent.change(screen.getByLabelText('Problem title'), {
       target: { value: 'Prepared Two Sum' },
     });
-    fireEvent.change(screen.getByLabelText('Description'), {
+    fireEvent.change(screen.getByLabelText(/Description \(optional\)/), {
       target: { value: 'Find the target pair.' },
     });
     fireEvent.change(
@@ -319,7 +319,9 @@ describe('Officer Problem workspace', () => {
     fireEvent.change(screen.getAllByLabelText('Time Complexity')[0], {
       target: { value: 'O(n)' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Save Problem and Solution changes' }),
+    );
 
     await waitFor(() =>
       expect(bankApi.materializeSessionProblemInBank).toHaveBeenCalledWith(
@@ -373,7 +375,9 @@ describe('Officer Problem workspace', () => {
     fireEvent.change(screen.getByLabelText('Problem title'), {
       target: { value: 'Prepared Two Sum' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Save Problem and Solution changes' }),
+    );
     expect(
       await screen.findByText(
         'Reusable Bank copy could not be created. Your Session content is saved; retry to create the copy.',
@@ -431,7 +435,8 @@ describe('Officer Problem workspace', () => {
     fireEvent.click(secondTab);
     expect(secondTab.getAttribute('aria-selected')).toBe('true');
     expect(
-      (screen.getByLabelText('Description') as HTMLTextAreaElement).value,
+      (screen.getByLabelText(/Description \(optional\)/) as HTMLTextAreaElement)
+        .value,
     ).toBe('Compare letters');
     fireEvent.keyDown(secondTab, { key: 'Home' });
     expect(document.activeElement).toBe(firstTab);
@@ -563,7 +568,9 @@ describe('Officer Problem workspace', () => {
     fireEvent.change(screen.getByLabelText('Problem title'), {
       target: { value: 'Corrected past title' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Save Problem and Solution changes' }),
+    );
     await waitFor(() =>
       expect(api.updateProblem).toHaveBeenCalledWith('session', 'first', {
         title: 'Corrected past title',
@@ -616,23 +623,29 @@ describe('Officer Problem workspace', () => {
     api.updateProblem.mockRejectedValueOnce(new Error('offline'));
     await loaded();
     const description = screen.getByLabelText(
-      'Description',
+      /Description \(optional\)/,
     ) as HTMLTextAreaElement;
     const markdownSource = 'New **statement**\n\n- first line';
     fireEvent.change(description, { target: { value: markdownSource } });
     fireEvent.change(screen.getByLabelText('Problem title'), {
       target: { value: 'Renamed' },
     });
-    fireEvent.change(screen.getByLabelText('Example input'), {
-      target: { value: '`4 5`' },
-    });
-    fireEvent.change(screen.getByLabelText('Expected output'), {
-      target: { value: '**9**' },
-    });
-    fireEvent.change(screen.getByLabelText('Constraints'), {
+    fireEvent.change(
+      screen.getByLabelText('Example input (optional) (Markdown supported)'),
+      {
+        target: { value: '`4 5`' },
+      },
+    );
+    fireEvent.change(
+      screen.getByLabelText('Expected output (optional) (Markdown supported)'),
+      {
+        target: { value: '**9**' },
+      },
+    );
+    fireEvent.change(screen.getByLabelText('Constraints (optional)'), {
       target: { value: '1 ≤ n ≤ 100\nValues are distinct.' },
     });
-    fireEvent.change(screen.getByLabelText('LeetCode link (optional)'), {
+    fireEvent.change(screen.getByLabelText('Problem link (optional)'), {
       target: { value: 'https://leetcode.com/problems/two-sum/' },
     });
     expect(api.updateProblem).not.toHaveBeenCalled();
@@ -642,7 +655,9 @@ describe('Officer Problem workspace', () => {
     ).toBe(true);
     fireEvent.blur(description);
     expect(api.updateProblem).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Save Problem and Solution changes' }),
+    );
     await screen.findByRole('alert');
     expect(description.value).toBe(markdownSource);
     expect(onBusyChange).toHaveBeenLastCalledWith(true);
@@ -667,7 +682,9 @@ describe('Officer Problem workspace', () => {
     fireEvent.change(difficulty, { target: { value: 'medium' } });
     expect(difficulty.value).toBe('medium');
     expect(api.updateProblem).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Save Problem and Solution changes' }),
+    );
     await waitFor(() =>
       expect(api.updateProblem).toHaveBeenCalledExactlyOnceWith(
         'session',
@@ -679,12 +696,14 @@ describe('Officer Problem workspace', () => {
   it('rejects an invalid LeetCode URL before saving and preserves the entered value', async () => {
     await loaded();
     const input = screen.getByLabelText(
-      'LeetCode link (optional)',
+      'Problem link (optional)',
     ) as HTMLInputElement;
     fireEvent.change(input, {
       target: { value: 'http://example.com/not-a-problem' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Save Problem and Solution changes' }),
+    );
     expect((await screen.findByRole('alert')).textContent).toContain(
       'Enter a valid HTTPS LeetCode Problem URL.',
     );
@@ -704,7 +723,9 @@ describe('Officer Problem workspace', () => {
       target: { value: 'New title' },
     });
     expect(api.updateProblem).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Save Problem and Solution changes' }),
+    );
     await waitFor(() =>
       expect(onSaveStateChange.mock.calls.at(-1)?.[0]).toMatchObject({
         dirty: true,
@@ -807,9 +828,12 @@ describe('Officer Problem workspace', () => {
     expect(api.getApproaches).toHaveBeenCalledWith(
       'sessions/session/problems/first',
     );
-    fireEvent.change(screen.getByLabelText('Expected output'), {
-      target: { value: 'shared expected result' },
-    });
+    fireEvent.change(
+      screen.getByLabelText('Expected output (optional) (Markdown supported)'),
+      {
+        target: { value: 'shared expected result' },
+      },
+    );
     fireEvent.change(screen.getByLabelText('Language'), {
       target: { value: 'cpp' },
     });
@@ -822,7 +846,9 @@ describe('Officer Problem workspace', () => {
         .disabled,
     ).toBe(true);
     expect(api.updateSolution).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Save Problem and Solution changes' }),
+    );
     await waitFor(() =>
       expect(api.updateSolution).toHaveBeenCalledWith(
         'session',

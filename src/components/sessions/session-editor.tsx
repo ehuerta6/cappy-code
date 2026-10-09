@@ -19,21 +19,14 @@ import { listProblems } from '@/lib/firebase/problems';
 import { getApproaches } from '@/lib/firebase/solutions';
 import { problemPath } from '@/lib/firebase/paths';
 import { getProblemReadiness } from '@/lib/preparation-readiness';
+import { Badge, Button } from '@/components/ui/primitives';
 import {
   sessionBranchLabels,
   sessionBranches,
   type SessionBranch,
 } from '@/lib/domain';
 
-const contextualButtonClass =
-  'min-h-10 rounded px-2 py-2 text-sm text-muted underline-offset-4 hover:bg-hover hover:text-accent-hover hover:underline disabled:cursor-default disabled:text-muted';
-const primaryButtonClass =
-  'min-h-11 rounded border border-accent bg-accent px-3 py-2 font-semibold text-accent-contrast hover:border-accent-hover hover:bg-accent-hover disabled:cursor-default disabled:border-border-strong disabled:bg-raised disabled:text-muted';
-const statusTone = {
-  draft: 'border-warning/50 text-warning',
-  live: 'border-success/50 bg-success-surface text-success',
-  ended: 'border-border-soft text-muted',
-};
+const contextualButtonClass = 'ui-button ui-button--quiet text-sm';
 
 export default function SessionEditor({
   record,
@@ -166,8 +159,8 @@ export default function SessionEditor({
       const noProblems = countKnown && problemCount.count === 0;
       return (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-          <button
-            className={primaryButtonClass}
+          <Button
+            variant="primary"
             onClick={() => void checkReadinessAndGoLive()}
             disabled={
               !countKnown ||
@@ -185,7 +178,7 @@ export default function SessionEditor({
               : transitionTarget === 'live'
                 ? 'Starting…'
                 : 'Go Live'}
-          </button>
+          </Button>
           {problemCount.status === 'loading' ? (
             <span className="text-sm text-muted">Checking Problems…</span>
           ) : problemCount.status === 'unavailable' ? (
@@ -203,24 +196,26 @@ export default function SessionEditor({
     if (status === 'live') {
       return (
         <>
-          <button
-            className={contextualButtonClass}
+          <Button
+            variant="quiet"
+            className="text-sm text-muted hover:text-accent-hover hover:underline"
             onClick={() => void transition('draft')}
             disabled={
               dirty || saving || deleting || transitionPending || problemBusy
             }
           >
             {transitionTarget === 'draft' ? 'Updating…' : 'Not Live'}
-          </button>
-          <button
-            className="min-h-10 rounded-md border border-danger/50 px-3 py-2 text-sm text-danger hover:bg-danger-surface disabled:cursor-default disabled:border-border-soft disabled:text-muted"
+          </Button>
+          <Button
+            variant="danger"
+            className="text-sm"
             onClick={() => void transition('ended')}
             disabled={
               dirty || saving || deleting || transitionPending || problemBusy
             }
           >
             {transitionTarget === 'ended' ? 'Ending…' : 'End Session'}
-          </button>
+          </Button>
         </>
       );
     }
@@ -438,7 +433,8 @@ export default function SessionEditor({
         className="w-full max-w-[1440px] text-base leading-relaxed"
         aria-label="Officer session workspace"
       >
-        <button
+        <Button
+          variant="quiet"
           className={`${contextualButtonClass} mb-3`}
           disabled={problemBusy || contentBusy}
           aria-describedby={
@@ -447,7 +443,7 @@ export default function SessionEditor({
           onClick={() => setProblemsOpen(false)}
         >
           Back to session
-        </button>
+        </Button>
         {contentBusy && (
           <p
             id="session-content-save-guard"
@@ -464,11 +460,17 @@ export default function SessionEditor({
               <h1 className="m-0 text-[28px] font-semibold leading-9 tracking-tight">
                 {title}
               </h1>
-              <span
-                className={`inline-flex min-h-7 items-center rounded-md border px-2.5 py-0.5 text-sm font-semibold capitalize leading-5 ${statusTone[status]}`}
+              <Badge
+                tone={
+                  status === 'live'
+                    ? 'success'
+                    : status === 'draft'
+                      ? 'warning'
+                      : 'neutral'
+                }
               >
                 {status}
-              </span>
+              </Badge>
             </div>
             <p className="mt-1 flex flex-wrap items-center gap-2 text-sm leading-5 text-muted">
               CIC {sessionBranchLabels[branch]} Session{' '}
@@ -476,10 +478,14 @@ export default function SessionEditor({
               <time dateTime={date}>{formatCalendarDate(date)}</time>
             </p>
           </div>
-          <div className="flex flex-wrap items-center justify-start gap-x-3 gap-y-2">
+          <div
+            className="flex flex-wrap items-center justify-start gap-2"
+            role="group"
+            aria-label="Session actions"
+          >
             {saveStatus()}
-            <button
-              className={primaryButtonClass}
+            <Button
+              variant="primary"
               disabled={
                 !workspaceDirty ||
                 workspaceSaving ||
@@ -491,19 +497,12 @@ export default function SessionEditor({
               {workspaceSaving
                 ? 'Saving…'
                 : saveError || contentSaveState?.error
-                  ? 'Retry Save'
-                  : 'Save Changes'}
-            </button>
-            <button
-              className={contextualButtonClass}
-              disabled={!dirty || saving || deleting || transitionPending}
-              onClick={() => void save()}
-            >
-              {saving ? 'Saving…' : saveError ? 'Retry' : 'Save changes'}
-            </button>
+                  ? 'Retry save'
+                  : 'Save changes'}
+            </Button>
             {(status === 'live' || status === 'ended') && (
               <Link
-                className={contextualButtonClass}
+                className="ui-button ui-button--quiet text-sm"
                 href={`/sessions/${encodeURIComponent(record.id)}`}
               >
                 View as Member
@@ -541,19 +540,17 @@ export default function SessionEditor({
               ))}
             </ul>
             <div className="flex flex-wrap gap-2">
-              <button
-                className={contextualButtonClass}
+              <Button
+                variant="quiet"
+                className="text-sm text-muted"
                 autoFocus
                 onClick={() => setReadinessWarnings(null)}
               >
                 Cancel
-              </button>
-              <button
-                className={primaryButtonClass}
-                onClick={() => void continueGoLive()}
-              >
+              </Button>
+              <Button variant="primary" onClick={() => void continueGoLive()}>
                 Go Live Anyway
-              </button>
+              </Button>
             </div>
           </div>
         )}
@@ -572,24 +569,31 @@ export default function SessionEditor({
       className="w-full max-w-[1440px] text-base leading-relaxed"
       aria-label="Session metadata"
     >
-      <button
+      <Button
+        variant="quiet"
         className={`${contextualButtonClass} mb-3`}
         onClick={onClose}
         disabled={dirty || saving || deleting || transitionPending}
       >
         Back to Sessions
-      </button>
+      </Button>
       <div className="mb-6 flex items-start justify-between gap-4 max-sm:mb-5 max-sm:flex-col">
         <div>
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="m-0 text-[28px] font-semibold leading-9 tracking-tight">
               {title}
             </h1>
-            <span
-              className={`inline-flex min-h-7 items-center rounded-md border px-2.5 py-0.5 text-sm font-semibold capitalize leading-5 ${statusTone[status]}`}
+            <Badge
+              tone={
+                status === 'live'
+                  ? 'success'
+                  : status === 'draft'
+                    ? 'warning'
+                    : 'neutral'
+              }
             >
               {status}
-            </span>
+            </Badge>
           </div>
           <p className="mt-1 flex flex-wrap items-center gap-2 text-sm leading-5 text-muted">
             CIC {sessionBranchLabels[branch]} Session{' '}
@@ -597,10 +601,14 @@ export default function SessionEditor({
             <time dateTime={date}>{formatCalendarDate(date)}</time>
           </p>
         </div>
-        <div className="flex flex-wrap items-center justify-start gap-x-3 gap-y-2">
+        <div
+          className="flex flex-wrap items-center justify-start gap-2"
+          role="group"
+          aria-label="Session actions"
+        >
           {saveStatus()}
-          <button
-            className={primaryButtonClass}
+          <Button
+            variant="primary"
             disabled={
               !workspaceDirty ||
               workspaceSaving ||
@@ -612,19 +620,12 @@ export default function SessionEditor({
             {workspaceSaving
               ? 'Saving…'
               : saveError || contentSaveState?.error
-                ? 'Retry Save'
-                : 'Save Changes'}
-          </button>
-          <button
-            className={contextualButtonClass}
-            disabled={!dirty || saving || deleting || transitionPending}
-            onClick={() => void save()}
-          >
-            {saving ? 'Saving…' : saveError ? 'Retry' : 'Save changes'}
-          </button>
+                ? 'Retry save'
+                : 'Save changes'}
+          </Button>
           {(status === 'live' || status === 'ended') && (
             <Link
-              className={contextualButtonClass}
+              className="ui-button ui-button--quiet text-sm"
               href={`/sessions/${encodeURIComponent(record.id)}`}
             >
               View as Member
@@ -672,26 +673,24 @@ export default function SessionEditor({
             ))}
           </ul>
           <div className="flex flex-wrap gap-2">
-            <button
-              className={contextualButtonClass}
+            <Button
+              variant="quiet"
+              className="text-sm text-muted"
               autoFocus
               onClick={() => setReadinessWarnings(null)}
             >
               Cancel
-            </button>
-            <button
-              className={primaryButtonClass}
-              onClick={() => void continueGoLive()}
-            >
+            </Button>
+            <Button variant="primary" onClick={() => void continueGoLive()}>
               Go Live Anyway
-            </button>
+            </Button>
           </div>
         </div>
       )}
       <label className="my-5 flex max-w-3xl flex-col gap-2">
         Session branch
         <select
-          className="min-h-11 w-full rounded border border-border-strong bg-surface px-3 py-2 text-ink"
+          className="ui-field"
           aria-label="Session branch"
           value={branch}
           onChange={(event) => {
@@ -723,7 +722,7 @@ export default function SessionEditor({
       <label className="my-5 flex max-w-3xl flex-col gap-2">
         Session title
         <input
-          className="min-h-11 w-full rounded border border-border-strong bg-surface px-3 py-2 text-ink"
+          className="ui-field"
           value={title}
           onChange={(event) => updateTitle(event.target.value)}
           disabled={saving || deleting || transitionPending}
@@ -733,7 +732,7 @@ export default function SessionEditor({
       <label className="my-5 flex max-w-3xl flex-col gap-2">
         Session date
         <input
-          className="min-h-11 w-full rounded border border-border-strong bg-surface px-3 py-2 text-ink"
+          className="ui-field"
           type="date"
           value={date}
           onChange={(event) => updateDate(event.target.value)}
@@ -741,14 +740,15 @@ export default function SessionEditor({
           required
         />
       </label>
-      <button
-        className={primaryButtonClass}
+      <Button
+        variant="primary"
         disabled={saving || deleting || transitionPending}
         onClick={() => setProblemsOpen(true)}
       >
         Manage problems
-      </button>
-      <button
+      </Button>
+      <Button
+        variant="quiet"
         className={`${contextualButtonClass} ml-2`}
         onClick={() => void duplicate()}
         aria-describedby={
@@ -765,7 +765,7 @@ export default function SessionEditor({
         }
       >
         {duplicating ? 'Duplicating…' : 'Duplicate session'}
-      </button>
+      </Button>
       {contentBusy && (
         <p
           id="session-content-save-guard"
@@ -776,13 +776,14 @@ export default function SessionEditor({
           Session.
         </p>
       )}
-      <button
-        className="ml-2 min-h-11 rounded px-3 py-2 text-sm text-danger hover:bg-danger-surface disabled:cursor-default disabled:text-muted"
+      <Button
+        variant="danger"
+        className="ml-2 text-sm"
         onClick={() => void remove()}
         disabled={saving || deleting || transitionPending || dirty}
       >
         {deleting ? 'Deleting…' : 'Delete session'}
-      </button>
+      </Button>
       {deleteError && (
         <p role="alert">
           Session could not be deleted. Check your connection and try Delete

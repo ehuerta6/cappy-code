@@ -20,6 +20,7 @@ import {
 import { listProblemUsageSummaries } from '@/lib/firebase/problem-usage';
 import { isPermissionDenied } from '@/lib/firebase/errors';
 import { problemApproachTags } from '@/lib/problem-bank-filters';
+import { Button, StateMessage } from '@/components/ui/primitives';
 import ProblemBankFilters from '@/components/problems/problem-bank-filters';
 import {
   emptyProblemBankFilters,
@@ -122,15 +123,8 @@ export function MemberProblemBank() {
   }, [metadataRetry, state]);
   return (
     <main className="min-h-screen bg-canvas text-ink">
-      <AppHeader>
-        <nav aria-label="Member navigation">
-          <Link href="/">Sessions</Link>
-        </nav>
-      </AppHeader>
-      <section
-        className="mx-auto w-[calc(100%-32px)] max-w-[1440px] py-5 sm:w-[calc(100%-48px)]"
-        aria-labelledby="member-bank-heading"
-      >
+      <AppHeader current="problem-bank" />
+      <section className="ui-page-shell" aria-labelledby="member-bank-heading">
         <h1
           className="m-0 text-[28px] font-semibold leading-9 tracking-tight"
           id="member-bank-heading"
@@ -141,21 +135,26 @@ export function MemberProblemBank() {
           Browse prepared CIC Problems and compare all three Solutions.
         </p>
         {state.status === 'loading' ? (
-          <div
-            className="mt-5 min-h-56 border-t border-border-soft pt-5"
-            aria-busy="true"
-          >
-            <p role="status">Loading Problem Bank…</p>
+          <div className="ui-loading-block mt-5 min-h-56" aria-busy="true">
+            <StateMessage className="sr-only">
+              Loading Problem Bank…
+            </StateMessage>
+            <div className="ui-skeleton mb-5 h-5 w-36" aria-hidden="true" />
+            <div
+              className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
+              aria-hidden="true"
+            >
+              <div className="ui-skeleton h-12" />
+              <div className="ui-skeleton h-12" />
+              <div className="ui-skeleton h-12" />
+            </div>
           </div>
         ) : state.status === 'error' ? (
           <div role="alert">
             <p>Problem Bank could not be loaded.</p>
-            <button
-              className="min-h-11 rounded border border-border-strong bg-surface px-3 py-2"
-              onClick={() => setRetry((value) => value + 1)}
-            >
+            <Button onClick={() => setRetry((value) => value + 1)}>
               Retry
-            </button>
+            </Button>
           </div>
         ) : state.records.length === 0 ? (
           <p>No public Problems are available right now.</p>
@@ -290,16 +289,8 @@ export function MemberBankProblemPage({ problemId }: { problemId: string }) {
       : state;
   return (
     <main className="min-h-screen bg-canvas text-ink">
-      <AppHeader>
-        <nav aria-label="Member navigation">
-          <Link href="/problem-bank">Problem Bank</Link>
-          <Link href="/">Sessions</Link>
-        </nav>
-      </AppHeader>
-      <section
-        className="mx-auto w-[calc(100%-32px)] max-w-[1440px] py-5 sm:w-[calc(100%-48px)]"
-        aria-labelledby="bank-problem-heading"
-      >
+      <AppHeader current="problem-bank" />
+      <section className="ui-page-shell" aria-labelledby="bank-problem-heading">
         {currentState.status === 'loading' ? (
           <div
             className="mt-4 min-h-[50vh] border-t border-border-soft pt-5"
@@ -318,12 +309,12 @@ export function MemberBankProblemPage({ problemId }: { problemId: string }) {
               This Problem is unavailable or is being used by the live Session.
             </p>
             <Link href="/problem-bank">← Problem Bank</Link>
-            <button
-              className="ml-3 min-h-11 rounded border border-border-strong bg-surface px-3 py-2"
+            <Button
+              className="ml-3"
               onClick={() => setRetry((value) => value + 1)}
             >
               Retry
-            </button>
+            </Button>
           </div>
         ) : currentState.status === 'error' ? (
           <div role="alert">
@@ -332,12 +323,12 @@ export function MemberBankProblemPage({ problemId }: { problemId: string }) {
             </h1>
             <p>Check your connection and retry loading this Problem.</p>
             <Link href="/problem-bank">← Problem Bank</Link>
-            <button
-              className="ml-3 min-h-11 rounded border border-border-strong bg-surface px-3 py-2"
+            <Button
+              className="ml-3"
               onClick={() => setRetry((value) => value + 1)}
             >
               Retry
-            </button>
+            </Button>
           </div>
         ) : (
           <>

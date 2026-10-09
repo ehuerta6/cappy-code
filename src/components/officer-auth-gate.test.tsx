@@ -18,6 +18,7 @@ const firebase = vi.hoisted(() => ({
 }));
 
 vi.mock('client-only', () => ({}));
+vi.mock('next/navigation', () => ({ usePathname: () => '/officer' }));
 vi.mock('@/lib/firebase/client', () => ({ getFirebaseApp: firebase.getApp }));
 vi.mock('firebase/auth', () => ({
   getAuth: firebase.getAuth,

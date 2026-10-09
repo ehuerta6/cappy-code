@@ -3,6 +3,7 @@
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { useState, type FormEvent } from 'react';
 import { getOfficerAuth } from '@/lib/firebase/auth';
+import { Button } from './ui/primitives';
 
 export default function OfficerLogin() {
   const [pending, setPending] = useState(false);
@@ -47,7 +48,7 @@ export default function OfficerLogin() {
           Email
         </label>
         <input
-          className="mb-2 min-h-11 w-full rounded-md border border-border-strong bg-surface px-3 py-2 text-ink disabled:cursor-default disabled:bg-raised disabled:text-muted"
+          className="ui-field mb-2"
           autoComplete="username"
           disabled={pending}
           id="officer-email"
@@ -59,7 +60,7 @@ export default function OfficerLogin() {
           Password
         </label>
         <input
-          className="mb-2 min-h-11 w-full rounded-md border border-border-strong bg-surface px-3 py-2 text-ink disabled:cursor-default disabled:bg-raised disabled:text-muted"
+          className="ui-field mb-2"
           autoComplete="current-password"
           disabled={pending}
           id="officer-password"
@@ -72,13 +73,14 @@ export default function OfficerLogin() {
             {error}
           </p>
         )}
-        <button
-          className="mt-2 min-h-11 w-full rounded border border-accent bg-accent px-3 py-2 font-semibold text-accent-contrast hover:bg-accent-hover disabled:cursor-default disabled:border-border-strong disabled:bg-raised disabled:text-muted"
+        <Button
+          variant="primary"
+          className="mt-2 w-full"
           disabled={pending}
           type="submit"
         >
           {pending ? 'Signing in…' : 'Sign in'}
-        </button>
+        </Button>
         {pending && (
           <p className="text-sm text-muted" role="status">
             Confirming officer access…

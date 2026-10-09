@@ -150,7 +150,7 @@ function ComplexityEditor({
       <label className="grid gap-1 text-sm font-medium">
         Time Complexity
         <input
-          className="min-h-10 rounded border border-border-strong bg-surface px-3 font-normal text-ink"
+          className="ui-field font-normal"
           value={solution.timeComplexity ?? ''}
           disabled={disabled}
           onChange={(event) =>
@@ -162,7 +162,7 @@ function ComplexityEditor({
       <label className="grid gap-1 text-sm font-medium">
         Time explanation
         <textarea
-          className="min-h-16 rounded border border-border-strong bg-surface px-3 py-2 font-normal text-ink"
+          className="ui-field min-h-16 font-normal"
           value={solution.timeComplexityReason ?? ''}
           disabled={disabled}
           onChange={(event) =>
@@ -174,7 +174,7 @@ function ComplexityEditor({
       <label className="grid gap-1 text-sm font-medium">
         Space Complexity
         <input
-          className="min-h-10 rounded border border-border-strong bg-surface px-3 font-normal text-ink"
+          className="ui-field font-normal"
           value={solution.spaceComplexity ?? ''}
           disabled={disabled}
           onChange={(event) =>
@@ -186,7 +186,7 @@ function ComplexityEditor({
       <label className="grid gap-1 text-sm font-medium">
         Space explanation
         <textarea
-          className="min-h-16 rounded border border-border-strong bg-surface px-3 py-2 font-normal text-ink"
+          className="ui-field min-h-16 font-normal"
           value={solution.spaceComplexityReason ?? ''}
           disabled={disabled}
           onChange={(event) =>

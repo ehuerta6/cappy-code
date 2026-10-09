@@ -63,7 +63,7 @@ export default function MemberSolutionViewer({
                 Approach
               </label>
               <select
-                className="min-h-11 min-w-0 rounded border border-border-strong bg-surface px-3 text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                className="ui-field min-w-0"
                 id={`${modelPath}-approach`}
                 value={selected.id}
                 onChange={(event) => setApproachId(event.target.value)}
@@ -85,7 +85,7 @@ export default function MemberSolutionViewer({
             Language
           </label>
           <select
-            className="min-h-11 min-w-0 rounded border border-border-strong bg-surface px-3 text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            className="ui-field min-w-0"
             id={`${modelPath}-language`}
             value={language}
             onChange={(event) =>
