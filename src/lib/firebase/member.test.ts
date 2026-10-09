@@ -149,26 +149,31 @@ describe('anonymous member persistence', () => {
     });
   });
 
-  it('waits for a server-confirmed discovery snapshot instead of accepting cache data', () => {
+  it('ignores cached discovery snapshots until a server-confirmed snapshot arrives', () => {
     const onValue = vi.fn();
     const onError = vi.fn();
     sdk.onSnapshot.mockImplementationOnce(
       (_query: unknown, _options: unknown, next: (value: unknown) => void) => {
-        next({ metadata: { fromCache: true }, docs: [] });
+        next({
+          metadata: { fromCache: true },
+          docs: [snapshot('cached-draft', { ...live, status: 'draft' })],
+        });
+        expect(onValue).not.toHaveBeenCalled();
+        expect(onError).not.toHaveBeenCalled();
         next({
           metadata: { fromCache: false },
           docs: [snapshot('live', live)],
+        });
+        next({
+          metadata: { fromCache: true },
+          docs: [snapshot('live', { ...live, title: 'Stale cached title' })],
         });
         return vi.fn();
       },
     );
 
     subscribeToMemberSessions(onValue, onError);
-    expect(onError).toHaveBeenCalledWith(
-      expect.objectContaining({
-        message: expect.stringContaining('server-confirmed'),
-      }),
-    );
+    expect(onError).not.toHaveBeenCalled();
     expect(onValue).toHaveBeenCalledOnce();
     expect(onValue).toHaveBeenCalledWith([
       {

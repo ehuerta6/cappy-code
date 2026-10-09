@@ -206,6 +206,40 @@ describe('Member answer visibility realtime', () => {
     expect(screen.getByText('Second description')).toBeTruthy();
   });
 
+  it('keeps an ended Session loading until its server-confirmed snapshot arrives', async () => {
+    let onValue: ((records: MemberSessionRecord[]) => void) | undefined;
+    member.subscribeToMemberSessions.mockImplementationOnce(
+      (next: (records: MemberSessionRecord[]) => void) => {
+        onValue = next;
+        return vi.fn();
+      },
+    );
+    render(<MemberSessionPage sessionId="session" />);
+
+    expect(screen.getByRole('status').textContent).toBe('Loading session…');
+    expect(
+      screen.queryByText(
+        'Session updates could not be synchronized. Check your connection and retry.',
+      ),
+    ).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: 'Retry session updates' }),
+    ).toBeNull();
+
+    act(() =>
+      onValue?.([
+        { ...session, session: { ...session.session, status: 'ended' } },
+      ]),
+    );
+
+    expect(
+      await screen.findByLabelText('Python Solution, read-only'),
+    ).toBeTruthy();
+    expect(screen.getByLabelText('Java Solution, read-only')).toBeTruthy();
+    expect(screen.getByLabelText('C++ Solution, read-only')).toBeTruthy();
+    expect(screen.queryByText('Answers hidden')).toBeNull();
+  });
+
   it('loads ended-session Solutions without an answer-visibility listener or gate', async () => {
     member.subscribeToMemberSessions.mockImplementationOnce(
       (onValue: (records: MemberSessionRecord[]) => void) => {
