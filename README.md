@@ -49,6 +49,8 @@ Project documentation lives in [`docs/`](docs/).
 - [AI Development Guidelines](docs/AI_GUIDELINES.md) — guardrails for AI coding assistants developing the repository. AI is outside the product runtime.
 - [AI Configuration Adoption](docs/AI_CONFIGURATION.md) — repeatable manual comparison with canonical `ai-setup`.
 - [Firebase Foundation](docs/FIREBASE.md) — local Firebase configuration, client access, and persisted document types.
+- [Getting Started](docs/GETTING_STARTED.md) — first-time local setup, seeded emulators, and development checks.
+- [Maintainer Handoff](docs/MAINTAINERS.md) — semester access transfer and post-handoff verification.
 
 ## Development workflow
 
@@ -56,23 +58,4 @@ Never develop directly on `main`. Use a short-lived branch and Conventional Comm
 
 ## Local development
 
-Use Node.js **24.11.0** and npm **11.6.2** for local development. The supported Node version is recorded in `.nvmrc` and `package.json`.
-
-Install dependencies and start the development server:
-
-```bash
-npm install
-npm run dev
-```
-
-For routine local development, follow [Firebase emulator setup](docs/FIREBASE.md#local-emulator-development). The public workspace is read-only and needs no authentication; the local Officer account is created by the seed command. Use [Firebase project setup](docs/FIREBASE.md#local-setup) only when intentionally connecting to a real Firebase project.
-
-Run the project checks before opening a pull request:
-
-```bash
-npm run lint
-npm run typecheck
-npm test
-npm run format:check
-npm run build
-```
+Use Node.js **24.11.0** and npm **11.6.2** for local development. The supported Node version is recorded in `.nvmrc` and `package.json`. Follow the [Getting Started](docs/GETTING_STARTED.md) guide for the seeded local setup and development checks. For Firebase emulator, project, and Rules details, see [Firebase foundation](docs/FIREBASE.md).
