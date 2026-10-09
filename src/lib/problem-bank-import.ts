@@ -444,7 +444,6 @@ export function newBankDocument(problem: ImportProblem) {
     ...(isLeetCodeUrl(problem.canonicalSourceUrl)
       ? { leetcodeUrl: problem.canonicalSourceUrl }
       : {}),
-    isPublished: false,
     hiddenByLiveSessionId: null,
     approachesEnabled: true,
   };

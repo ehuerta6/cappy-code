@@ -26,13 +26,11 @@ production write is authorized.
   `bankProblemId` on the Session Problem snapshot and the corresponding
   distinct ID in the parent Session's `bankProblemIds` list. The latter
   remains the existing Rules/lifecycle reference. There are no counters.
-- #121 separates publication intent (`isPublished`) from temporary
-  live-session hiding (`hiddenByLiveSessionId`). New reusable Bank records
-  start with `isPublished: false`; importing must not publish them. Live
-  hiding is temporary and does not change that intent.
-- #131 was updated to remove the unsupported Heap tag, specify both required
-  provenance references, and make imported records unpublished until an
-  Officer explicitly publishes reviewed entries.
+- Problem Bank content is public by default and is hidden only while used by
+  the active live Session. Imports preserve temporary hiding on existing Bank
+  records and do not store publication intent.
+- #131 was updated to remove the unsupported Heap tag and specify both required
+  provenance references.
 
 ## Production target verified
 

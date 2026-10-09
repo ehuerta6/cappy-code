@@ -91,8 +91,8 @@ beforeEach(async () => {
         hiddenByLiveSessionId: 'live',
       }),
       setDoc(doc(database, 'problemBank/used-private'), {
-        title: 'Unpublished and used live',
-        description: 'Must remain unpublished after lifecycle release.',
+        title: 'Legacy unpublished and used live',
+        description: 'Legacy publication fields are ignored after release.',
         constraints: '',
         exampleInput: '1',
         exampleOutput: '2',
@@ -112,21 +112,33 @@ beforeEach(async () => {
       }),
       setDoc(doc(database, 'problemBank/legacy-public'), {
         title: 'Legacy public bank Problem',
-        description: 'Legacy publication is inferred from true.',
+        description: 'Legacy publication fields are ignored.',
         constraints: '',
         exampleInput: '3',
         exampleOutput: '4',
         category: 'interview-style',
         isPublic: true,
+        hiddenByLiveSessionId: null,
       }),
       setDoc(doc(database, 'problemBank/legacy-private'), {
         title: 'Legacy private bank Problem',
-        description: 'Legacy false remains private.',
+        description: 'Legacy false does not hide this Problem.',
         constraints: '',
         exampleInput: '3',
         exampleOutput: '4',
         category: 'interview-style',
         isPublic: false,
+        hiddenByLiveSessionId: null,
+      }),
+      setDoc(doc(database, 'problemBank/legacy-unpublished'), {
+        title: 'Legacy unpublished field',
+        description: 'isPublished false does not hide this Problem.',
+        constraints: '',
+        exampleInput: '3',
+        exampleOutput: '4',
+        category: 'interview-style',
+        isPublished: false,
+        hiddenByLiveSessionId: null,
       }),
     );
     for (const problemId of ['used-live', 'used-private', 'public']) {
@@ -564,20 +576,20 @@ describe('Firestore security rules', () => {
     const visible = await getDocs(
       query(
         collection(member, 'problemBank'),
-        where('isPublished', '==', true),
         where('hiddenByLiveSessionId', '==', null),
       ),
     );
-    expect(visible.docs.map((item) => item.id)).toEqual(['public']);
+    expect(visible.docs.map((item) => item.id)).toEqual([
+      'legacy-private',
+      'legacy-public',
+      'legacy-unpublished',
+      'public',
+    ]);
     await assertSucceeds(getDoc(doc(member, 'problemBank/public')));
     await assertSucceeds(getDoc(doc(member, 'problemBank/legacy-public')));
-    await assertSucceeds(
-      getDocs(
-        query(collection(member, 'problemBank'), where('isPublic', '==', true)),
-      ),
-    );
     await assertFails(getDoc(doc(member, 'problemBank/used-private')));
-    await assertFails(getDoc(doc(member, 'problemBank/legacy-private')));
+    await assertSucceeds(getDoc(doc(member, 'problemBank/legacy-private')));
+    await assertSucceeds(getDoc(doc(member, 'problemBank/legacy-unpublished')));
     await assertFails(
       getDoc(doc(member, 'problemBank/used-private/solutions/python')),
     );
@@ -595,7 +607,6 @@ describe('Firestore security rules', () => {
       setDoc(doc(member, 'problemBank/member'), {
         title: 'Member write',
         category: 'custom',
-        isPublished: true,
         hiddenByLiveSessionId: null,
       }),
     );
@@ -604,8 +615,14 @@ describe('Firestore security rules', () => {
       setDoc(doc(officer, 'problemBank/invalid-category'), {
         title: 'Invalid category',
         category: 'leetcode',
-        isPublished: false,
         hiddenByLiveSessionId: null,
+      }),
+    );
+    await assertFails(
+      setDoc(doc(officer, 'problemBank/created-hidden'), {
+        title: 'Cannot create already hidden',
+        category: 'custom',
+        hiddenByLiveSessionId: 'live',
       }),
     );
   });
@@ -680,55 +697,26 @@ describe('Firestore security rules', () => {
         exampleInput: '1',
         exampleOutput: '1',
         category: 'custom',
-        isPublished: false,
         hiddenByLiveSessionId: null,
       }),
-    );
-    await assertSucceeds(
-      updateDoc(doc(officerDb(), 'problemBank/first'), { isPublished: true }),
     );
     await assertSucceeds(getDoc(doc(anonymousDb(), 'problemBank/first')));
   });
 
-  it('allows explicit Officer publish and unpublish while Members follow the saved intent', async () => {
-    const officer = officerDb();
-    const member = anonymousDb();
-    await assertSucceeds(
-      updateDoc(doc(officer, 'problemBank/used-private'), {
-        isPublished: true,
-      }),
-    );
-    // The active live Session still hides this Bank copy.
-    await assertFails(getDoc(doc(member, 'problemBank/used-private')));
-
-    await assertSucceeds(
-      updateDoc(doc(officer, 'problemBank/public'), { isPublished: false }),
-    );
-    await assertFails(getDoc(doc(member, 'problemBank/public')));
-    await assertFails(
-      getDoc(doc(member, 'problemBank/public/solutions/python')),
-    );
-    await assertSucceeds(getDoc(doc(officer, 'problemBank/public')));
-  });
-
-  it('keeps a live Session bank Problem unavailable even if an Officer tries to make it public', async () => {
+  it('keeps a live Session bank Problem unavailable even when its hiding marker is stale', async () => {
     const member = anonymousDb();
     const officer = officerDb();
     await assertFails(getDoc(doc(member, 'problemBank/used-live')));
     await assertFails(
       getDoc(doc(member, 'problemBank/used-live/solutions/python')),
     );
+    // Clearing stale hiding metadata cannot expose a Bank Problem used by the live Session.
     await assertSucceeds(
-      updateDoc(doc(officer, 'problemBank/used-live'), { isPublished: true }),
+      updateDoc(doc(officer, 'problemBank/used-live'), {
+        hiddenByLiveSessionId: null,
+      }),
     );
-    const visible = await getDocs(
-      query(
-        collection(member, 'problemBank'),
-        where('isPublished', '==', true),
-        where('hiddenByLiveSessionId', '==', null),
-      ),
-    );
-    expect(visible.docs.map((item) => item.id)).toEqual(['public']);
+    await assertFails(getDoc(doc(member, 'problemBank/used-live')));
   });
 
   it.each(['draft', 'ended'] as const)(
@@ -752,16 +740,14 @@ describe('Firestore security rules', () => {
       await assertSucceeds(
         getDoc(doc(member, 'problemBank/used-live/solutions/cpp')),
       );
-      await assertSucceeds(
-        getDocs(
-          query(
-            collection(member, 'problemBank'),
-            where('isPublished', '==', true),
-            where('hiddenByLiveSessionId', '==', null),
-          ),
+      const visible = await getDocs(
+        query(
+          collection(member, 'problemBank'),
+          where('hiddenByLiveSessionId', '==', null),
         ),
       );
-      await assertFails(getDoc(doc(member, 'problemBank/used-private')));
+      expect(visible.docs.map((item) => item.id)).toContain('used-private');
+      await assertSucceeds(getDoc(doc(member, 'problemBank/used-private')));
       if (nextStatus === 'draft') {
         await assertFails(
           getDoc(doc(member, 'sessions/live/problems/hidden/solutions/python')),
@@ -775,7 +761,7 @@ describe('Firestore security rules', () => {
   );
 
   it.each(['draft', 'ended'] as const)(
-    'restores the saved publication intent after a full live → %s cycle',
+    'restores public visibility after a full live → %s cycle',
     async (nextStatus) => {
       const member = anonymousDb();
       const officer = officerDb();
@@ -831,11 +817,11 @@ describe('Firestore security rules', () => {
       await assertSucceeds(
         getDoc(doc(member, 'problemBank/public/solutions/python')),
       );
-      await assertFails(getDoc(doc(member, 'problemBank/used-private')));
+      await assertSucceeds(getDoc(doc(member, 'problemBank/used-private')));
     },
   );
 
-  it('releases live hiding when the live Session is deleted without changing publication intent', async () => {
+  it('releases live hiding when the live Session is deleted', async () => {
     const member = anonymousDb();
     const officer = officerDb();
     const deletion = writeBatch(officer);
@@ -851,7 +837,7 @@ describe('Firestore security rules', () => {
     deletion.delete(doc(officer, 'sessions/live'));
     await assertSucceeds(deletion.commit());
     await assertSucceeds(getDoc(doc(member, 'problemBank/used-live')));
-    await assertFails(getDoc(doc(member, 'problemBank/used-private')));
+    await assertSucceeds(getDoc(doc(member, 'problemBank/used-private')));
   });
 
   it('protects Approach metadata and Solutions with Session reveal state and lifecycle', async () => {
@@ -946,8 +932,9 @@ describe('Firestore security rules', () => {
     );
   });
 
-  it('allows Bank Approach reads only under effectively published parents', async () => {
+  it('allows Bank Approach reads only under visible parents', async () => {
     const member = anonymousDb();
+    const officer = officerDb();
     await assertSucceeds(
       getDoc(doc(member, 'problemBank/public/approaches/primary')),
     );
@@ -962,6 +949,11 @@ describe('Firestore security rules', () => {
     await assertFails(
       getDoc(
         doc(member, 'problemBank/used-live/approaches/primary/solutions/java'),
+      ),
+    );
+    await assertSucceeds(
+      getDoc(
+        doc(officer, 'problemBank/used-live/approaches/primary/solutions/java'),
       ),
     );
     await assertFails(

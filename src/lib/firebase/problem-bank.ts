@@ -8,6 +8,7 @@ import {
   getDocFromServer,
   getDocsFromServer,
   query,
+  runTransaction,
   setDoc,
   updateDoc,
   where,
@@ -56,7 +57,6 @@ export interface BankProblemContent {
 
 export interface BankProblemRecord extends BankProblemContent {
   id: string;
-  isPublished: boolean;
   isTemporarilyHidden: boolean;
 }
 
@@ -119,14 +119,6 @@ function sorted(records: BankProblemRecord[]) {
   );
 }
 
-function publicationIntent(data: Record<string, unknown>): boolean {
-  // isPublic is the legacy field. A false legacy value is ambiguous because
-  // the old live lifecycle also wrote false, so preserve it conservatively.
-  return typeof data.isPublished === 'boolean'
-    ? data.isPublished
-    : data.isPublic === true;
-}
-
 function mapBankSnapshot(snapshot: {
   docs: Array<{
     id: string;
@@ -141,7 +133,6 @@ function mapBankSnapshot(snapshot: {
     return {
       id: document.id,
       ...validateContent(data),
-      isPublished: publicationIntent(data),
       isTemporarilyHidden:
         typeof data.hiddenByLiveSessionId === 'string' &&
         data.hiddenByLiveSessionId.length > 0,
@@ -188,28 +179,13 @@ export async function listBankProblemApproachTags(
 
 export async function listMemberBankProblems(): Promise<BankProblemRecord[]> {
   const db = getFirestoreDb();
-  const bank = collection(db, 'problemBank');
-  const [published, legacyPublic] = await Promise.all([
-    getDocsFromServer(
-      query(
-        bank,
-        where('isPublished', '==', true),
-        where('hiddenByLiveSessionId', '==', null),
-      ),
-    ),
-    getDocsFromServer(query(bank, where('isPublic', '==', true))),
-  ]);
-  const documents = new Map(
-    [...published.docs, ...legacyPublic.docs].map((document) => [
-      document.id,
-      document,
-    ]),
-  );
-  return sorted(
-    mapBankSnapshot({ docs: [...documents.values()] }).filter(
-      (problem) => problem.isPublished,
+  const snapshot = await getDocsFromServer(
+    query(
+      collection(db, 'problemBank'),
+      where('hiddenByLiveSessionId', '==', null),
     ),
   );
+  return sorted(mapBankSnapshot(snapshot));
 }
 
 export async function getBankProblem(
@@ -227,7 +203,6 @@ export async function getBankProblem(
   const problem = {
     id: parent.id,
     ...validateContent(parentData),
-    isPublished: publicationIntent(parentData),
     isTemporarilyHidden:
       typeof parentData.hiddenByLiveSessionId === 'string' &&
       parentData.hiddenByLiveSessionId.length > 0,
@@ -269,7 +244,6 @@ export async function createBankProblem(): Promise<BankProblemRecord> {
   const batch = writeBatch(db);
   batch.set(reference, {
     ...problem,
-    isPublished: false,
     hiddenByLiveSessionId: null,
   });
   for (const language of languages)
@@ -278,7 +252,6 @@ export async function createBankProblem(): Promise<BankProblemRecord> {
   return {
     id: reference.id,
     ...problem,
-    isPublished: false,
     isTemporarilyHidden: false,
   };
 }
@@ -292,21 +265,6 @@ export async function updateBankProblem(
   updates.difficulty = validated.difficulty ?? deleteField();
   updates.leetcodeUrl = validated.leetcodeUrl ?? deleteField();
   await updateDoc(doc(officerDb(), bankProblemPath(problemId)), updates);
-}
-
-export async function updateBankPublication(
-  problemId: string,
-  isPublished: boolean,
-): Promise<void> {
-  const db = officerDb();
-  const reference = doc(db, bankProblemPath(problemId));
-  const snapshot = await getDocFromServer(reference);
-  if (!snapshot.exists())
-    throw new Error('This bank Problem no longer exists.');
-  await updateDoc(reference, {
-    isPublished,
-    isPublic: deleteField(),
-  });
 }
 
 /** Delete a reusable Bank Problem and every Bank-owned child document. */
@@ -496,37 +454,48 @@ export async function materializeSessionProblemInBank(
     ...(problem.difficulty ? { difficulty: problem.difficulty } : {}),
     ...(problem.leetcodeUrl ? { leetcodeUrl: problem.leetcodeUrl } : {}),
   };
-  const batch = writeBatch(db);
-  batch.set(bankReference, {
-    ...bankContent,
-    isPublished: false,
-    hiddenByLiveSessionId: null,
-    approachesEnabled: true,
-  });
-  for (const [language, solution] of solutionEntries)
-    batch.set(doc(db, bankSolutionPath(bankProblemId, language)), solution);
-  for (const approach of approaches) {
-    batch.set(
-      doc(db, `${bankProblemPath(bankProblemId)}/approaches/${approach.id}`),
-      { name: approach.name, tags: approach.tags, order: approach.order },
-    );
-    for (const language of languages)
-      batch.set(
-        doc(
-          db,
-          `${bankProblemPath(bankProblemId)}/approaches/${approach.id}/solutions/${language}`,
-        ),
-        approach.solutions[language],
+  await runTransaction(db, async (transaction) => {
+    const sessionReference = doc(db, sessionPath(sessionId));
+    const sessionSnapshot = await transaction.get(sessionReference);
+    if (!sessionSnapshot.exists())
+      throw new Error('This Session no longer exists.');
+    if (sessionSnapshot.data().status !== 'draft')
+      throw new Error(
+        'Only draft Sessions can be materialized into the Problem Bank.',
       );
-  }
-  batch.update(problemReference, {
-    bankProblemId,
-    bankOrigin: 'session',
-    bankCopyPending: deleteField(),
+
+    transaction.set(bankReference, {
+      ...bankContent,
+      hiddenByLiveSessionId: null,
+      approachesEnabled: true,
+    });
+    for (const [language, solution] of solutionEntries)
+      transaction.set(
+        doc(db, bankSolutionPath(bankProblemId, language)),
+        solution,
+      );
+    for (const approach of approaches) {
+      transaction.set(
+        doc(db, `${bankProblemPath(bankProblemId)}/approaches/${approach.id}`),
+        { name: approach.name, tags: approach.tags, order: approach.order },
+      );
+      for (const language of languages)
+        transaction.set(
+          doc(
+            db,
+            `${bankProblemPath(bankProblemId)}/approaches/${approach.id}/solutions/${language}`,
+          ),
+          approach.solutions[language],
+        );
+    }
+    transaction.update(problemReference, {
+      bankProblemId,
+      bankOrigin: 'session',
+      bankCopyPending: deleteField(),
+    });
+    transaction.update(sessionReference, {
+      bankProblemIds: arrayUnion(bankProblemId),
+    });
   });
-  batch.update(doc(db, sessionPath(sessionId)), {
-    bankProblemIds: arrayUnion(bankProblemId),
-  });
-  await batch.commit();
   return { bankProblemId };
 }

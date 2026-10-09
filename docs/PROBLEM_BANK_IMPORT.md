@@ -12,6 +12,14 @@ The command defaults to `cappycode-f133c` and Firestore `(default)`. It uses Goo
 
 The production Bank model currently supports `leetcodeUrl`, not a generic external source field. `canonicalSourceUrl` is manifest provenance; only a valid LeetCode Problem URL is written or compared as `leetcodeUrl`. Codeforces, CSES, AtCoder, and contest archive URLs remain in the manifest and are not persisted in Firestore.
 
-New Bank records are unpublished and start with `hiddenByLiveSessionId: null`. Reconciliation only fills missing values. Differences from existing content are conflicts, and an existing record's publication and live-hiding fields are preserved. Strong identity matches under another Bank document ID reconcile that existing record and use its ID for historical references. Each Problem hierarchy is applied in one Firestore transaction. A provenance transaction changes only the historical snapshot's `bankProblemId` and the parent Session's distinct `bankProblemIds` list. A reviewed historical skip remains visible and causes no mutation; only a pending historical decision blocks the plan.
+Problem Bank content is public by default and hidden only while used by the active live Session. New Bank records start with `hiddenByLiveSessionId: null`. Reconciliation only fills missing content fields and preserves that live-hiding marker on existing records. Legacy publication fields do not affect reconciliation or Member visibility. Strong identity matches under another Bank document ID reconcile that existing record and use its ID for historical references. Each Problem hierarchy is applied in one Firestore transaction. A provenance transaction changes only the historical snapshot's `bankProblemId` and the parent Session's distinct `bankProblemIds` list. A reviewed historical skip remains visible and causes no mutation; only a pending historical decision blocks the plan.
+
+To inspect obsolete publication fields on production Bank parents, run the cleanup dry-run (it performs no writes):
+
+```bash
+npm run problem-bank:cleanup-publication -- --expected-project-id=cappycode-f133c
+```
+
+The cleanup write mode requires `--write-production --expected-project-id=cappycode-f133c`. Run it only after the application and Firestore Rules deployment are verified. It targets project `cappycode-f133c`, database `(default)`, and deletes only `isPublished` and `isPublic` from Bank parent documents.
 
 Production import requires both `--write-production` and `--expected-project-id=cappycode-f133c`. The importer refuses the write path while any conflict or pending historical snapshot exists. Explicitly irreducible source ambiguities and proposed difficulty normalizations are printed for human review. Gate 5A does not run the write path.

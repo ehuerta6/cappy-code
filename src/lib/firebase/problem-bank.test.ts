@@ -15,6 +15,10 @@ const sdk = vi.hoisted(() => ({
   batchUpdate: vi.fn(),
   batchDelete: vi.fn(),
   commit: vi.fn(),
+  runTransaction: vi.fn(),
+  transactionGet: vi.fn(),
+  transactionSet: vi.fn(),
+  transactionUpdate: vi.fn(),
 }));
 
 vi.mock('client-only', () => ({}));
@@ -30,6 +34,7 @@ vi.mock('firebase/firestore', async (importOriginal) => ({
   },
   getDocFromServer: sdk.getDocFromServer,
   getDocsFromServer: sdk.getDocsFromServer,
+  runTransaction: sdk.runTransaction,
   updateDoc: sdk.updateDoc,
   setDoc: sdk.setDoc,
   arrayUnion: sdk.arrayUnion,
@@ -51,7 +56,6 @@ import {
   listMemberBankProblems,
   listBankProblemApproachTags,
   materializeSessionProblemInBank,
-  updateBankPublication,
   updateBankProblem,
   updateBankSolution,
 } from './problem-bank';
@@ -106,6 +110,17 @@ beforeEach(() => {
     },
   );
   sdk.commit.mockResolvedValue(undefined);
+  sdk.transactionGet.mockResolvedValue({
+    exists: () => true,
+    data: () => ({ status: 'draft' }),
+  });
+  sdk.runTransaction.mockImplementation(async (_db, callback) =>
+    callback({
+      get: sdk.transactionGet,
+      set: sdk.transactionSet,
+      update: sdk.transactionUpdate,
+    }),
+  );
 });
 
 describe('Problem Bank snapshots', () => {
@@ -251,38 +266,43 @@ describe('Problem Bank snapshots', () => {
     expect(sdk.commit).toHaveBeenCalledOnce();
   });
 
-  it('creates a new Bank Problem unpublished with no live hiding marker', async () => {
+  it('creates a new public Bank Problem with no publication fields', async () => {
     const result = await createBankProblem();
-    expect(result.isPublished).toBe(false);
+    expect(result).not.toHaveProperty('isPublished');
     expect(sdk.batchSet).toHaveBeenCalledWith(
       expect.objectContaining({ path: 'problemBank/session-copy' }),
       expect.objectContaining({
-        isPublished: false,
         hiddenByLiveSessionId: null,
       }),
     );
+    expect(sdk.batchSet.mock.calls[0][1]).not.toHaveProperty('isPublic');
+    expect(sdk.batchSet.mock.calls[0][1]).not.toHaveProperty('isPublished');
   });
 
   it('atomically materializes a prepared Session Problem and all three Solutions', async () => {
     await expect(
       materializeSessionProblemInBank('session', 'problem'),
     ).resolves.toEqual({ bankProblemId: 'reserved-bank' });
-    expect(sdk.batchSet).toHaveBeenCalledWith(
+    expect(sdk.transactionSet).toHaveBeenCalledWith(
       { path: 'problemBank/reserved-bank' },
       {
         ...metadata,
-        isPublished: false,
         hiddenByLiveSessionId: null,
         approachesEnabled: true,
       },
     );
+    const bankParent = sdk.transactionSet.mock.calls.find(
+      ([reference]) => reference.path === 'problemBank/reserved-bank',
+    )?.[1];
+    expect(bankParent).not.toHaveProperty('isPublished');
+    expect(bankParent).not.toHaveProperty('isPublic');
     for (const language of ['python', 'java', 'cpp'] as const) {
-      expect(sdk.batchSet).toHaveBeenCalledWith(
+      expect(sdk.transactionSet).toHaveBeenCalledWith(
         { path: `problemBank/reserved-bank/solutions/${language}` },
         solutions[language],
       );
     }
-    expect(sdk.batchUpdate).toHaveBeenCalledWith(
+    expect(sdk.transactionUpdate).toHaveBeenCalledWith(
       { path: 'sessions/session/problems/problem' },
       {
         bankProblemId: 'reserved-bank',
@@ -290,44 +310,33 @@ describe('Problem Bank snapshots', () => {
         bankCopyPending: { deleteField: true },
       },
     );
-    expect(sdk.batchUpdate).toHaveBeenCalledWith(
+    expect(sdk.transactionUpdate).toHaveBeenCalledWith(
       { path: 'sessions/session' },
       { bankProblemIds: { arrayUnion: 'reserved-bank' } },
     );
-    expect(sdk.commit).toHaveBeenCalledOnce();
+    expect(sdk.runTransaction).toHaveBeenCalledOnce();
   });
 
-  it('changes publication intent explicitly without clearing temporary live hiding', async () => {
-    await updateBankPublication('source', true);
-    expect(sdk.updateDoc).toHaveBeenCalledWith(
-      { path: 'problemBank/source' },
-      {
-        isPublished: true,
-        isPublic: { deleteField: true },
-      },
+  it('lists all unhidden Bank Problems regardless of legacy publication fields', async () => {
+    const records = [undefined, false, true].flatMap((isPublished, index) =>
+      [undefined, false, true].map((isPublic, legacyIndex) => ({
+        id: `bank-${index}-${legacyIndex}`,
+        data: () => ({
+          ...metadata,
+          hiddenByLiveSessionId: null,
+          ...(isPublished === undefined ? {} : { isPublished }),
+          ...(isPublic === undefined ? {} : { isPublic }),
+        }),
+        metadata: { hasPendingWrites: false },
+      })),
     );
-  });
-
-  it('keeps legacy publication deterministic: only legacy true is public intent', async () => {
-    const legacyPublic = {
-      id: 'legacy-public',
-      data: () => ({ ...metadata, isPublic: true }),
-      metadata: { hasPendingWrites: false },
-    };
-    const canonicalPublic = {
-      id: 'canonical-public',
-      data: () => ({ ...metadata, isPublished: true }),
-      metadata: { hasPendingWrites: false },
-    };
-    sdk.getDocsFromServer
-      .mockResolvedValueOnce({ docs: [canonicalPublic] })
-      .mockResolvedValueOnce({ docs: [legacyPublic] });
-    await expect(listMemberBankProblems()).resolves.toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ id: 'legacy-public', isPublished: true }),
-        expect.objectContaining({ id: 'canonical-public', isPublished: true }),
-      ]),
-    );
+    sdk.getDocsFromServer.mockResolvedValueOnce({ docs: records });
+    await expect(listMemberBankProblems()).resolves.toHaveLength(9);
+    expect(sdk.query).toHaveBeenCalledWith({ path: 'problemBank' }, [
+      'hiddenByLiveSessionId',
+      '==',
+      null,
+    ]);
   });
 
   it('does not publish a new direct Session Problem while it is still Untitled', async () => {
@@ -345,7 +354,7 @@ describe('Problem Bank snapshots', () => {
       materializeSessionProblemInBank('session', 'problem'),
     ).resolves.toBeNull();
     expect(sdk.getDocFromServer).toHaveBeenCalledOnce();
-    expect(sdk.commit).not.toHaveBeenCalled();
+    expect(sdk.runTransaction).not.toHaveBeenCalled();
   });
 
   it('does not report success or partially publish when a Solution read fails', async () => {
@@ -369,19 +378,37 @@ describe('Problem Bank snapshots', () => {
     await expect(
       materializeSessionProblemInBank('session', 'problem'),
     ).rejects.toBe(error);
-    expect(sdk.batchSet).not.toHaveBeenCalled();
-    expect(sdk.commit).not.toHaveBeenCalled();
+    expect(sdk.transactionSet).not.toHaveBeenCalled();
+    expect(sdk.runTransaction).not.toHaveBeenCalled();
   });
 
+  it.each(['live', 'ended'] as const)(
+    'rejects Session-to-Bank materialization while the Session is %s',
+    async (status) => {
+      sdk.transactionGet.mockResolvedValueOnce({
+        exists: () => true,
+        data: () => ({ status }),
+      });
+
+      await expect(
+        materializeSessionProblemInBank('session', 'problem'),
+      ).rejects.toThrow(
+        'Only draft Sessions can be materialized into the Problem Bank.',
+      );
+      expect(sdk.transactionSet).not.toHaveBeenCalled();
+      expect(sdk.transactionUpdate).not.toHaveBeenCalled();
+    },
+  );
+
   it('retries failed materialization against the same Bank ID without creating duplicates', async () => {
-    sdk.commit.mockRejectedValueOnce(new Error('offline'));
+    sdk.runTransaction.mockRejectedValueOnce(new Error('offline'));
     await expect(
       materializeSessionProblemInBank('session', 'problem'),
     ).rejects.toThrow('offline');
     await expect(
       materializeSessionProblemInBank('session', 'problem'),
     ).resolves.toEqual({ bankProblemId: 'reserved-bank' });
-    const bankWrites = sdk.batchSet.mock.calls.map(
+    const bankWrites = sdk.transactionSet.mock.calls.map(
       ([reference]) => reference.path,
     );
     expect(bankWrites).toEqual([
@@ -393,27 +420,19 @@ describe('Problem Bank snapshots', () => {
       'problemBank/reserved-bank/approaches/primary/solutions/python',
       'problemBank/reserved-bank/approaches/primary/solutions/java',
       'problemBank/reserved-bank/approaches/primary/solutions/cpp',
-      'problemBank/reserved-bank',
-      'problemBank/reserved-bank/solutions/python',
-      'problemBank/reserved-bank/solutions/java',
-      'problemBank/reserved-bank/solutions/cpp',
-      'problemBank/reserved-bank/approaches/primary',
-      'problemBank/reserved-bank/approaches/primary/solutions/python',
-      'problemBank/reserved-bank/approaches/primary/solutions/java',
-      'problemBank/reserved-bank/approaches/primary/solutions/cpp',
     ]);
-    expect(sdk.commit).toHaveBeenCalledTimes(2);
+    expect(sdk.runTransaction).toHaveBeenCalledTimes(2);
   });
 
   it('does not create another Bank entry after the copy has materialized', async () => {
     await materializeSessionProblemInBank('session', 'problem');
-    const writeCount = sdk.batchSet.mock.calls.length;
+    const writeCount = sdk.transactionSet.mock.calls.length;
     pendingSessionProblem.bankCopyPending = false;
     await expect(
       materializeSessionProblemInBank('session', 'problem'),
     ).resolves.toBeNull();
-    expect(sdk.batchSet).toHaveBeenCalledTimes(writeCount);
-    expect(sdk.commit).toHaveBeenCalledOnce();
+    expect(sdk.transactionSet).toHaveBeenCalledTimes(writeCount);
+    expect(sdk.runTransaction).toHaveBeenCalledOnce();
   });
 
   it('does not materialize legacy Session-origin links or synchronize later edits', async () => {

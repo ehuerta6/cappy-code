@@ -1466,7 +1466,6 @@ const bankProblems = [
     exampleOutput: '6',
     category: 'custom',
     difficulty: 'easy',
-    isPublished: true,
     hiddenByLiveSessionId: 'live-hash-maps',
     solution: 'first-repeat',
     complexity: {
@@ -1486,7 +1485,6 @@ const bankProblems = [
     exampleInput: 'agenda = ["warm-up", "practice", "review"]',
     exampleOutput: '["review", "practice", "warm-up"]',
     category: 'custom',
-    isPublished: true,
     hiddenByLiveSessionId: null,
     solution: 'reverse-list',
     complexity: {
@@ -1507,7 +1505,6 @@ const bankProblems = [
     exampleOutput: '3',
     category: 'interview-style',
     difficulty: 'medium',
-    isPublished: true,
     hiddenByLiveSessionId: null,
     leetcodeUrl:
       'https://leetcode.com/problems/longest-substring-without-repeating-characters/',
@@ -1531,7 +1528,6 @@ const bankProblems = [
     exampleOutput: '4',
     category: 'interview-style',
     difficulty: 'easy',
-    isPublished: true,
     hiddenByLiveSessionId: null,
     solution: 'binary-search',
     complexity: {
@@ -1552,7 +1548,6 @@ const bankProblems = [
     exampleOutput: 'true',
     category: 'competitive-programming',
     difficulty: 'medium',
-    isPublished: true,
     hiddenByLiveSessionId: null,
     solution: 'room-reachability',
     complexity: {
@@ -1573,7 +1568,6 @@ const bankProblems = [
     exampleOutput: '3',
     category: 'competitive-programming',
     difficulty: 'hard',
-    isPublished: true,
     hiddenByLiveSessionId: null,
     solution: 'number-of-islands',
     complexity: {
@@ -1686,7 +1680,7 @@ function assertFixture() {
   const bankIds = new Set(bankProblems.map(({ id }) => id));
   if (
     bankProblems.some(
-      ({ category, isPublished, solution, complexity }) =>
+      ({ category, solution, complexity }) =>
         !['custom', 'interview-style', 'competitive-programming'].includes(
           category,
         ) ||
@@ -1696,8 +1690,7 @@ function assertFixture() {
           'timeComplexityReason',
           'spaceComplexity',
           'spaceComplexityReason',
-        ].some((field) => !complexity[field]?.trim()) ||
-        typeof isPublished !== 'boolean',
+        ].some((field) => !complexity[field]?.trim()),
     ) ||
     ['custom', 'interview-style', 'competitive-programming'].some(
       (category) =>
@@ -1713,7 +1706,6 @@ function assertFixture() {
   );
   if (
     !hiddenLiveBankProblem ||
-    !hiddenLiveBankProblem.isPublished ||
     hiddenLiveBankProblem.hiddenByLiveSessionId !== liveSession.id
   )
     throw new Error(

@@ -262,6 +262,81 @@ describe('officer session persistence', () => {
     expect(sdk.updateDoc).not.toHaveBeenCalled();
   });
 
+  it('only writes the live-hiding marker when a Session goes Live', async () => {
+    sdk.transactionLiveSessionExists = true;
+    sdk.transactionGet.mockImplementation(async (reference) => {
+      if (reference.path === 'sessionControl/liveSession')
+        return { exists: () => true, data: () => ({ sessionId: null }) };
+      if (reference.path === 'sessions/session-id')
+        return {
+          exists: () => true,
+          data: () => ({ ...session, bankProblemIds: ['bank-one'] }),
+        };
+      return {
+        exists: () => true,
+        ref: { path: reference.path },
+        data: () => ({
+          isPublished: false,
+          isPublic: true,
+          hiddenByLiveSessionId: null,
+        }),
+      };
+    });
+    sdk.getDocsFromServer.mockResolvedValueOnce({
+      docs: [document('problem')],
+    });
+
+    await transitionSession('session-id', 'live');
+
+    expect(sdk.transactionUpdate).toHaveBeenCalledWith(
+      { path: 'problemBank/bank-one' },
+      { hiddenByLiveSessionId: 'session-id' },
+    );
+    expect(sdk.transactionUpdate.mock.calls[0][1]).not.toHaveProperty(
+      'isPublished',
+    );
+    expect(sdk.transactionUpdate.mock.calls[0][1]).not.toHaveProperty(
+      'isPublic',
+    );
+  });
+
+  it.each(['draft', 'ended'] as const)(
+    'clears an already-linked Bank Problem when a live Session becomes %s',
+    async (nextStatus) => {
+      sdk.transactionStatus = 'live';
+      sdk.transactionLiveSessionExists = true;
+      sdk.transactionLiveSessionId = 'session-id';
+      sdk.transactionGet.mockImplementation(async (reference) => {
+        if (reference.path === 'sessionControl/liveSession')
+          return {
+            exists: () => true,
+            data: () => ({ sessionId: 'session-id' }),
+          };
+        if (reference.path === 'sessions/session-id')
+          return {
+            exists: () => true,
+            data: () => ({
+              ...session,
+              status: 'live',
+              bankProblemIds: ['bank-one'],
+            }),
+          };
+        return {
+          exists: () => true,
+          ref: { path: reference.path },
+          data: () => ({ hiddenByLiveSessionId: 'session-id' }),
+        };
+      });
+
+      await transitionSession('session-id', nextStatus);
+
+      expect(sdk.transactionUpdate).toHaveBeenCalledWith(
+        { path: 'problemBank/bank-one' },
+        { hiddenByLiveSessionId: null },
+      );
+    },
+  );
+
   it('blocks Go Live when legacy-lock initialization finds another live Session', async () => {
     sdk.getDocsFromServer.mockResolvedValueOnce({
       docs: [document('problem')],

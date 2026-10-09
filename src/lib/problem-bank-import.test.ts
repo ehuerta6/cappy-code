@@ -39,7 +39,6 @@ function existingState(problem: ImportProblem): ExistingProblemState {
       ...(isLeetCodeUrl(problem.canonicalSourceUrl)
         ? { leetcodeUrl: problem.canonicalSourceUrl }
         : {}),
-      isPublished: true,
       hiddenByLiveSessionId: null,
       approachesEnabled: true,
     },
@@ -296,12 +295,17 @@ describe('Problem Bank import planning safety', () => {
     );
   });
 
-  it('creates new records unpublished and preserves existing publication intent', () => {
+  it('creates records without publication state and ignores legacy publication differences', () => {
     const problem = manifest.problems[1];
     expect(newBankDocument(problem)).toMatchObject({
-      isPublished: false,
       hiddenByLiveSessionId: null,
     });
+    expect(newBankDocument(problem)).not.toHaveProperty('isPublished');
+    expect(newBankDocument(problem)).not.toHaveProperty('isPublic');
+    const legacy = existingState(problem);
+    legacy.data.isPublished = false;
+    legacy.data.isPublic = true;
+    expect(classifyExisting(problem, legacy)).toBe('UNCHANGED');
     const update = missingBankFields(problem, existingState(problem).data);
     expect(update).not.toHaveProperty('isPublished');
     expect(update).not.toHaveProperty('hiddenByLiveSessionId');
