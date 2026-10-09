@@ -9,7 +9,7 @@ import type { ProblemDifficulty } from '@/lib/domain';
 import AppHeader from '@/components/app-header';
 import ProblemMarkdown from '@/components/member/problem-markdown';
 import { formatCalendarDate } from '@/lib/calendar-date';
-import SolutionWorkspace from '@/components/solutions/solution-workspace';
+import MemberSolutionViewer from '@/components/solutions/member-solution-viewer';
 import { useAnswersVisible } from '@/hooks/use-answer-visibility';
 import {
   sessionBranches,
@@ -338,7 +338,7 @@ function SessionContent({
   }
 
   return (
-    <section className="mx-auto w-[calc(100%-32px)] max-w-[1440px] py-5 pb-12 leading-relaxed sm:w-[calc(100%-48px)] sm:pt-6">
+    <section className="mx-auto w-[calc(100%-32px)] max-w-[1440px] py-4 leading-relaxed sm:w-[calc(100%-48px)] sm:pt-5">
       {state.session.status === 'ended' && (
         <Link
           className="mb-3 inline-flex min-h-10 items-center text-sm text-muted underline-offset-4 hover:text-accent-hover hover:underline"
@@ -347,8 +347,8 @@ function SessionContent({
           ← Sessions
         </Link>
       )}
-      <div className="mb-6 flex flex-wrap items-center gap-x-3 gap-y-1">
-        <h1 className="m-0 text-[25px] font-semibold leading-8 tracking-tight sm:text-[28px] sm:leading-9">
+      <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1">
+        <h1 className="m-0 text-[22px] font-semibold leading-7 tracking-tight sm:text-[24px] sm:leading-8">
           {state.session.title}
         </h1>
         <span
@@ -399,18 +399,14 @@ function SessionContent({
         <p className="text-muted">No problems are available in this session.</p>
       ) : (
         <>
-          <div className="mt-1 border-b border-border-soft pb-1">
-            <ProblemTabs
-              problems={problems}
-              selectedId={effectiveSelectedProblemId ?? ''}
-              onSelect={selectProblem}
-            />
-          </div>
           {selectedProblem ? (
             <ProblemContent
               key={selectedProblem.id}
               session={state.session}
               problem={selectedProblem}
+              problems={problems}
+              selectedProblemId={effectiveSelectedProblemId ?? ''}
+              onSelectProblem={selectProblem}
               loadRevealedSolutions={state.loadRevealedSolutions}
             />
           ) : (
@@ -466,7 +462,6 @@ function ProblemTabs({
           type="button"
           role="tab"
           aria-selected={problem.id === selectedId}
-          aria-controls={`problem-panel-${problem.id}`}
           className="min-h-12 shrink-0 rounded-t px-3 py-2 text-[15px] font-medium text-muted hover:bg-hover hover:text-ink focus-visible:relative focus-visible:z-10 aria-selected:border-b-2 aria-selected:border-accent aria-selected:font-semibold aria-selected:text-ink"
           tabIndex={problem.id === selectedId ? 0 : -1}
           onClick={() => onSelect(problem.id)}
@@ -482,10 +477,16 @@ function ProblemTabs({
 function ProblemContent({
   session,
   problem,
+  problems,
+  selectedProblemId,
+  onSelectProblem,
   loadRevealedSolutions,
 }: {
   session: PublicSessionSummary;
   problem: PublicProblem;
+  problems: PublicProblem[];
+  selectedProblemId: string;
+  onSelectProblem: (problemId: string) => void;
   loadRevealedSolutions: (
     problemId: string,
   ) => Promise<SolutionApproach[] | ProblemSolutions>;
@@ -499,100 +500,114 @@ function ProblemContent({
   );
 
   return (
-    <article
-      className="pt-5"
-      id={`problem-panel-${problem.id}`}
-      role="tabpanel"
-      aria-labelledby={`problem-tab-${problem.id}`}
-      tabIndex={0}
-    >
-      <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1">
-        <h2 className="m-0 text-2xl font-semibold leading-8">
-          {problem.title}
-        </h2>
-        {problem.difficulty ? (
-          <span className="rounded border border-border-strong bg-raised px-2 py-0.5 text-sm font-medium text-ink">
-            {problem.difficulty[0].toUpperCase() + problem.difficulty.slice(1)}
-          </span>
-        ) : null}
-      </div>
-      {problem.leetcodeUrl ? (
-        <a
-          className="inline-flex min-h-10 items-center text-sm text-muted underline decoration-border-strong underline-offset-4 hover:text-ink focus-visible:rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-          href={problem.leetcodeUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          View on LeetCode ↗
-        </a>
-      ) : null}
-      <section
-        className="mt-4 mb-8 rounded-lg border border-border-soft bg-surface px-4 py-4 sm:px-6 sm:py-5"
-        aria-label="Problem content"
+    <div className="grid min-w-0 gap-5 pt-2 min-[1100px]:h-[calc(100dvh-11rem)] min-[1100px]:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)] min-[1100px]:gap-0 min-[1100px]:overflow-hidden min-[1100px]:divide-x min-[1100px]:divide-border-soft">
+      <div
+        className="min-w-0 min-[1100px]:h-full min-[1100px]:overflow-y-auto min-[1100px]:overscroll-contain min-[1100px]:pr-5 min-[1100px]:focus-visible:outline-2 min-[1100px]:focus-visible:outline-offset-[-2px] min-[1100px]:focus-visible:outline-accent"
+        role="region"
+        aria-label="Problem"
+        tabIndex={0}
       >
-        <div className="space-y-5">
-          {problem.description ? (
-            <div className="break-words">
-              <ProblemMarkdown>{problem.description}</ProblemMarkdown>
-            </div>
-          ) : null}
-          {problem.constraints ? (
-            <section
-              className="border-t border-border-soft pt-4"
-              aria-labelledby={`constraints-${problem.id}`}
+        <div className="mb-3 border-b border-border-soft pb-1">
+          <ProblemTabs
+            problems={problems}
+            selectedId={selectedProblemId}
+            onSelect={onSelectProblem}
+          />
+        </div>
+        <article
+          className="min-w-0"
+          id={`problem-panel-${problem.id}`}
+          role="tabpanel"
+          aria-labelledby={`problem-tab-${problem.id}`}
+          tabIndex={0}
+        >
+          <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+            <h2 className="m-0 text-2xl font-semibold leading-8">
+              {problem.title}
+            </h2>
+            {problem.difficulty ? (
+              <span className="rounded border border-border-strong bg-raised px-2 py-0.5 text-sm font-medium text-ink">
+                {problem.difficulty[0].toUpperCase() +
+                  problem.difficulty.slice(1)}
+              </span>
+            ) : null}
+          </div>
+          {problem.leetcodeUrl ? (
+            <a
+              className="inline-flex min-h-10 items-center text-sm text-muted underline decoration-border-strong underline-offset-4 hover:text-ink focus-visible:rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              href={problem.leetcodeUrl}
+              target="_blank"
+              rel="noopener noreferrer"
             >
-              <h3
-                className="mb-2 mt-0 text-base font-semibold leading-6"
-                id={`constraints-${problem.id}`}
-              >
-                Constraints
-              </h3>
-              <p className="m-0 max-w-[80ch] whitespace-pre-wrap break-words text-base leading-[26px]">
-                {problem.constraints}
-              </p>
-            </section>
+              View on LeetCode ↗
+            </a>
           ) : null}
-          <section
-            className="border-t border-border-soft pt-4"
-            aria-labelledby={`examples-${problem.id}`}
-          >
-            <h3
-              className="mb-2 mt-0 text-base font-semibold leading-6"
-              id={`examples-${problem.id}`}
-            >
-              Examples
-            </h3>
-            <div className="grid sm:grid-cols-2 sm:divide-x sm:divide-border-soft">
-              <section className="min-w-0 py-2 sm:pr-5">
-                <h4 className="mb-1 mt-0 text-sm font-semibold leading-5 text-muted">
-                  Input
-                </h4>
-                <div className="min-w-0 break-words font-mono text-[15px] leading-[23px]">
-                  <ProblemMarkdown>
-                    {problem.exampleInput || 'No example input'}
-                  </ProblemMarkdown>
+          <section className="mt-4 mb-8 min-w-0" aria-label="Problem content">
+            <div className="space-y-5">
+              {problem.description ? (
+                <div className="break-words">
+                  <ProblemMarkdown>{problem.description}</ProblemMarkdown>
                 </div>
-              </section>
-              <section className="min-w-0 border-t border-border-soft py-3 sm:border-t-0 sm:pl-5 sm:pt-2">
-                <h4 className="mb-1 mt-0 text-sm font-semibold leading-5 text-muted">
-                  Expected output
-                </h4>
-                <div className="min-w-0 break-words font-mono text-[15px] leading-[23px]">
-                  <ProblemMarkdown>
-                    {problem.exampleOutput || 'No expected output'}
-                  </ProblemMarkdown>
+              ) : null}
+              {problem.constraints ? (
+                <section
+                  className="border-t border-border-soft pt-4"
+                  aria-labelledby={`constraints-${problem.id}`}
+                >
+                  <h3
+                    className="mb-2 mt-0 text-base font-semibold leading-6"
+                    id={`constraints-${problem.id}`}
+                  >
+                    Constraints
+                  </h3>
+                  <p className="m-0 max-w-[80ch] whitespace-pre-wrap break-words text-base leading-[26px]">
+                    {problem.constraints}
+                  </p>
+                </section>
+              ) : null}
+              <section
+                className="border-t border-border-soft pt-4"
+                aria-labelledby={`examples-${problem.id}`}
+              >
+                <h3
+                  className="mb-2 mt-0 text-base font-semibold leading-6"
+                  id={`examples-${problem.id}`}
+                >
+                  Examples
+                </h3>
+                <div className="grid sm:grid-cols-2 sm:divide-x sm:divide-border-soft">
+                  <section className="min-w-0 py-2 sm:pr-5">
+                    <h4 className="mb-1 mt-0 text-sm font-semibold leading-5 text-muted">
+                      Input
+                    </h4>
+                    <div className="min-w-0 break-words font-mono text-[15px] leading-[23px]">
+                      <ProblemMarkdown>
+                        {problem.exampleInput || 'No example input'}
+                      </ProblemMarkdown>
+                    </div>
+                  </section>
+                  <section className="min-w-0 border-t border-border-soft py-3 sm:border-t-0 sm:pl-5 sm:pt-2">
+                    <h4 className="mb-1 mt-0 text-sm font-semibold leading-5 text-muted">
+                      Expected output
+                    </h4>
+                    <div className="min-w-0 break-words font-mono text-[15px] leading-[23px]">
+                      <ProblemMarkdown>
+                        {problem.exampleOutput || 'No expected output'}
+                      </ProblemMarkdown>
+                    </div>
+                  </section>
                 </div>
               </section>
             </div>
           </section>
-        </div>
-      </section>
+        </article>
+      </div>
       <section
-        className="mt-8 border-t border-border-soft pt-6"
+        className="min-w-0 min-[1100px]:h-full min-[1100px]:overflow-y-auto min-[1100px]:overscroll-contain min-[1100px]:pl-5 min-[1100px]:focus-visible:outline-2 min-[1100px]:focus-visible:outline-offset-[-2px] min-[1100px]:focus-visible:outline-accent"
         aria-labelledby="solutions-heading"
       >
         <h2
-          className="mb-2 mt-0 text-2xl font-semibold leading-8"
+          className="mb-3 mt-0 text-2xl font-semibold leading-8"
           id="solutions-heading"
         >
           Solutions
@@ -620,7 +635,7 @@ function ProblemContent({
             </button>
           </div>
         ) : !visibility.value ? (
-          <div className="flex min-h-40 flex-col items-center justify-center rounded-lg border border-border-soft bg-surface p-6 text-center">
+          <div className="flex min-h-40 flex-col items-center justify-center border border-border-soft bg-surface p-6 text-center">
             <svg
               className="mb-2 text-muted"
               viewBox="0 0 24 24"
@@ -661,7 +676,7 @@ function ProblemContent({
           />
         )}
       </section>
-    </article>
+    </div>
   );
 }
 
@@ -677,14 +692,12 @@ function RevealedSolutions({
   ) => Promise<SolutionApproach[] | ProblemSolutions>;
 }) {
   const [approaches, setApproaches] = useState<SolutionApproach[] | null>(null);
-  const [approachId, setApproachId] = useState('primary');
   const [failed, setFailed] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
     let active = true;
     setApproaches(null);
-    setApproachId('primary');
     setFailed(false);
     void loadRevealedSolutions(problemId).then(
       (result) => {
@@ -701,7 +714,6 @@ function RevealedSolutions({
                 },
               ];
           setApproaches(records);
-          setApproachId(records[0]?.id ?? 'primary');
         }
       },
       () => {
@@ -733,36 +745,10 @@ function RevealedSolutions({
     );
   }
   if (!approaches) return <p role="status">Loading solutions…</p>;
-  const selected =
-    approaches.find(({ id }) => id === approachId) ?? approaches[0];
-  if (!selected) return <p>No approaches are available yet.</p>;
   return (
-    <>
-      {approaches.length > 1 && (
-        <div
-          className="mb-4 flex flex-wrap gap-2"
-          aria-label="Solution approaches"
-        >
-          {approaches.map((approach) => (
-            <button
-              key={approach.id}
-              type="button"
-              aria-pressed={approach.id === selected.id}
-              className="rounded border border-border-strong bg-surface px-3 py-2"
-              onClick={() => setApproachId(approach.id)}
-            >
-              {approach.name}
-            </button>
-          ))}
-        </div>
-      )}
-      {selected.tags.length > 0 && (
-        <p className="mb-3 text-sm text-muted">{selected.tags.join(' · ')}</p>
-      )}
-      <SolutionWorkspace
-        solutions={selected.solutions}
-        modelPath={`member/${sessionId}/${problemId}/${selected.id}`}
-      />
-    </>
+    <MemberSolutionViewer
+      approaches={approaches}
+      modelPath={`member/${sessionId}/${problemId}`}
+    />
   );
 }

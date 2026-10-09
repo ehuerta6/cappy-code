@@ -28,7 +28,7 @@ vi.mock('@/components/app-header', () => ({
 vi.mock('@/components/member/problem-markdown', () => ({
   default: ({ children }: { children: React.ReactNode }) => <p>{children}</p>,
 }));
-vi.mock('@/components/solutions/solution-workspace', () => ({
+vi.mock('@/components/solutions/member-solution-viewer', () => ({
   default: () => <div>Prepared solution content</div>,
 }));
 

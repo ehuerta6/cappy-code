@@ -153,10 +153,13 @@ test('Officer edits and reuses a bank Problem as an independent Session snapshot
     await expect(
       member.getByText('Updated in the bank after reuse.'),
     ).toBeVisible();
-    for (const language of ['Python', 'Java', 'C++'])
-      await expect(
-        member.getByRole('heading', { name: language, level: 3 }),
-      ).toBeVisible();
+    await expect(
+      member.getByRole('group', { name: 'Approach: Primary Approach' }),
+    ).toBeVisible();
+    await expect(member.getByLabel('Language')).toHaveValue('python');
+    await expect(
+      member.getByRole('heading', { name: 'Python', level: 3 }),
+    ).toBeVisible();
     const bankProblemId = new URL(member.url()).pathname.split('/').at(-1);
     for (const [index, language] of ['python', 'java', 'cpp'].entries()) {
       const response = await member.request.get(
@@ -170,12 +173,21 @@ test('Officer edits and reuses a bank Problem as an independent Session snapshot
         language === 'python' ? updatedBankPython : secrets[index],
       );
     }
-    await expect(member.getByText('Time: O(n)', { exact: true })).toHaveCount(
-      3,
-    );
-    await expect(member.getByText('Space: O(1)', { exact: true })).toHaveCount(
-      3,
-    );
+    await expect(member.getByText('Time: O(n)', { exact: true })).toBeVisible();
+    await expect(
+      member.getByText('Space: O(1)', { exact: true }),
+    ).toBeVisible();
+    await member.getByLabel('Language').selectOption('java');
+    await expect(
+      member.getByRole('heading', { name: 'Java', level: 3 }),
+    ).toBeVisible();
+    await expect(member.getByText('Java time.')).toBeVisible();
+    await expect(member.getByText('Python time.')).toHaveCount(0);
+    await member.getByLabel('Language').selectOption('cpp');
+    await expect(
+      member.getByRole('heading', { name: 'C++', level: 3 }),
+    ).toBeVisible();
+    await expect(member.getByText('C++ time.')).toBeVisible();
 
     await officer.getByRole('button', { name: 'Go Live' }).click();
     await member.goto('/problem-bank');
