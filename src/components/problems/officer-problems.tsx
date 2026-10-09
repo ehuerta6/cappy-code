@@ -591,7 +591,12 @@ export default function OfficerProblems({
           ) : (
             <>
               <div className={sessionProblemWorkspaceClass}>
-                <div className="min-w-0 min-[1100px]:h-full min-[1100px]:overflow-y-auto min-[1100px]:overscroll-contain min-[1100px]:pr-5">
+                <div
+                  className="min-w-0 min-[1100px]:h-full min-[1100px]:overflow-y-auto min-[1100px]:overscroll-contain min-[1100px]:pr-5 min-[1100px]:focus-visible:outline-2 min-[1100px]:focus-visible:outline-offset-[-2px] min-[1100px]:focus-visible:outline-accent"
+                  role="region"
+                  aria-label="Problem"
+                  tabIndex={0}
+                >
                   <div className="flex flex-wrap items-stretch gap-2 border-b border-border-soft">
                     <div
                       className="flex min-w-0 max-w-full flex-1 basis-80 overflow-x-auto [scrollbar-width:thin]"
@@ -774,10 +779,23 @@ export default function OfficerProblems({
                       </button>
                     </div>
                   )}
+                  {selected && (
+                    <ProblemEditor
+                      key={selected.id}
+                      sessionId={sessionId}
+                      record={selected}
+                      disabled={operation !== null}
+                      onBusyChange={setEditing}
+                      onSaveStateChange={setProblemSaveState}
+                      onSaved={handleProblemSaved}
+                    />
+                  )}
                 </div>
                 <section
-                  className="min-w-0 min-[1100px]:h-full min-[1100px]:overflow-y-auto min-[1100px]:overscroll-contain min-[1100px]:pl-5"
+                  className="min-w-0 min-[1100px]:h-full min-[1100px]:overflow-y-auto min-[1100px]:overscroll-contain min-[1100px]:pl-5 min-[1100px]:focus-visible:outline-2 min-[1100px]:focus-visible:outline-offset-[-2px] min-[1100px]:focus-visible:outline-accent"
+                  role="region"
                   aria-labelledby="officer-solutions-heading"
+                  tabIndex={0}
                 >
                   <h2
                     id="officer-solutions-heading"
@@ -830,15 +848,6 @@ export default function OfficerProblems({
                           </p>
                         </div>
                       ) : null}
-                      <ProblemEditor
-                        key={selected.id}
-                        sessionId={sessionId}
-                        record={selected}
-                        disabled={operation !== null}
-                        onBusyChange={setEditing}
-                        onSaveStateChange={setProblemSaveState}
-                        onSaved={handleProblemSaved}
-                      />
                       <OfficerSolutions
                         key={`${sessionId}/${selected.id}`}
                         sessionId={sessionId}
