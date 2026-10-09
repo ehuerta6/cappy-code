@@ -36,6 +36,7 @@ test('Officer prepares and presents a Session through its public lifecycle', asy
     await expect(
       officer.getByRole('heading', { name: 'Sessions', level: 1 }),
     ).toBeVisible();
+    console.log('[core E2E] Officer signed in');
 
     // The shared deterministic fixture has a Live Session. Return it to draft
     // so this flow can prove the globally unique live pointer from a clean state.
@@ -69,6 +70,7 @@ test('Officer prepares and presents a Session through its public lifecycle', asy
     await officer.reload();
     await expect(officer).toHaveURL(officerSessionURL);
     await expect(officer.getByLabel('Session title')).toHaveValue(sessionTitle);
+    console.log('[core E2E] Session created and saved');
 
     await officer.getByRole('button', { name: 'Manage problems' }).click();
     await officer.getByRole('button', { name: 'Add problem' }).click();
@@ -97,6 +99,7 @@ test('Officer prepares and presents a Session through its public lifecycle', asy
     await officer
       .getByRole('textbox', { name: 'Expected output' })
       .fill('[0, 1]');
+    console.log('[core E2E] Problem content entered');
 
     const solutionCode = [pythonSolution, javaSolution, cppSolution];
     for (let index = 0; index < solutionCode.length; index += 1) {
@@ -134,6 +137,7 @@ test('Officer prepares and presents a Session through its public lifecycle', asy
       .getByRole('button', { name: 'Save Changes', exact: true })
       .click();
     await expect(officer.getByText('Saved ✓')).toBeVisible();
+    console.log('[core E2E] Primary solutions saved');
     await officer.getByRole('button', { name: 'Add Approach' }).click();
     await expect(
       officer.getByRole('textbox', { name: 'Approach name' }),
@@ -163,6 +167,7 @@ test('Officer prepares and presents a Session through its public lifecycle', asy
       await expect(saveChangesButton).toBeEnabled();
       await saveChangesButton.click();
       await expect(officer.getByText('Saved ✓')).toBeVisible();
+      console.log(`[core E2E] ${language} alternate solution saved`);
     }
     await expect(
       officer.getByRole('combobox', { name: 'Approach', exact: true }),
@@ -474,7 +479,6 @@ test('Officer prepares and presents a Session through its public lifecycle', asy
       officer.getByText('python-corrected-answer-secret'),
     ).toBeVisible();
   } finally {
-    await officerContext.close();
-    await memberContext.close();
+    await Promise.allSettled([officerContext.close(), memberContext.close()]);
   }
 });
