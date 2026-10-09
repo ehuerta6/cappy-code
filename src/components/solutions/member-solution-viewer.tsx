@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { languages, type SolutionApproach } from '@/lib/domain';
+import { ProblemApproachTags } from '@/components/problems/problem-bank-metadata';
 import SolutionPanel, { languageNames } from './solution-panel';
 
 export default function MemberSolutionViewer({
@@ -16,18 +17,8 @@ export default function MemberSolutionViewer({
     languages.find((item) => approaches[0]?.solutions[item].code.trim()) ??
       'python',
   );
-  const [editorHeight, setEditorHeight] = useState(440);
   const selected =
     approaches.find(({ id }) => id === approachId) ?? approaches[0];
-
-  useEffect(() => {
-    function updateEditorHeight() {
-      setEditorHeight(Math.max(300, Math.min(640, window.innerHeight - 360)));
-    }
-    updateEditorHeight();
-    window.addEventListener('resize', updateEditorHeight);
-    return () => window.removeEventListener('resize', updateEditorHeight);
-  }, []);
 
   if (!selected) {
     return (
@@ -57,7 +48,7 @@ export default function MemberSolutionViewer({
                 Approach
               </span>
               <p
-                className="m-0 flex min-h-11 items-center rounded border border-border-soft bg-raised px-3 font-medium"
+                className="m-0 flex min-h-9 items-center px-0 font-medium"
                 aria-labelledby={`${modelPath}-approach-label`}
               >
                 {selected.name}
@@ -109,17 +100,13 @@ export default function MemberSolutionViewer({
           </select>
         </div>
       </div>
-      {selected.tags.length > 0 ? (
-        <p className="mb-3 mt-0 text-sm text-muted">
-          {selected.tags.join(' · ')}
-        </p>
-      ) : null}
+      <ProblemApproachTags tags={selected.tags} />
       <SolutionPanel
         mode="member"
         language={language}
         solution={selected.solutions[language]}
         modelPath={`${modelPath}/${selected.id}/${language}`}
-        editorHeight={editorHeight}
+        editorHeight="clamp(18.75rem, 55dvh, 40rem)"
       />
     </div>
   );

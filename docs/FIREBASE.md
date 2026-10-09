@@ -197,15 +197,16 @@ responses. Firestore Security Rules independently enforce backend access.
 
 `src/lib/domain.ts` defines document fields, with IDs held in document paths rather than duplicated inside records:
 
-| Path                                                             | Type           | Fields                                                                                                                    |
-| ---------------------------------------------------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `sessions/{sessionId}`                                           | `Session`      | `title`, `date`, `status`, `createdAt`, `updatedAt`                                                                       |
-| `sessions/{sessionId}/problems/{problemId}`                      | `Problem`      | `title`, `description`, `exampleInput`, `exampleOutput`, `constraints`, `order`, `answersVisible`, optional `leetcodeUrl` |
-| `sessionControl/{branch}`                                        | control        | `sessionId` (live Session ID or `null`), `bankProblemIds` (its reusable Problem IDs, or `[]` when unclaimed)              |
-| `sessionControl/liveSession`                                     | legacy control | `sessionId` (read only for compatibility migration; `null` after migration)                                               |
-| `sessions/{sessionId}/problems/{problemId}/solutions/{language}` | `Solution`     | `code`                                                                                                                    |
-| `problemBank/{problemId}`                                        | Bank Problem   | Problem content, `hiddenByLiveSessionId`                                                                                  |
-| `problemBank/{problemId}/solutions/{language}`                   | `Solution`     | `code`                                                                                                                    |
+| Path                                                             | Type               | Fields                                                                                                                    |
+| ---------------------------------------------------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------- |
+| `sessions/{sessionId}`                                           | `Session`          | `title`, `date`, `status`, `createdAt`, `updatedAt`                                                                       |
+| `sessions/{sessionId}/problems/{problemId}`                      | `Problem`          | `title`, `description`, `exampleInput`, `exampleOutput`, `constraints`, `order`, `answersVisible`, optional `leetcodeUrl` |
+| `sessionControl/{branch}`                                        | control            | `sessionId` (live Session ID or `null`), `bankProblemIds` (its reusable Problem IDs, or `[]` when unclaimed)              |
+| `sessionControl/liveSession`                                     | legacy control     | `sessionId` (read only for compatibility migration; `null` after migration)                                               |
+| `sessions/{sessionId}/problems/{problemId}/solutions/{language}` | `Solution`         | `code`                                                                                                                    |
+| `problemBank/{problemId}`                                        | Bank Problem       | Problem content, `hiddenByLiveSessionId`, derived `approachTagSummary`                                                    |
+| `problemBank/{problemId}/approaches/{approachId}`                | `SolutionApproach` | `name`, `tags`, `order`                                                                                                   |
+| `problemBank/{problemId}/solutions/{language}`                   | `Solution`         | `code`                                                                                                                    |
 
 - `Language` is exactly `python | java | cpp`; each language identifies its own Solution document.
 - `SessionStatus` is `draft | live | ended`.
@@ -230,6 +231,11 @@ Member listings query the unhidden marker; Firestore Rules also check every
 branch claim and the legacy pointer during compatibility migration, so a stale
 marker cannot expose a live-used Problem. Rules remain the authorization
 boundary, and Officers retain access while an entry is hidden.
+
+`approachTagSummary` is a sorted, de-duplicated list derived from a Bank
+Problem's Approach tags. It travels with each Bank Problem record so Member
+lists can render and filter tags without reading every Approach subcollection.
+Officer Approach changes update the summary in the same Firestore batch.
 
 ## Officer Session preparation (#38)
 
@@ -457,6 +463,41 @@ read model maps missing documents to empty source and ignores any legacy
 Solution `output` field. Firestore Rules remain authoritative for every read.
 The shared Problem example appears before Solutions, and the reusable
 `SolutionWorkspace` renders returned records in read-only Monaco panels.
+
+### Problem Bank Approach tag summaries
+
+Member Bank lists use the parent `approachTagSummary` field for DSA badges and
+filtering. New and updated Bank content maintains this field alongside its
+Approach documents. For older parents without the field, the Member list loads
+the missing Approach tags before returning its first list result; it does not
+show an empty state and then add badges later. This compatibility path reads
+Approaches only for parents missing the summary. Once all legacy parents are
+backfilled, normal Member list reads use only the Bank parent query.
+
+The backfill targets `cappycode-f133c` / `(default)` and is read-only by
+default. Before using it, export a Firestore backup and review the project's
+current Problem Bank content. Run a dry run with valid Application Default
+Credentials and inspect every planned summary:
+
+```bash
+npm run problem-bank:backfill-tag-summary
+```
+
+If the plan is correct, schedule a short maintenance window so Officers do not
+change Bank Approach tags between the scan and writes. An authorized maintainer
+can then run the explicit write command after independently confirming the
+project and backup:
+
+```bash
+npm run problem-bank:backfill-tag-summary -- --write-production --expected-project-id=cappycode-f133c
+```
+
+The script refuses writes unless the expected project ID is supplied, rejects
+credentials configured for another Firebase project, requires no more than 500
+Bank parents, and writes in batches of at most 400. Verify every
+formerly missing parent now has a summary, and compare the saved tags with its
+Approach documents. This change does not run the script or modify production
+Firebase data.
 
 ## Realtime answer visibility
 

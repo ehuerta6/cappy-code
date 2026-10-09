@@ -37,7 +37,7 @@ type Props = {
   language: Language;
   solution: Solution;
   modelPath: string;
-  editorHeight: number;
+  editorHeight: number | string;
 } & (
   | { mode: 'member'; onChange?: never; disabled?: never }
   | {
@@ -48,18 +48,32 @@ type Props = {
 );
 
 export default function SolutionPanel(props: Props) {
-  const { language, solution, modelPath, mode, editorHeight } = props;
+  const {
+    language,
+    solution,
+    modelPath,
+    mode,
+    editorHeight: editorHeightValue,
+  } = props;
   const id = useId();
   const theme = useColorTheme()?.theme;
   const dark = theme === 'dark';
   const name = languageNames[language];
+  const editorHeight =
+    typeof editorHeightValue === 'number'
+      ? `${editorHeightValue}px`
+      : editorHeightValue;
   return (
     <section
       className="flex min-w-0 flex-col overflow-hidden bg-surface text-ink"
       aria-labelledby={`${id}-heading`}
     >
       <h3
-        className="m-0 flex min-h-10 items-center px-3 py-2 text-[15px] font-semibold leading-[22px]"
+        className={
+          mode === 'member'
+            ? 'sr-only'
+            : 'm-0 flex min-h-10 items-center px-3 py-2 text-[15px] font-semibold leading-[22px]'
+        }
         id={`${id}-heading`}
       >
         {name}
@@ -74,7 +88,7 @@ export default function SolutionPanel(props: Props) {
           style={{ height: editorHeight }}
         >
           <Editor
-            height={`${editorHeight}px`}
+            height={editorHeight}
             language={language}
             path={modelPath}
             value={solution.code}
@@ -96,7 +110,12 @@ export default function SolutionPanel(props: Props) {
                 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
               minimap: { enabled: false },
               scrollBeyondLastLine: false,
-              wordWrap: 'off',
+              wordWrap: mode === 'member' ? 'on' : 'off',
+              wrappingIndent: mode === 'member' ? 'indent' : 'none',
+              scrollbar: {
+                horizontal: mode === 'member' ? 'hidden' : 'auto',
+                vertical: 'auto',
+              },
               tabSize: 4,
               padding: { top: 16, bottom: 16 },
             }}

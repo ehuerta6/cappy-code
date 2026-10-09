@@ -13,7 +13,13 @@ vi.mock('@monaco-editor/react', async () => {
       options,
     }: {
       value: string;
-      options: { ariaLabel: string; readOnly: boolean };
+      options: {
+        ariaLabel: string;
+        readOnly: boolean;
+        wordWrap: string;
+        wrappingIndent: string;
+        scrollbar: { horizontal: string; vertical: string };
+      };
     }) => {
       React.useEffect(() => {
         editorLifecycle.mounts += 1;
@@ -22,11 +28,18 @@ vi.mock('@monaco-editor/react', async () => {
         };
       }, []);
       return (
-        <textarea
-          aria-label={options.ariaLabel}
-          readOnly={options.readOnly}
-          value={value}
-        />
+        <div
+          data-word-wrap={options.wordWrap}
+          data-wrapping-indent={options.wrappingIndent}
+          data-horizontal-scrollbar={options.scrollbar.horizontal}
+          data-vertical-scrollbar={options.scrollbar.vertical}
+        >
+          <textarea
+            aria-label={options.ariaLabel}
+            readOnly={options.readOnly}
+            value={value}
+          />
+        </div>
       );
     },
   };
@@ -83,6 +96,16 @@ describe('MemberSolutionViewer', () => {
     expect(
       container.querySelectorAll('[aria-label$="Solution, read-only"]'),
     ).toHaveLength(1);
+    expect(container.querySelector('[data-word-wrap="on"]')).toBeTruthy();
+    expect(
+      container.querySelector('[data-wrapping-indent="indent"]'),
+    ).toBeTruthy();
+    expect(
+      container.querySelector('[data-horizontal-scrollbar="hidden"]'),
+    ).toBeTruthy();
+    expect(
+      container.querySelector('[data-vertical-scrollbar="auto"]'),
+    ).toBeTruthy();
     expect(editorLifecycle.mounts).toBe(mounts + 1);
     expect(editorLifecycle.unmounts).toBe(unmounts);
     expect(screen.getByText('Time: O(n)')).toBeTruthy();

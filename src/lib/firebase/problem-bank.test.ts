@@ -306,6 +306,7 @@ describe('Problem Bank snapshots', () => {
         ...metadata,
         hiddenByLiveSessionId: null,
         approachesEnabled: true,
+        approachTagSummary: [],
       },
     );
     const bankParent = sdk.transactionSet.mock.calls.find(
@@ -341,6 +342,7 @@ describe('Problem Bank snapshots', () => {
         data: () => ({
           ...metadata,
           hiddenByLiveSessionId: null,
+          approachTagSummary: ['Graph', 'Unsupported tag', 'Arrays'],
           ...(isPublished === undefined ? {} : { isPublished }),
           ...(isPublic === undefined ? {} : { isPublic }),
         }),
@@ -348,12 +350,63 @@ describe('Problem Bank snapshots', () => {
       })),
     );
     sdk.getDocsFromServer.mockResolvedValueOnce({ docs: records });
-    await expect(listMemberBankProblems()).resolves.toHaveLength(9);
+    const result = await listMemberBankProblems();
+    expect(result).toHaveLength(9);
+    expect(result[0].approachTagSummary).toEqual(['Arrays', 'Graph']);
     expect(sdk.query).toHaveBeenCalledWith({ path: 'problemBank' }, [
       'hiddenByLiveSessionId',
       '==',
       null,
     ]);
+    expect(sdk.getDocsFromServer).toHaveBeenCalledOnce();
+  });
+
+  it('loads legacy Approach tags before resolving the Member list and skips current records', async () => {
+    const parent = (id: string, fields: Record<string, unknown>) => ({
+      id,
+      data: () => ({ ...metadata, hiddenByLiveSessionId: null, ...fields }),
+      metadata: { hasPendingWrites: false },
+    });
+    sdk.getDocsFromServer.mockImplementation(
+      async (reference: { reference?: { path: string }; path?: string }) => {
+        const path = reference.reference?.path ?? reference.path;
+        if (path === 'problemBank')
+          return {
+            docs: [
+              parent('current', { approachTagSummary: ['Arrays'] }),
+              parent('legacy', {}),
+            ],
+          };
+        if (path === 'problemBank/legacy/approaches')
+          return {
+            docs: [
+              {
+                id: 'primary',
+                data: () => ({
+                  name: 'Primary Approach',
+                  tags: ['Graph', 'BFS', 'Unsupported tag'],
+                  order: 0,
+                }),
+                metadata: { hasPendingWrites: false },
+              },
+            ],
+          };
+        throw new Error(`Unexpected query: ${String(path)}`);
+      },
+    );
+
+    const result = await listMemberBankProblems();
+
+    expect(
+      result.find(({ id }) => id === 'legacy')?.approachTagSummary,
+    ).toEqual(['BFS', 'Graph']);
+    expect(
+      result.find(({ id }) => id === 'current')?.approachTagSummary,
+    ).toEqual(['Arrays']);
+    expect(sdk.getDocsFromServer).toHaveBeenCalledTimes(2);
+    expect(sdk.getDocsFromServer).toHaveBeenCalledWith({
+      path: 'problemBank/legacy/approaches',
+    });
   });
 
   it('does not publish a new direct Session Problem while it is still Untitled', async () => {

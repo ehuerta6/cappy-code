@@ -10,6 +10,7 @@ import {
 } from 'firebase/firestore';
 import {
   languages,
+  approachTags,
   solutionSchema,
   solutionApproachSchema,
   type Language,
@@ -33,6 +34,45 @@ const emptySolutions = (): ProblemSolutions => ({
   java: { code: '' },
   cpp: { code: '' },
 });
+
+function bankTagSummary(
+  parentPath: string,
+  rows: Array<{ id: string; tags: string[] }>,
+  changes: Map<string, string[] | null> = new Map(),
+) {
+  if (!parentPath.startsWith('problemBank/')) return undefined;
+  const tags = new Set<string>();
+  for (const row of rows) {
+    const next = changes.has(row.id) ? changes.get(row.id) : row.tags;
+    next?.forEach((tag) => {
+      if (approachTags.includes(tag as (typeof approachTags)[number]))
+        tags.add(tag);
+    });
+  }
+  changes.forEach((next, id) => {
+    if (rows.some((row) => row.id === id) || !next) return;
+    next.forEach((tag) => {
+      if (approachTags.includes(tag as (typeof approachTags)[number]))
+        tags.add(tag);
+    });
+  });
+  return [...tags].sort((a, b) => a.localeCompare(b));
+}
+
+async function readApproachTagRows(parentPath: string) {
+  const snapshot = await getDocsFromServer(
+    collection(getFirestoreDb(), approachCollectionPath(parentPath)),
+  );
+  return snapshot.docs.map((entry) => {
+    const value = entry.data().tags;
+    return {
+      id: entry.id,
+      tags: Array.isArray(value)
+        ? value.filter((tag): tag is string => typeof tag === 'string')
+        : [],
+    };
+  });
+}
 
 export async function getApproaches(
   parentPath: string,
@@ -115,6 +155,9 @@ export async function saveApproach(
   const existing = await getDocFromServer(
     doc(db, approachPath(parentPath, approach.id)),
   );
+  const tagRows = parentPath.startsWith('problemBank/')
+    ? await readApproachTagRows(parentPath)
+    : [];
   const batch = writeBatch(db);
   if (!existing.exists()) {
     const legacy = await Promise.all(
@@ -142,7 +185,18 @@ export async function saveApproach(
     tags: parsed.data.tags,
     order: parsed.data.order,
   });
-  batch.update(doc(db, parentPath), { approachesEnabled: true });
+  batch.update(doc(db, parentPath), {
+    approachesEnabled: true,
+    ...(parentPath.startsWith('problemBank/')
+      ? {
+          approachTagSummary: bankTagSummary(
+            parentPath,
+            tagRows,
+            new Map([[approach.id, parsed.data.tags]]),
+          ),
+        }
+      : {}),
+  });
   await batch.commit();
 }
 
@@ -151,6 +205,9 @@ export async function deleteApproach(
   approachId: string,
 ): Promise<void> {
   const db = getFirestoreDb();
+  const tagRows = parentPath.startsWith('problemBank/')
+    ? await readApproachTagRows(parentPath)
+    : [];
   const batch = writeBatch(db);
   for (const language of languages)
     batch.delete(
@@ -160,7 +217,18 @@ export async function deleteApproach(
     for (const language of languages)
       batch.delete(doc(db, `${parentPath}/solutions/${language}`));
   batch.delete(doc(db, approachPath(parentPath, approachId)));
-  batch.update(doc(db, parentPath), { approachesEnabled: true });
+  batch.update(doc(db, parentPath), {
+    approachesEnabled: true,
+    ...(parentPath.startsWith('problemBank/')
+      ? {
+          approachTagSummary: bankTagSummary(
+            parentPath,
+            tagRows,
+            new Map([[approachId, null]]),
+          ),
+        }
+      : {}),
+  });
   await batch.commit();
 }
 
@@ -190,7 +258,18 @@ export async function createApproach(
     tags: approach.tags,
     order: approach.order,
   });
-  batch.update(doc(db, parentPath), { approachesEnabled: true });
+  batch.update(doc(db, parentPath), {
+    approachesEnabled: true,
+    ...(parentPath.startsWith('problemBank/')
+      ? {
+          approachTagSummary: bankTagSummary(
+            parentPath,
+            current.map(({ id, tags }) => ({ id, tags })),
+            new Map([[approach.id, approach.tags]]),
+          ),
+        }
+      : {}),
+  });
   await batch.commit();
   return approach;
 }

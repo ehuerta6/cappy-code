@@ -43,6 +43,7 @@ import {
   deleteApproach,
   getApproaches,
   getSolutionsForProblem,
+  saveApproach,
   updateSolution,
 } from './solutions';
 
@@ -61,6 +62,38 @@ beforeEach(() => {
 });
 
 describe('officer solution persistence', () => {
+  it('updates a Bank Problem tag summary atomically with Approach metadata', async () => {
+    sdk.getDocsFromServer.mockResolvedValueOnce({
+      docs: [
+        {
+          id: 'primary',
+          data: () => ({ tags: ['Arrays', 'Graph'] }),
+        },
+        {
+          id: 'other',
+          data: () => ({ tags: ['DFS'] }),
+        },
+      ],
+    });
+    await saveApproach('problemBank/two-sum', {
+      id: 'primary',
+      name: 'Lookup',
+      tags: ['Hash Map'],
+      order: 0,
+      solutions: {
+        python: { code: 'py' },
+        java: { code: 'java' },
+        cpp: { code: 'cpp' },
+      },
+    });
+    expect(sdk.batchUpdate).toHaveBeenCalledWith(
+      { path: 'problemBank/two-sum' },
+      {
+        approachesEnabled: true,
+        approachTagSummary: ['DFS', 'Hash Map'],
+      },
+    );
+  });
   it.each(languages)(
     'writes independent %s source to its fixed child document',
     async (language) => {

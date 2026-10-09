@@ -40,7 +40,8 @@ export function ProblemApproachTags({ tags }: { tags: string[] }) {
     >
       {tags.map((tag) => (
         <span
-          className={`${badgeClass} border-border-soft bg-raised`}
+          className={`${badgeClass} ${tagFamilies[approachTagFamily(tag)]}`}
+          data-tag-family={approachTagFamily(tag)}
           key={tag}
         >
           {tag}
@@ -48,4 +49,45 @@ export function ProblemApproachTags({ tags }: { tags: string[] }) {
       ))}
     </div>
   );
+}
+
+export function ProblemLink({ href }: { href?: string }) {
+  if (!href) return null;
+  return (
+    <a
+      className="inline-flex min-h-10 items-center text-sm text-muted underline decoration-border-strong underline-offset-4 hover:text-ink focus-visible:rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+    >
+      Problem link ↗
+    </a>
+  );
+}
+
+const tagFamilies: Record<string, string> = {
+  'tag-data': 'border-[var(--tag-data-border)] bg-[var(--tag-data-bg)]',
+  'tag-search': 'border-[var(--tag-search-border)] bg-[var(--tag-search-bg)]',
+  'tag-graph': 'border-[var(--tag-graph-border)] bg-[var(--tag-graph-bg)]',
+  'tag-strategy':
+    'border-[var(--tag-strategy-border)] bg-[var(--tag-strategy-bg)]',
+};
+
+export function approachTagFamily(tag: string) {
+  if (
+    [
+      'Arrays',
+      'Hash Map',
+      'Two Pointers',
+      'Linked List',
+      'Stack',
+      'Queue',
+      'Tree',
+    ].includes(tag)
+  )
+    return 'tag-data';
+  if (['Binary Search', 'DFS', 'BFS'].includes(tag)) return 'tag-search';
+  if (['Graph', 'Union Find', 'Shortest Path'].includes(tag))
+    return 'tag-graph';
+  return 'tag-strategy';
 }
