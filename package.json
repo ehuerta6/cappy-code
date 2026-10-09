@@ -17,6 +17,7 @@
     "seed": "node scripts/seed-emulator.mjs",
     "reset": "node scripts/reset-emulator.mjs",
     "problem-bank:import": "node --import=tsx scripts/import-production-problem-bank.mts",
+    "problem-bank:backfill-tag-summary": "node --import=tsx scripts/backfill-bank-approach-tag-summary.mts",
     "problem-bank:cleanup-publication": "node --import=tsx scripts/cleanup-production-bank-publication.mts",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",

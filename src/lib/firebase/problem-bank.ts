@@ -16,7 +16,6 @@ import {
 } from 'firebase/firestore';
 import {
   languages,
-  approachTags,
   problemCategorySchema,
   problemDifficultySchema,
   problemSchema,
@@ -28,6 +27,7 @@ import {
 } from '../domain';
 import { validateLeetcodeProblemUrl } from '../problem-metadata';
 import { problemApproachTags } from '../problem-bank-filters';
+import { normalizeBankApproachTagSummary } from '../problem-bank-tag-summary';
 import { getOfficerAuth } from './auth';
 import { getFirestoreDb } from './client';
 import {
@@ -131,7 +131,6 @@ function mapBankSnapshot(snapshot: {
     if (document.metadata.hasPendingWrites)
       throw new Error('Problem Bank changes are awaiting confirmation.');
     const data = document.data();
-    const supportedTags = new Set<string>(approachTags);
     return {
       id: document.id,
       ...validateContent(data),
@@ -139,15 +138,8 @@ function mapBankSnapshot(snapshot: {
         typeof data.hiddenByLiveSessionId === 'string' &&
         data.hiddenByLiveSessionId.length > 0,
       approachTagSummary: Array.isArray(data.approachTagSummary)
-        ? problemApproachTags([
-            {
-              tags: data.approachTagSummary.filter(
-                (tag): tag is string =>
-                  typeof tag === 'string' && supportedTags.has(tag),
-              ),
-            },
-          ])
-        : [],
+        ? normalizeBankApproachTagSummary([{ tags: data.approachTagSummary }])
+        : undefined,
     };
   });
 }
@@ -164,7 +156,6 @@ export async function listBankProblemApproachTags(
   officer = false,
 ): Promise<Record<string, string[]>> {
   const db = officer ? officerDb() : getFirestoreDb();
-  const supportedTags = new Set<string>(approachTags);
   const entries = await Promise.all(
     problemIds.map(async (problemId) => {
       const snapshot = await getDocsFromServer(
@@ -173,17 +164,9 @@ export async function listBankProblemApproachTags(
       const approaches = snapshot.docs.map((approach) => {
         if (approach.metadata.hasPendingWrites)
           throw new Error('Approach changes are awaiting confirmation.');
-        const value = approach.data().tags;
-        return {
-          tags: Array.isArray(value)
-            ? value.filter(
-                (tag): tag is string =>
-                  typeof tag === 'string' && supportedTags.has(tag),
-              )
-            : [],
-        };
+        return approach.data();
       });
-      return [problemId, problemApproachTags(approaches)];
+      return [problemId, normalizeBankApproachTagSummary(approaches)];
     }),
   );
   return Object.fromEntries(entries);
@@ -197,7 +180,25 @@ export async function listMemberBankProblems(): Promise<BankProblemRecord[]> {
       where('hiddenByLiveSessionId', '==', null),
     ),
   );
-  return sorted(mapBankSnapshot(snapshot));
+  const records = mapBankSnapshot(snapshot);
+  const legacyRecords = records.filter(
+    ({ approachTagSummary }) => approachTagSummary === undefined,
+  );
+  if (legacyRecords.length === 0) return sorted(records);
+
+  // Older Bank parents do not have the denormalized summary. Resolve their
+  // Approach tags before returning the list, so the first render is complete.
+  // The one-time backfill removes this compatibility read from normal lists.
+  const legacyTags = await listBankProblemApproachTags(
+    legacyRecords.map(({ id }) => id),
+  );
+  return sorted(
+    records.map((record) =>
+      record.approachTagSummary === undefined
+        ? { ...record, approachTagSummary: legacyTags[record.id] ?? [] }
+        : record,
+    ),
+  );
 }
 
 export async function getBankProblem(
@@ -219,15 +220,10 @@ export async function getBankProblem(
       typeof parentData.hiddenByLiveSessionId === 'string' &&
       parentData.hiddenByLiveSessionId.length > 0,
     approachTagSummary: Array.isArray(parentData.approachTagSummary)
-      ? problemApproachTags([
-          {
-            tags: parentData.approachTagSummary.filter(
-              (tag): tag is string =>
-                typeof tag === 'string' && approachTags.includes(tag as never),
-            ),
-          },
+      ? normalizeBankApproachTagSummary([
+          { tags: parentData.approachTagSummary },
         ])
-      : [],
+      : undefined,
   };
   const approaches = await getApproaches(bankProblemPath(problemId));
   return {

@@ -464,6 +464,41 @@ Solution `output` field. Firestore Rules remain authoritative for every read.
 The shared Problem example appears before Solutions, and the reusable
 `SolutionWorkspace` renders returned records in read-only Monaco panels.
 
+### Problem Bank Approach tag summaries
+
+Member Bank lists use the parent `approachTagSummary` field for DSA badges and
+filtering. New and updated Bank content maintains this field alongside its
+Approach documents. For older parents without the field, the Member list loads
+the missing Approach tags before returning its first list result; it does not
+show an empty state and then add badges later. This compatibility path reads
+Approaches only for parents missing the summary. Once all legacy parents are
+backfilled, normal Member list reads use only the Bank parent query.
+
+The backfill targets `cappycode-f133c` / `(default)` and is read-only by
+default. Before using it, export a Firestore backup and review the project's
+current Problem Bank content. Run a dry run with valid Application Default
+Credentials and inspect every planned summary:
+
+```bash
+npm run problem-bank:backfill-tag-summary
+```
+
+If the plan is correct, schedule a short maintenance window so Officers do not
+change Bank Approach tags between the scan and writes. An authorized maintainer
+can then run the explicit write command after independently confirming the
+project and backup:
+
+```bash
+npm run problem-bank:backfill-tag-summary -- --write-production --expected-project-id=cappycode-f133c
+```
+
+The script refuses writes unless the expected project ID is supplied, rejects
+credentials configured for another Firebase project, requires no more than 500
+Bank parents, and writes in batches of at most 400. Verify every
+formerly missing parent now has a summary, and compare the saved tags with its
+Approach documents. This change does not run the script or modify production
+Firebase data.
+
 ## Realtime answer visibility
 
 `src/lib/firebase/answer-visibility.ts` subscribes to the viewed Problem's

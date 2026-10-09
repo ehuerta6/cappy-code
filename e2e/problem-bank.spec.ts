@@ -39,7 +39,9 @@ test('Officer edits and reuses a bank Problem as an independent Session snapshot
     await officer.getByRole('link', { name: 'Problem Bank' }).click();
     await officer.getByRole('button', { name: bankTitle }).click();
     await expect(officer.getByLabel('Problem title')).toHaveValue(bankTitle);
-    await officer.getByLabel('Tags').fill('Arrays, Hash Map');
+    await officer
+      .getByRole('textbox', { name: 'Tags' })
+      .fill('Arrays, Hash Map');
     await officer
       .getByRole('button', { name: 'Save approach details' })
       .click();

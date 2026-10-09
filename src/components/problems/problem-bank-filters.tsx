@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { approachTags } from '@/lib/domain';
 import {
   emptyProblemBankFilters,
@@ -34,11 +34,46 @@ export default function ProblemBankFilters({
   const [openFilter, setOpenFilter] = useState<FilterKey | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [panelPosition, setPanelPosition] = useState<
+    { left: number; top: number } | undefined
+  >();
   const panelId = useId();
   const activeGroups = (
     ['branch', 'difficulty', 'category', 'tag'] as const
   ).filter((group) => value[group].length > 0).length;
   const activeValues = activeGroups + (value.name.trim() ? 1 : 0);
+
+  useLayoutEffect(() => {
+    if (!openFilter) return;
+    const positionPanel = () => {
+      const trigger = triggerRef.current;
+      const panel = panelRef.current;
+      if (!trigger || !panel) return;
+      const triggerRect = trigger.getBoundingClientRect();
+      const panelRect = panel.getBoundingClientRect();
+      const margin = 8;
+      const maxLeft = Math.max(
+        margin,
+        window.innerWidth - panelRect.width - margin,
+      );
+      const maxTop = Math.max(
+        margin,
+        window.innerHeight - panelRect.height - margin,
+      );
+      setPanelPosition({
+        left: Math.min(Math.max(triggerRect.left, margin), maxLeft),
+        top: Math.min(triggerRect.bottom + 4, maxTop),
+      });
+    };
+    positionPanel();
+    window.addEventListener('resize', positionPanel);
+    window.addEventListener('scroll', positionPanel, true);
+    return () => {
+      window.removeEventListener('resize', positionPanel);
+      window.removeEventListener('scroll', positionPanel, true);
+    };
+  }, [openFilter]);
 
   useEffect(() => {
     if (!openFilter) return;
@@ -106,10 +141,16 @@ export default function ProblemBankFilters({
         </button>
         {isOpen ? (
           <div
-            className="absolute right-0 z-30 mt-1 max-h-[min(24rem,70dvh)] w-[min(20rem,calc(100vw-2rem))] overflow-y-auto rounded border border-border-strong bg-surface p-2 text-ink shadow-lg"
+            className="fixed z-30 max-h-[min(24rem,70dvh)] w-[min(20rem,calc(100vw-2rem))] overflow-y-auto rounded border border-border-strong bg-surface p-2 text-ink shadow-lg"
             id={id}
             role="group"
             aria-label={`${label} options`}
+            ref={panelRef}
+            style={{
+              left: panelPosition?.left ?? 8,
+              top: panelPosition?.top ?? 8,
+              visibility: panelPosition ? 'visible' : 'hidden',
+            }}
           >
             {options.map((option) => (
               <label className={optionClass} key={option}>

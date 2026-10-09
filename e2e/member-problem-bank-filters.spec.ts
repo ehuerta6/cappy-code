@@ -20,6 +20,9 @@ test('Member Problem Bank search and filters adapt across themes and widths', as
   await expect(
     page.getByRole('link', { name: 'Contest Room Route' }),
   ).toBeVisible();
+  await expect(
+    page.getByRole('group', { name: 'Contest Room Route classification' }),
+  ).toContainText('Graph');
   await page.screenshot({
     path: testInfo.outputPath('member-bank-desktop-light.png'),
     fullPage: true,
@@ -32,6 +35,17 @@ test('Member Problem Bank search and filters adapt across themes and widths', as
   await expect(
     page.getByRole('link', { name: 'Count Grid Regions' }),
   ).toHaveCount(0);
+  await search.fill('');
+  await page.getByRole('button', { name: 'DSA / algorithm' }).click();
+  await page.getByLabel('Graph', { exact: true }).check();
+  await expect(
+    page.getByRole('link', { name: 'Contest Room Route' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('link', { name: 'Longest Unique Substring' }),
+  ).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Clear all (1)' }).click();
   await page.getByRole('button', { name: 'Difficulty' }).click();
   const difficultyPanel = page.getByRole('group', {
     name: 'Difficulty options',
@@ -69,13 +83,28 @@ test('Member Problem Bank search and filters adapt across themes and widths', as
       ),
     )
     .toBe(true);
+  for (const name of [
+    'CIC branch',
+    'Difficulty',
+    'Category',
+    'DSA / algorithm',
+  ]) {
+    const trigger = page.getByRole('button', { name });
+    await trigger.click();
+    const panel = page.getByRole('group', { name: `${name} options` });
+    const box = await panel.boundingBox();
+    expect(box, `${name} panel should be measurable`).not.toBeNull();
+    expect(box!.x, `${name} panel left edge`).toBeGreaterThanOrEqual(0);
+    expect(box!.x + box!.width, `${name} panel right edge`).toBeLessThanOrEqual(
+      390,
+    );
+    if (name === 'DSA / algorithm')
+      expect(box!.height).toBeLessThanOrEqual(844 * 0.7);
+    await page.keyboard.press('Escape');
+    await expect(panel).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+  }
   await page.getByRole('button', { name: 'DSA / algorithm' }).click();
-  const tagPanel = page.getByRole('group', { name: 'DSA / algorithm options' });
-  const tagBox = await tagPanel.boundingBox();
-  expect(tagBox).not.toBeNull();
-  expect(tagBox!.x).toBeGreaterThanOrEqual(0);
-  expect(tagBox!.x + tagBox!.width).toBeLessThanOrEqual(390);
-  expect(tagBox!.height).toBeLessThanOrEqual(844 * 0.7);
   await page.screenshot({
     path: testInfo.outputPath('member-bank-mobile-dark.png'),
     fullPage: true,

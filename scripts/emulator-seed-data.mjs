@@ -1872,6 +1872,10 @@ export async function seedEmulatorData() {
     ...solutionDocuments,
     ...bankDocuments,
     ...bankSolutionDocuments,
+    [
+      'problemBank/bank-cp-room-route/approaches/primary',
+      { name: 'Primary Approach', tags: ['Graph', 'BFS'], order: 0 },
+    ],
     ['sessionControl/liveSession', { sessionId: null }],
     [
       'sessionControl/intro',
