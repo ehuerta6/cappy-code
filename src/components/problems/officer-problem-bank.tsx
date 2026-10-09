@@ -34,6 +34,10 @@ import { listProblemUsageSummaries } from '@/lib/firebase/problem-usage';
 import type { ProblemUsageSummary } from '@/lib/problem-usage';
 import ProblemBankFilters from './problem-bank-filters';
 import {
+  ProblemApproachTags,
+  ProblemDifficultyBadge,
+} from './problem-bank-metadata';
+import {
   emptyProblemBankFilters,
   filterProblemBank,
   type ProblemBankFilters as Filters,
@@ -66,6 +70,7 @@ export default function OfficerProblemBank() {
     [],
   );
   const [approachId, setApproachId] = useState('primary');
+  const [language, setLanguage] = useState<Language>('python');
   const activeApproach = approaches.find(({ id }) => id === approachId);
   const [savedSolutions, setSavedSolutions] = useState<BankSolutions | null>(
     null,
@@ -228,6 +233,11 @@ export default function OfficerProblemBank() {
         setApproaches(result.approaches);
         setSavedApproaches(result.approaches);
         setApproachId(result.approaches[0]?.id ?? 'primary');
+        setLanguage(
+          languages.find((item) =>
+            result.approaches[0]?.solutions[item].code.trim(),
+          ) ?? 'python',
+        );
         setError(null);
       },
       () => {
@@ -440,25 +450,18 @@ export default function OfficerProblemBank() {
                             summary={usage[item.id]}
                             failed={usageFailed}
                           />
-                          <p className="mb-2 px-3 text-xs text-muted">
-                            {item.difficulty
-                              ? `${item.difficulty[0].toUpperCase()}${item.difficulty.slice(1)}`
-                              : ''}
-                            {tagsByProblem[item.id]?.length
-                              ? ` · ${tagsByProblem[item.id].join(' · ')}`
-                              : ''}
-                            {usage[item.id]?.branches.length
-                              ? ` · ${usage[item.id].branches
-                                  .map((branch) =>
-                                    branch === 'intro'
-                                      ? 'Intro'
-                                      : branch === 'general'
-                                        ? 'General'
-                                        : 'ICPC',
-                                  )
-                                  .join(', ')}`
-                              : ''}
-                          </p>
+                          <div
+                            className="flex flex-wrap items-center gap-1.5 px-3 pb-2"
+                            role="group"
+                            aria-label={`${item.title} classification`}
+                          >
+                            <ProblemDifficultyBadge
+                              difficulty={item.difficulty}
+                            />
+                            <ProblemApproachTags
+                              tags={tagsByProblem[item.id] ?? []}
+                            />
+                          </div>
                         </li>
                       ))}
                     </ul>
@@ -507,238 +510,172 @@ export default function OfficerProblemBank() {
               >
                 {saving ? 'Saving…' : dirty ? 'Unsaved changes' : 'Saved ✓'}
               </p>
-              <div className="grid max-w-3xl gap-4 sm:grid-cols-2">
-                <label className="grid gap-1 font-medium">
-                  Problem title
-                  <input
-                    className="min-h-11 rounded border border-border-strong bg-surface px-3 py-2 font-normal"
-                    value={content.title}
-                    disabled={saving || deleting}
-                    onChange={(event) =>
-                      setContent({ ...content, title: event.target.value })
-                    }
-                  />
-                </label>
-                <label className="grid gap-1 font-medium">
-                  Problem type
-                  <select
-                    className="min-h-11 rounded border border-border-strong bg-surface px-3 py-2 font-normal"
-                    value={content.category}
-                    disabled={saving || deleting}
-                    onChange={(event) =>
-                      setContent({
-                        ...content,
-                        category: event.target
-                          .value as BankProblemContent['category'],
-                      })
-                    }
-                  >
-                    {problemCategories.map((category) => (
-                      <option key={category} value={category}>
-                        {labels[category]}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="grid gap-1 font-medium">
-                  Difficulty
-                  <select
-                    className="min-h-11 rounded border border-border-strong bg-surface px-3 py-2 font-normal"
-                    value={content.difficulty ?? ''}
-                    disabled={saving || deleting}
-                    onChange={(event) =>
-                      setContent({
-                        ...content,
-                        difficulty: event.target.value
-                          ? (event.target
-                              .value as BankProblemContent['difficulty'])
-                          : undefined,
-                      })
-                    }
-                  >
-                    <option value="">Not set</option>
-                    <option value="easy">Easy</option>
-                    <option value="medium">Medium</option>
-                    <option value="hard">Hard</option>
-                  </select>
-                </label>
-                <label className="grid gap-1 font-medium">
-                  LeetCode link (optional)
-                  <input
-                    className="min-h-11 rounded border border-border-strong bg-surface px-3 py-2 font-normal"
-                    type="url"
-                    disabled={saving || deleting}
-                    value={content.leetcodeUrl ?? ''}
-                    placeholder="https://leetcode.com/problems/two-sum/"
-                    onChange={(event) =>
-                      setContent({
-                        ...content,
-                        leetcodeUrl: event.target.value || undefined,
-                      })
-                    }
-                  />
-                </label>
-              </div>
-              <label className="my-4 grid max-w-3xl gap-1 font-medium">
-                Description (Markdown supported)
-                <textarea
-                  className="min-h-32 rounded border border-border-strong bg-surface px-3 py-2 font-normal"
-                  value={content.description}
-                  disabled={saving || deleting}
-                  onChange={(event) =>
-                    setContent({
-                      ...content,
-                      description: event.target.value,
-                    })
-                  }
-                />
-              </label>
-              <label className="my-4 grid max-w-3xl gap-1 font-medium">
-                Constraints
-                <textarea
-                  className="min-h-20 rounded border border-border-strong bg-surface px-3 py-2 font-normal"
-                  value={content.constraints}
-                  disabled={saving || deleting}
-                  onChange={(event) =>
-                    setContent({
-                      ...content,
-                      constraints: event.target.value,
-                    })
-                  }
-                />
-              </label>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <label className="grid gap-1 font-medium">
-                  Example input
-                  <textarea
-                    className="min-h-20 rounded border border-border-strong bg-surface px-3 py-2 font-mono font-normal"
-                    value={content.exampleInput}
-                    disabled={saving}
-                    onChange={(event) =>
-                      setContent({
-                        ...content,
-                        exampleInput: event.target.value,
-                      })
-                    }
-                  />
-                </label>
-                <label className="grid gap-1 font-medium">
-                  Expected output
-                  <textarea
-                    className="min-h-20 rounded border border-border-strong bg-surface px-3 py-2 font-mono font-normal"
-                    value={content.exampleOutput}
-                    disabled={saving}
-                    onChange={(event) =>
-                      setContent({
-                        ...content,
-                        exampleOutput: event.target.value,
-                      })
-                    }
-                  />
-                </label>
-              </div>
-              {approaches.length > 1 && (
-                <div
-                  className="mb-3 flex flex-wrap gap-2"
-                  aria-label="Solution approaches"
-                >
-                  {approaches.map((approach) => (
-                    <button
-                      key={approach.id}
-                      type="button"
-                      className={buttonClass}
-                      disabled={approachActionsDisabled}
-                      aria-pressed={approach.id === approachId}
-                      onClick={() => {
-                        setApproachId(approach.id);
-                        setSolutions(approach.solutions);
-                        setSavedSolutions(approach.solutions);
-                      }}
-                    >
-                      {approach.name}
-                    </button>
-                  ))}
-                </div>
-              )}
-              <div className="mb-3 flex flex-wrap items-end gap-2">
-                <button
-                  className={buttonClass}
-                  type="button"
-                  disabled={approachActionsDisabled}
-                  onClick={async () => {
-                    setError(null);
-                    setStructuralBusy(true);
-                    try {
-                      const added = await createApproach(
-                        bankProblemPath(selected.id),
-                      );
-                      const next = [...approaches, added].map(
-                        (approach, order) => ({ ...approach, order }),
-                      );
-                      setApproaches(next);
-                      setSavedApproaches(next);
-                      setApproachId(added.id);
-                      setSolutions(added.solutions);
-                      setSavedSolutions(added.solutions);
-                    } catch {
-                      setError('Approach could not be added. Retry.');
-                    } finally {
-                      setStructuralBusy(false);
-                    }
-                  }}
-                >
-                  Add Approach
-                </button>
-                {activeApproach && (
-                  <>
-                    <label>
-                      Approach name
+              <div className="grid min-w-0 gap-6 min-[1350px]:h-[calc(100dvh-14rem)] min-[1350px]:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)] min-[1350px]:gap-0 min-[1350px]:overflow-hidden min-[1350px]:divide-x min-[1350px]:divide-border-soft">
+                <div className="min-w-0 min-[1350px]:h-full min-[1350px]:overflow-y-auto min-[1350px]:overscroll-contain min-[1350px]:pr-5">
+                  <div className="grid max-w-3xl gap-4 sm:grid-cols-2">
+                    <label className="grid gap-1 font-medium">
+                      Problem title
                       <input
-                        className="ml-2 rounded border border-border-strong bg-surface px-2 py-2"
+                        className="min-h-11 rounded border border-border-strong bg-surface px-3 py-2 font-normal"
+                        value={content.title}
                         disabled={saving || deleting}
-                        value={activeApproach.name}
                         onChange={(event) =>
-                          setApproaches((items) =>
-                            items.map((item) =>
-                              item.id === approachId
-                                ? { ...item, name: event.target.value }
-                                : item,
-                            ),
-                          )
+                          setContent({ ...content, title: event.target.value })
                         }
                       />
                     </label>
-                    <label>
-                      Tags
-                      <input
-                        className="ml-2 rounded border border-border-strong bg-surface px-2 py-2"
+                    <label className="grid gap-1 font-medium">
+                      Problem type
+                      <select
+                        className="min-h-11 rounded border border-border-strong bg-surface px-3 py-2 font-normal"
+                        value={content.category}
                         disabled={saving || deleting}
-                        value={activeApproach.tags.join(', ')}
                         onChange={(event) =>
-                          setApproaches((items) =>
-                            items.map((item) =>
-                              item.id === approachId
-                                ? {
-                                    ...item,
-                                    tags: event.target.value
-                                      .split(',')
-                                      .map((tag) => tag.trim())
-                                      .filter(Boolean),
-                                  }
-                                : item,
-                            ),
-                          )
+                          setContent({
+                            ...content,
+                            category: event.target
+                              .value as BankProblemContent['category'],
+                          })
+                        }
+                      >
+                        {problemCategories.map((category) => (
+                          <option key={category} value={category}>
+                            {labels[category]}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="grid gap-1 font-medium">
+                      Difficulty
+                      <select
+                        className="min-h-11 rounded border border-border-strong bg-surface px-3 py-2 font-normal"
+                        value={content.difficulty ?? ''}
+                        disabled={saving || deleting}
+                        onChange={(event) =>
+                          setContent({
+                            ...content,
+                            difficulty: event.target.value
+                              ? (event.target
+                                  .value as BankProblemContent['difficulty'])
+                              : undefined,
+                          })
+                        }
+                      >
+                        <option value="">Not set</option>
+                        <option value="easy">Easy</option>
+                        <option value="medium">Medium</option>
+                        <option value="hard">Hard</option>
+                      </select>
+                    </label>
+                    <label className="grid gap-1 font-medium">
+                      LeetCode link (optional)
+                      <input
+                        className="min-h-11 rounded border border-border-strong bg-surface px-3 py-2 font-normal"
+                        type="url"
+                        disabled={saving || deleting}
+                        value={content.leetcodeUrl ?? ''}
+                        placeholder="https://leetcode.com/problems/two-sum/"
+                        onChange={(event) =>
+                          setContent({
+                            ...content,
+                            leetcodeUrl: event.target.value || undefined,
+                          })
                         }
                       />
                     </label>
-                    <button
-                      className={buttonClass}
-                      type="button"
+                  </div>
+                  <label className="my-4 grid max-w-3xl gap-1 font-medium">
+                    Description (Markdown supported)
+                    <textarea
+                      className="min-h-32 rounded border border-border-strong bg-surface px-3 py-2 font-normal"
+                      value={content.description}
                       disabled={saving || deleting}
-                      onClick={() => void save()}
+                      onChange={(event) =>
+                        setContent({
+                          ...content,
+                          description: event.target.value,
+                        })
+                      }
+                    />
+                  </label>
+                  <label className="my-4 grid max-w-3xl gap-1 font-medium">
+                    Constraints
+                    <textarea
+                      className="min-h-20 rounded border border-border-strong bg-surface px-3 py-2 font-normal"
+                      value={content.constraints}
+                      disabled={saving || deleting}
+                      onChange={(event) =>
+                        setContent({
+                          ...content,
+                          constraints: event.target.value,
+                        })
+                      }
+                    />
+                  </label>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <label className="grid gap-1 font-medium">
+                      Example input
+                      <textarea
+                        className="min-h-20 rounded border border-border-strong bg-surface px-3 py-2 font-mono font-normal"
+                        value={content.exampleInput}
+                        disabled={saving}
+                        onChange={(event) =>
+                          setContent({
+                            ...content,
+                            exampleInput: event.target.value,
+                          })
+                        }
+                      />
+                    </label>
+                    <label className="grid gap-1 font-medium">
+                      Expected output
+                      <textarea
+                        className="min-h-20 rounded border border-border-strong bg-surface px-3 py-2 font-mono font-normal"
+                        value={content.exampleOutput}
+                        disabled={saving}
+                        onChange={(event) =>
+                          setContent({
+                            ...content,
+                            exampleOutput: event.target.value,
+                          })
+                        }
+                      />
+                    </label>
+                  </div>
+                </div>
+                <section
+                  className="min-w-0 min-[1350px]:h-full min-[1350px]:overflow-y-auto min-[1350px]:overscroll-contain min-[1350px]:pl-5"
+                  aria-label="Approach and solution"
+                >
+                  {approaches.length > 1 && (
+                    <div
+                      className="mb-3 flex flex-wrap gap-2"
+                      aria-label="Solution approaches"
                     >
-                      Save approach details
-                    </button>
+                      {approaches.map((approach) => (
+                        <button
+                          key={approach.id}
+                          type="button"
+                          className={buttonClass}
+                          disabled={approachActionsDisabled}
+                          aria-pressed={approach.id === approachId}
+                          onClick={() => {
+                            setApproachId(approach.id);
+                            setSolutions(approach.solutions);
+                            setSavedSolutions(approach.solutions);
+                            setLanguage(
+                              languages.find((item) =>
+                                approach.solutions[item].code.trim(),
+                              ) ?? 'python',
+                            );
+                          }}
+                        >
+                          {approach.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <div className="mb-3 flex flex-wrap items-end gap-2">
                     <button
                       className={buttonClass}
                       type="button"
@@ -747,150 +684,246 @@ export default function OfficerProblemBank() {
                         setError(null);
                         setStructuralBusy(true);
                         try {
-                          await deleteApproach(
+                          const added = await createApproach(
                             bankProblemPath(selected.id),
-                            approachId,
                           );
-                          const next = approaches
-                            .filter((approach) => approach.id !== approachId)
-                            .map((approach, order) => ({ ...approach, order }));
-                          const empty = {
-                            python: { code: '' },
-                            java: { code: '' },
-                            cpp: { code: '' },
-                          };
+                          const next = [...approaches, added].map(
+                            (approach, order) => ({ ...approach, order }),
+                          );
                           setApproaches(next);
                           setSavedApproaches(next);
-                          setApproachId(next[0]?.id ?? '');
-                          setSolutions(next[0]?.solutions ?? empty);
-                          setSavedSolutions(next[0]?.solutions ?? empty);
+                          setApproachId(added.id);
+                          setSolutions(added.solutions);
+                          setSavedSolutions(added.solutions);
                         } catch {
-                          setError('Approach could not be deleted. Retry.');
+                          setError('Approach could not be added. Retry.');
                         } finally {
                           setStructuralBusy(false);
                         }
                       }}
                     >
-                      Delete Approach
+                      Add Approach
                     </button>
-                    <button
-                      className={buttonClass}
-                      type="button"
-                      disabled={approachActionsDisabled}
-                      onClick={async () => {
-                        const index = approaches.findIndex(
-                          (item) => item.id === approachId,
-                        );
-                        if (index > 0) {
-                          const order = [...approaches];
-                          [order[index - 1], order[index]] = [
-                            order[index],
-                            order[index - 1],
-                          ];
-                          setError(null);
-                          setStructuralBusy(true);
-                          try {
-                            await reorderApproaches(
-                              bankProblemPath(selected.id),
-                              order,
+                    {activeApproach && (
+                      <>
+                        <label>
+                          Approach name
+                          <input
+                            className="ml-2 rounded border border-border-strong bg-surface px-2 py-2"
+                            disabled={saving || deleting}
+                            value={activeApproach.name}
+                            onChange={(event) =>
+                              setApproaches((items) =>
+                                items.map((item) =>
+                                  item.id === approachId
+                                    ? { ...item, name: event.target.value }
+                                    : item,
+                                ),
+                              )
+                            }
+                          />
+                        </label>
+                        <label>
+                          Tags
+                          <input
+                            className="ml-2 rounded border border-border-strong bg-surface px-2 py-2"
+                            disabled={saving || deleting}
+                            value={activeApproach.tags.join(', ')}
+                            onChange={(event) =>
+                              setApproaches((items) =>
+                                items.map((item) =>
+                                  item.id === approachId
+                                    ? {
+                                        ...item,
+                                        tags: event.target.value
+                                          .split(',')
+                                          .map((tag) => tag.trim())
+                                          .filter(Boolean),
+                                      }
+                                    : item,
+                                ),
+                              )
+                            }
+                          />
+                        </label>
+                        <ProblemApproachTags tags={activeApproach.tags} />
+                        <button
+                          className={buttonClass}
+                          type="button"
+                          disabled={saving || deleting}
+                          onClick={() => void save()}
+                        >
+                          Save approach details
+                        </button>
+                        <button
+                          className={buttonClass}
+                          type="button"
+                          disabled={approachActionsDisabled}
+                          onClick={async () => {
+                            setError(null);
+                            setStructuralBusy(true);
+                            try {
+                              await deleteApproach(
+                                bankProblemPath(selected.id),
+                                approachId,
+                              );
+                              const next = approaches
+                                .filter(
+                                  (approach) => approach.id !== approachId,
+                                )
+                                .map((approach, order) => ({
+                                  ...approach,
+                                  order,
+                                }));
+                              const empty = {
+                                python: { code: '' },
+                                java: { code: '' },
+                                cpp: { code: '' },
+                              };
+                              setApproaches(next);
+                              setSavedApproaches(next);
+                              setApproachId(next[0]?.id ?? '');
+                              setSolutions(next[0]?.solutions ?? empty);
+                              setSavedSolutions(next[0]?.solutions ?? empty);
+                            } catch {
+                              setError('Approach could not be deleted. Retry.');
+                            } finally {
+                              setStructuralBusy(false);
+                            }
+                          }}
+                        >
+                          Delete Approach
+                        </button>
+                        <button
+                          className={buttonClass}
+                          type="button"
+                          disabled={approachActionsDisabled}
+                          onClick={async () => {
+                            const index = approaches.findIndex(
+                              (item) => item.id === approachId,
                             );
-                            const next = order.map((item, i) => ({
-                              ...item,
-                              order: i,
-                            }));
-                            setApproaches(next);
-                            setSavedApproaches(next);
-                          } catch {
-                            setError(
-                              'Approaches could not be reordered. Retry.',
+                            if (index > 0) {
+                              const order = [...approaches];
+                              [order[index - 1], order[index]] = [
+                                order[index],
+                                order[index - 1],
+                              ];
+                              setError(null);
+                              setStructuralBusy(true);
+                              try {
+                                await reorderApproaches(
+                                  bankProblemPath(selected.id),
+                                  order,
+                                );
+                                const next = order.map((item, i) => ({
+                                  ...item,
+                                  order: i,
+                                }));
+                                setApproaches(next);
+                                setSavedApproaches(next);
+                              } catch {
+                                setError(
+                                  'Approaches could not be reordered. Retry.',
+                                );
+                              } finally {
+                                setStructuralBusy(false);
+                              }
+                            }
+                          }}
+                        >
+                          Move Approach earlier
+                        </button>
+                        <button
+                          className={buttonClass}
+                          type="button"
+                          disabled={approachActionsDisabled}
+                          onClick={async () => {
+                            const index = approaches.findIndex(
+                              (item) => item.id === approachId,
                             );
-                          } finally {
-                            setStructuralBusy(false);
-                          }
-                        }
-                      }}
-                    >
-                      Move Approach earlier
-                    </button>
-                    <button
-                      className={buttonClass}
-                      type="button"
-                      disabled={approachActionsDisabled}
-                      onClick={async () => {
-                        const index = approaches.findIndex(
-                          (item) => item.id === approachId,
-                        );
-                        if (index >= 0 && index < approaches.length - 1) {
-                          const order = [...approaches];
-                          [order[index], order[index + 1]] = [
-                            order[index + 1],
-                            order[index],
-                          ];
-                          setError(null);
-                          setStructuralBusy(true);
-                          try {
-                            await reorderApproaches(
-                              bankProblemPath(selected.id),
-                              order,
-                            );
-                            const next = order.map((item, i) => ({
-                              ...item,
-                              order: i,
-                            }));
-                            setApproaches(next);
-                            setSavedApproaches(next);
-                          } catch {
-                            setError(
-                              'Approaches could not be reordered. Retry.',
-                            );
-                          } finally {
-                            setStructuralBusy(false);
-                          }
-                        }
-                      }}
-                    >
-                      Move Approach later
-                    </button>
-                  </>
-                )}
-              </div>
-              {activeApproach?.tags.length ? (
-                <p className="text-sm text-muted">
-                  {activeApproach.tags.join(' · ')}
-                </p>
-              ) : null}
-              <h2 className="mb-3 mt-7 text-lg font-semibold">
-                Prepared Solutions
-              </h2>
-              {activeApproach ? (
-                <div className="overflow-x-auto pb-2">
-                  <div className="grid min-w-[1080px] grid-cols-3 gap-4">
-                    {languages.map((language: Language) => (
-                      <SolutionPanel
-                        key={language}
-                        mode="officer"
-                        language={language}
-                        solution={solutions[language]}
-                        modelPath={`bank/${selectedId}/${approachId}/${language}`}
-                        editorHeight={getSharedEditorHeight(solutions)}
-                        onChange={(solution: Solution) =>
-                          setSolutions((current) =>
-                            current
-                              ? { ...current, [language]: solution }
-                              : current,
-                          )
-                        }
-                        disabled={saving || deleting}
-                      />
-                    ))}
+                            if (index >= 0 && index < approaches.length - 1) {
+                              const order = [...approaches];
+                              [order[index], order[index + 1]] = [
+                                order[index + 1],
+                                order[index],
+                              ];
+                              setError(null);
+                              setStructuralBusy(true);
+                              try {
+                                await reorderApproaches(
+                                  bankProblemPath(selected.id),
+                                  order,
+                                );
+                                const next = order.map((item, i) => ({
+                                  ...item,
+                                  order: i,
+                                }));
+                                setApproaches(next);
+                                setSavedApproaches(next);
+                              } catch {
+                                setError(
+                                  'Approaches could not be reordered. Retry.',
+                                );
+                              } finally {
+                                setStructuralBusy(false);
+                              }
+                            }
+                          }}
+                        >
+                          Move Approach later
+                        </button>
+                      </>
+                    )}
                   </div>
-                </div>
-              ) : (
-                <p>
-                  No solution approaches yet. Add an Approach to prepare
-                  Solutions.
-                </p>
-              )}
+                  {activeApproach?.tags.length ? (
+                    <p className="text-sm text-muted">
+                      {activeApproach.tags.join(' · ')}
+                    </p>
+                  ) : null}
+                  <label className="mb-3 mt-7 grid max-w-sm gap-1 text-sm font-semibold">
+                    Language
+                    <select
+                      className="min-h-11 min-w-0 rounded border border-border-strong bg-surface px-3 text-ink"
+                      aria-label="Language"
+                      value={language}
+                      disabled={saving || deleting}
+                      onChange={(event) =>
+                        setLanguage(event.target.value as Language)
+                      }
+                    >
+                      {languages.map((item) => (
+                        <option key={item} value={item}>
+                          {item === 'cpp'
+                            ? 'C++'
+                            : item[0].toUpperCase() + item.slice(1)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {activeApproach ? (
+                    <SolutionPanel
+                      mode="officer"
+                      language={language}
+                      solution={solutions[language]}
+                      modelPath={`bank/${selectedId}/${approachId}/${language}`}
+                      editorHeight={getSharedEditorHeight(solutions)}
+                      onChange={(solution: Solution) =>
+                        setSolutions((current) =>
+                          current
+                            ? { ...current, [language]: solution }
+                            : current,
+                        )
+                      }
+                      disabled={saving || deleting}
+                    />
+                  ) : (
+                    <p>
+                      No solution approaches yet. Add an Approach to prepare
+                      Solutions.
+                    </p>
+                  )}
+                </section>
+              </div>
               <ProblemUsageHistory
                 summary={usage[selected.id]}
                 failed={usageFailed}

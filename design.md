@@ -452,6 +452,9 @@ component boundaries. Do not implement them in this issue.
 
 ## 17. UX invariants / product rules
 
+Member presentation is the canonical content design; Officer Mode extends it
+with authenticated editing and management controls.
+
 1. Reveal state belongs to each **Problem**: `answersVisible` is not Session-wide.
 2. Session status (`draft`, `live`, `ended`) and reveal status are separate concepts.
 3. Member and officer Problem selection is local to each view.

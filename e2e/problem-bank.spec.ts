@@ -51,6 +51,9 @@ test('Officer edits and reuses a bank Problem as an independent Session snapshot
       'BANK_CPP_SOLUTION',
     ];
     for (const [index, language] of ['Python', 'Java', 'C++'].entries()) {
+      await officer
+        .getByLabel('Language')
+        .selectOption(['python', 'java', 'cpp'][index]);
       const editor = officer
         .getByRole('region', { name: language })
         .locator('.monaco-editor');
@@ -58,16 +61,10 @@ test('Officer edits and reuses a bank Problem as an independent Session snapshot
       await officer.keyboard.press('ControlOrMeta+A');
       await officer.keyboard.insertText(secrets[index]);
       await expect(editor.locator('.view-lines')).toContainText(secrets[index]);
-      await officer.getByLabel('Time Complexity').nth(index).fill('O(n)');
-      await officer
-        .getByLabel('Time explanation')
-        .nth(index)
-        .fill(`${language} time.`);
-      await officer.getByLabel('Space Complexity').nth(index).fill('O(1)');
-      await officer
-        .getByLabel('Space explanation')
-        .nth(index)
-        .fill(`${language} space.`);
+      await officer.getByLabel('Time Complexity').fill('O(n)');
+      await officer.getByLabel('Time explanation').fill(`${language} time.`);
+      await officer.getByLabel('Space Complexity').fill('O(1)');
+      await officer.getByLabel('Space explanation').fill(`${language} space.`);
     }
     await officer.getByRole('button', { name: 'Save changes' }).click();
     await expect(

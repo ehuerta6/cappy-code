@@ -79,7 +79,9 @@ test('Officer prepares and presents a Session through its public lifecycle', asy
     await officer
       .getByLabel('Problem category')
       .selectOption('interview-style');
-    await officer.getByLabel('Difficulty').selectOption('medium');
+    await officer
+      .getByRole('combobox', { name: 'Difficulty', exact: true })
+      .selectOption('medium');
     await officer
       .getByRole('textbox', { name: 'Description' })
       .fill('Use a **map** to find the matching pair.');
@@ -98,6 +100,9 @@ test('Officer prepares and presents a Session through its public lifecycle', asy
 
     const solutionCode = [pythonSolution, javaSolution, cppSolution];
     for (let index = 0; index < solutionCode.length; index += 1) {
+      await officer
+        .getByLabel('Language')
+        .selectOption(['python', 'java', 'cpp'][index]);
       const editor = officer
         .getByRole('region', {
           name: ['Python', 'Java', 'C++'][index],
@@ -109,20 +114,20 @@ test('Officer prepares and presents a Session through its public lifecycle', asy
       await officer.keyboard.insertText(solutionCode[index]);
     }
 
-    for (const [index, time, space] of [
-      [0, 'O(n)', 'O(n)'],
-      [1, 'O(n log n)', 'O(n)'],
-      [2, 'O(n)', 'O(1)'],
-    ] as const) {
-      await officer.getByLabel('Time Complexity').nth(index).fill(time);
+    for (const [index, language] of ['python', 'java', 'cpp'].entries()) {
+      await officer.getByLabel('Language').selectOption(language);
+      const [time, space] = [
+        ['O(n)', 'O(n)'],
+        ['O(n log n)', 'O(n)'],
+        ['O(n)', 'O(1)'],
+      ][index];
+      await officer.getByLabel('Time Complexity').fill(time);
       await officer
         .getByLabel('Time explanation')
-        .nth(index)
         .fill(`${['Python', 'Java', 'C++'][index]} time analysis.`);
-      await officer.getByLabel('Space Complexity').nth(index).fill(space);
+      await officer.getByLabel('Space Complexity').fill(space);
       await officer
         .getByLabel('Space explanation')
-        .nth(index)
         .fill(`${['Python', 'Java', 'C++'][index]} space analysis.`);
     }
     await officer
@@ -131,9 +136,15 @@ test('Officer prepares and presents a Session through its public lifecycle', asy
     await expect(officer.getByText('Saved ✓')).toBeVisible();
     await officer.getByRole('button', { name: 'Add Approach' }).click();
     await expect(
-      officer.getByRole('button', { name: 'New Approach' }),
+      officer.getByRole('textbox', { name: 'Approach name' }),
     ).toBeVisible();
+    await officer
+      .getByRole('textbox', { name: 'Approach name' })
+      .fill('New Approach');
     for (const [index, language] of ['Python', 'Java', 'C++'].entries()) {
+      await officer
+        .getByLabel('Language')
+        .selectOption(['python', 'java', 'cpp'][index]);
       const editor = officer
         .getByRole('region', { name: language })
         .locator('.monaco-editor');
@@ -144,14 +155,14 @@ test('Officer prepares and presents a Session through its public lifecycle', asy
           index
         ],
       );
+      await officer
+        .getByRole('button', { name: 'Save Changes', exact: true })
+        .click();
+      await expect(officer.getByText('Saved ✓')).toBeVisible();
     }
-    await officer
-      .getByRole('button', { name: 'Save Changes', exact: true })
-      .click();
-    await expect(officer.getByText('Saved ✓')).toBeVisible();
     await expect(
-      officer.getByRole('button', { name: 'New Approach' }),
-    ).toBeVisible();
+      officer.getByRole('combobox', { name: 'Approach', exact: true }),
+    ).toHaveValue(/.+/);
 
     // Session-created reusable Bank copies are available without a publication step.
     await officer.goto('/officer/problem-bank');
@@ -169,7 +180,7 @@ test('Officer prepares and presents a Session through its public lifecycle', asy
     ).toBeVisible();
     await officer.getByRole('button', { name: 'Manage problems' }).click();
     await expect(
-      officer.getByRole('button', { name: 'New Approach' }),
+      officer.getByRole('textbox', { name: 'Approach name' }),
     ).toBeVisible();
 
     await member.goto('/');
@@ -254,7 +265,9 @@ test('Officer prepares and presents a Session through its public lifecycle', asy
     await officer.getByLabel('Constraints').fill('Corrected live constraints.');
     await officer.getByLabel('Example input').fill('values = [1, 2, 3]');
     await officer.getByLabel('Expected output').fill('6');
-    await officer.getByLabel('Difficulty').selectOption('hard');
+    await officer
+      .getByRole('combobox', { name: 'Difficulty', exact: true })
+      .selectOption('hard');
     await officer
       .getByLabel('LeetCode link (optional)')
       .fill('https://leetcode.com/problems/valid-anagram/');

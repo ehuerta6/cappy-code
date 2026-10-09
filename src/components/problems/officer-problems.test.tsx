@@ -270,8 +270,14 @@ describe('Officer Problem workspace', () => {
         target: { value: 'python prepared' },
       },
     );
+    fireEvent.change(screen.getByLabelText('Language'), {
+      target: { value: 'java' },
+    });
     fireEvent.change(screen.getByLabelText('Java Solution, editable'), {
       target: { value: 'java prepared' },
+    });
+    fireEvent.change(screen.getByLabelText('Language'), {
+      target: { value: 'cpp' },
     });
     fireEvent.change(screen.getByLabelText('C++ Solution, editable'), {
       target: { value: 'cpp prepared' },
@@ -769,6 +775,9 @@ describe('Officer Problem workspace', () => {
     );
     fireEvent.change(screen.getByLabelText('Expected output'), {
       target: { value: 'shared expected result' },
+    });
+    fireEvent.change(screen.getByLabelText('Language'), {
+      target: { value: 'cpp' },
     });
     fireEvent.change(screen.getByLabelText('C++ Solution, editable'), {
       target: { value: 'updated C++ source' },

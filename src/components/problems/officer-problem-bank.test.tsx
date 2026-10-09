@@ -131,6 +131,19 @@ beforeEach(() => {
 afterEach(() => cleanup());
 
 describe('Officer Problem Bank', () => {
+  it('uses one selected Language editor and the shared classification badges', async () => {
+    render(<OfficerProblemBank />);
+    await screen.findByLabelText('Python Solution, editable');
+    expect(screen.getAllByLabelText(/Solution, editable/)).toHaveLength(1);
+    fireEvent.change(screen.getByLabelText('Language'), {
+      target: { value: 'java' },
+    });
+    expect(
+      await screen.findByLabelText('Java Solution, editable'),
+    ).toBeTruthy();
+    expect(screen.getAllByLabelText(/Solution, editable/)).toHaveLength(1);
+  });
+
   it('confirms deletion, then removes the row only after persistence succeeds', async () => {
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
     const deletion = deferred<void>();

@@ -1007,6 +1007,9 @@ describe('Officer Sessions surface', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Manage problems' }));
     await screen.findByLabelText('Python Solution, editable');
     const backButton = screen.getByRole('button', { name: 'Back to session' });
+    fireEvent.change(screen.getByLabelText('Language'), {
+      target: { value: 'cpp' },
+    });
     fireEvent.change(screen.getByLabelText('C++ Solution, editable'), {
       target: { value: 'static source' },
     });
@@ -1134,6 +1137,9 @@ describe('Officer Sessions surface', () => {
     fireEvent.change(screen.getByLabelText('Python Solution, editable'), {
       target: { value: 'new python' },
     });
+    fireEvent.change(screen.getByLabelText('Language'), {
+      target: { value: 'java' },
+    });
     fireEvent.change(screen.getByLabelText('Java Solution, editable'), {
       target: { value: 'new java source' },
     });
@@ -1215,6 +1221,9 @@ describe('Officer Sessions surface', () => {
     });
     expect((deleteProblem as HTMLButtonElement).disabled).toBe(false);
 
+    fireEvent.change(screen.getByLabelText('Language'), {
+      target: { value: 'cpp' },
+    });
     fireEvent.change(screen.getByLabelText('C++ Solution, editable'), {
       target: { value: 'changed source' },
     });

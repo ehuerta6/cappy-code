@@ -35,6 +35,7 @@ import type {
   OfficerSaveState,
   SaveStateReporter,
 } from '@/components/officer-save-state';
+import { sessionProblemWorkspaceClass } from './session-problem-workspace';
 
 const buttonClass =
   'min-h-11 rounded border border-border-strong bg-surface px-3 py-2 text-ink hover:bg-hover disabled:cursor-default disabled:bg-raised disabled:text-muted';
@@ -589,252 +590,268 @@ export default function OfficerProblems({
             </div>
           ) : (
             <>
-              <div className="flex flex-wrap items-stretch gap-2 border-b border-border-soft">
-                <div
-                  className="flex min-w-0 max-w-full flex-1 basis-80 overflow-x-auto [scrollbar-width:thin]"
-                  role="tablist"
-                  aria-label="Problems"
-                >
-                  {records.map((record, index) =>
-                    (() => {
-                      const readiness = readinessApproaches[record.id]
-                        ? getProblemReadiness(
-                            record.problem,
-                            readinessApproaches[record.id],
-                          )
-                        : null;
-                      return (
-                        <button
-                          key={record.id}
-                          ref={(element) => {
-                            if (element) tabs.current.set(record.id, element);
-                            else tabs.current.delete(record.id);
-                          }}
-                          className="min-h-11 shrink-0 border-b-2 border-transparent px-3 py-2 text-muted hover:bg-hover hover:text-ink aria-selected:border-accent aria-selected:font-semibold aria-selected:text-ink"
-                          role="tab"
-                          id={`problem-tab-${record.id}`}
-                          aria-controls={`problem-panel-${record.id}`}
-                          aria-describedby={
-                            readiness?.warnings.length
-                              ? `problem-readiness-${record.id}`
-                              : undefined
-                          }
-                          aria-selected={selectedId === record.id}
-                          tabIndex={selectedId === record.id ? 0 : -1}
-                          disabled={blocked}
-                          onKeyDown={(event) => keyboard(event, index)}
-                          onClick={() => select(record.id)}
-                        >
-                          {record.problem.title}
-                          {readiness?.warnings.length ? (
-                            <span
-                              className="ml-2 rounded border border-warning/50 px-1.5 py-0.5 text-xs font-medium text-warning"
-                              aria-hidden="true"
+              <div className={sessionProblemWorkspaceClass}>
+                <div className="min-w-0 min-[1100px]:h-full min-[1100px]:overflow-y-auto min-[1100px]:overscroll-contain min-[1100px]:pr-5">
+                  <div className="flex flex-wrap items-stretch gap-2 border-b border-border-soft">
+                    <div
+                      className="flex min-w-0 max-w-full flex-1 basis-80 overflow-x-auto [scrollbar-width:thin]"
+                      role="tablist"
+                      aria-label="Problems"
+                    >
+                      {records.map((record, index) =>
+                        (() => {
+                          const readiness = readinessApproaches[record.id]
+                            ? getProblemReadiness(
+                                record.problem,
+                                readinessApproaches[record.id],
+                              )
+                            : null;
+                          return (
+                            <button
+                              key={record.id}
+                              ref={(element) => {
+                                if (element)
+                                  tabs.current.set(record.id, element);
+                                else tabs.current.delete(record.id);
+                              }}
+                              className="min-h-11 shrink-0 border-b-2 border-transparent px-3 py-2 text-muted hover:bg-hover hover:text-ink aria-selected:border-accent aria-selected:font-semibold aria-selected:text-ink"
+                              role="tab"
+                              id={`problem-tab-${record.id}`}
+                              aria-controls={`problem-panel-${record.id}`}
+                              aria-describedby={
+                                readiness?.warnings.length
+                                  ? `problem-readiness-${record.id}`
+                                  : undefined
+                              }
+                              aria-selected={selectedId === record.id}
+                              tabIndex={selectedId === record.id ? 0 : -1}
+                              disabled={blocked}
+                              onKeyDown={(event) => keyboard(event, index)}
+                              onClick={() => select(record.id)}
                             >
-                              Needs prep
-                            </span>
-                          ) : null}
-                          {readiness?.warnings.length ? (
-                            <span
-                              className="sr-only"
-                              id={`problem-readiness-${record.id}`}
-                            >
-                              Preparation warnings:{' '}
-                              {readiness.warnings.join('. ')}.
-                            </span>
-                          ) : null}
-                        </button>
-                      );
-                    })(),
-                  )}
-                </div>
-                <button
-                  ref={addButton}
-                  className={buttonClass}
-                  disabled={blocked || sessionStatus !== 'draft'}
-                  onClick={add}
-                  aria-label="Add problem"
-                >
-                  + Add problem
-                </button>
-                {selected && (
-                  <button
-                    ref={actionsButton}
-                    className="min-h-10 min-w-10 rounded-md px-2 text-lg text-muted hover:bg-hover hover:text-ink disabled:cursor-default disabled:text-muted"
-                    disabled={blocked}
-                    aria-label={`Manage ${selected.problem.title}`}
-                    aria-expanded={actionsOpen}
-                    aria-controls="problem-actions"
-                    onClick={() => setActionsOpen((open) => !open)}
-                  >
-                    ···
-                  </button>
-                )}
-              </div>
-              {actionsOpen && selected && (
-                <div
-                  id="problem-actions"
-                  className="my-3 flex flex-wrap items-center gap-2 border-y border-border-soft py-3 [&>p]:m-0 [&>p]:basis-full"
-                  onKeyDown={(event) => {
-                    if (event.key === 'Escape') {
-                      setActionsOpen(false);
-                      actionsButton.current?.focus();
-                    }
-                  }}
-                >
-                  <button
-                    autoFocus
-                    className={buttonClass}
-                    disabled={blocked}
-                    onClick={() => {
-                      setActionsOpen(false);
-                      document.getElementById('problem-title')?.focus();
-                    }}
-                  >
-                    Rename
-                  </button>
-                  <button
-                    className={buttonClass}
-                    disabled={blocked || sessionStatus !== 'draft'}
-                    onClick={duplicate}
-                  >
-                    Duplicate problem
-                  </button>
-                  <button
-                    className={buttonClass}
-                    disabled={
-                      blocked ||
-                      sessionStatus !== 'draft' ||
-                      records[0].id === selected.id
-                    }
-                    onClick={() => move(-1)}
-                  >
-                    Move earlier
-                  </button>
-                  <button
-                    className={buttonClass}
-                    disabled={
-                      blocked ||
-                      sessionStatus !== 'draft' ||
-                      records.at(-1)?.id === selected.id
-                    }
-                    onClick={() => move(1)}
-                  >
-                    Move later
-                  </button>
-                  <button
-                    className={buttonClass}
-                    disabled={blocked || sessionStatus !== 'draft'}
-                    onClick={() => {
-                      setConfirmDelete(true);
-                      setActionsOpen(false);
-                    }}
-                  >
-                    Delete problem
-                  </button>
-                </div>
-              )}
-              {confirmDelete && selected && (
-                <div
-                  className="my-3 flex flex-wrap items-center gap-2 rounded-md border border-border-strong bg-surface p-3 [&>p]:m-0 [&>p]:basis-full"
-                  role="group"
-                  aria-label="Confirm problem deletion"
-                  onKeyDown={(event) => {
-                    if (event.key === 'Escape' && !blocked) {
-                      setConfirmDelete(false);
-                      actionsButton.current?.focus();
-                    }
-                  }}
-                >
-                  <p>
-                    Delete “{selected.problem.title}”? This permanently removes
-                    the problem and all three prepared solutions.
-                  </p>
-                  <button
-                    autoFocus
-                    className={buttonClass}
-                    disabled={blocked}
-                    onClick={() => {
-                      setConfirmDelete(false);
-                      actionsButton.current?.focus();
-                    }}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    className={buttonClass}
-                    disabled={blocked || sessionStatus !== 'draft'}
-                    onClick={remove}
-                  >
-                    Confirm delete problem
-                  </button>
-                </div>
-              )}
-              {selected && (
-                <>
-                  {sessionStatus === 'live' ? (
-                    <div className="my-3 flex flex-wrap items-center gap-3 border-b border-border-soft py-2 pb-3">
-                      <p className="m-0 flex items-center gap-2 text-sm">
-                        <span
-                          aria-hidden="true"
-                          className={
-                            selected.problem.answersVisible
-                              ? 'text-success'
-                              : 'text-muted'
-                          }
-                        >
-                          ●
-                        </span>
-                        <span className="font-semibold">
-                          {selected.problem.answersVisible
-                            ? 'Visible to members'
-                            : 'Hidden from members'}
-                        </span>
-                        <span className="text-muted">
-                          for {selected.problem.title}
-                        </span>
-                      </p>
+                              {record.problem.title}
+                              {readiness?.warnings.length ? (
+                                <span
+                                  className="ml-2 rounded border border-warning/50 px-1.5 py-0.5 text-xs font-medium text-warning"
+                                  aria-hidden="true"
+                                >
+                                  Needs prep
+                                </span>
+                              ) : null}
+                              {readiness?.warnings.length ? (
+                                <span
+                                  className="sr-only"
+                                  id={`problem-readiness-${record.id}`}
+                                >
+                                  Preparation warnings:{' '}
+                                  {readiness.warnings.join('. ')}.
+                                </span>
+                              ) : null}
+                            </button>
+                          );
+                        })(),
+                      )}
+                    </div>
+                    <button
+                      ref={addButton}
+                      className={buttonClass}
+                      disabled={blocked || sessionStatus !== 'draft'}
+                      onClick={add}
+                      aria-label="Add problem"
+                    >
+                      + Add problem
+                    </button>
+                    {selected && (
                       <button
-                        className={
-                          selected.problem.answersVisible
-                            ? 'min-h-10 rounded-md px-3 py-2 text-sm text-muted hover:bg-hover hover:text-ink disabled:text-muted'
-                            : 'min-h-10 rounded-md border border-accent bg-accent px-3 py-2 text-sm font-semibold text-accent-contrast hover:bg-accent-hover disabled:cursor-default disabled:border-border-strong disabled:bg-raised disabled:text-muted'
-                        }
+                        ref={actionsButton}
+                        className="min-h-10 min-w-10 rounded-md px-2 text-lg text-muted hover:bg-hover hover:text-ink disabled:cursor-default disabled:text-muted"
                         disabled={blocked}
-                        onClick={toggleAnswers}
+                        aria-label={`Manage ${selected.problem.title}`}
+                        aria-expanded={actionsOpen}
+                        aria-controls="problem-actions"
+                        onClick={() => setActionsOpen((open) => !open)}
                       >
-                        {selected.problem.answersVisible
-                          ? 'Hide answers'
-                          : 'Show answers'}
+                        ···
+                      </button>
+                    )}
+                  </div>
+                  {actionsOpen && selected && (
+                    <div
+                      id="problem-actions"
+                      className="my-3 flex flex-wrap items-center gap-2 border-y border-border-soft py-3 [&>p]:m-0 [&>p]:basis-full"
+                      onKeyDown={(event) => {
+                        if (event.key === 'Escape') {
+                          setActionsOpen(false);
+                          actionsButton.current?.focus();
+                        }
+                      }}
+                    >
+                      <button
+                        autoFocus
+                        className={buttonClass}
+                        disabled={blocked}
+                        onClick={() => {
+                          setActionsOpen(false);
+                          document.getElementById('problem-title')?.focus();
+                        }}
+                      >
+                        Rename
+                      </button>
+                      <button
+                        className={buttonClass}
+                        disabled={blocked || sessionStatus !== 'draft'}
+                        onClick={duplicate}
+                      >
+                        Duplicate problem
+                      </button>
+                      <button
+                        className={buttonClass}
+                        disabled={
+                          blocked ||
+                          sessionStatus !== 'draft' ||
+                          records[0].id === selected.id
+                        }
+                        onClick={() => move(-1)}
+                      >
+                        Move earlier
+                      </button>
+                      <button
+                        className={buttonClass}
+                        disabled={
+                          blocked ||
+                          sessionStatus !== 'draft' ||
+                          records.at(-1)?.id === selected.id
+                        }
+                        onClick={() => move(1)}
+                      >
+                        Move later
+                      </button>
+                      <button
+                        className={buttonClass}
+                        disabled={blocked || sessionStatus !== 'draft'}
+                        onClick={() => {
+                          setConfirmDelete(true);
+                          setActionsOpen(false);
+                        }}
+                      >
+                        Delete problem
                       </button>
                     </div>
-                  ) : sessionStatus === 'ended' ? (
-                    <div className="my-3 flex flex-wrap items-center justify-between gap-3 border-b border-border-soft py-2 pb-3">
-                      <p className="m-0">
-                        Solutions are public in ended sessions.
+                  )}
+                  {confirmDelete && selected && (
+                    <div
+                      className="my-3 flex flex-wrap items-center gap-2 rounded-md border border-border-strong bg-surface p-3 [&>p]:m-0 [&>p]:basis-full"
+                      role="group"
+                      aria-label="Confirm problem deletion"
+                      onKeyDown={(event) => {
+                        if (event.key === 'Escape' && !blocked) {
+                          setConfirmDelete(false);
+                          actionsButton.current?.focus();
+                        }
+                      }}
+                    >
+                      <p>
+                        Delete “{selected.problem.title}”? This permanently
+                        removes the problem and all three prepared solutions.
                       </p>
+                      <button
+                        autoFocus
+                        className={buttonClass}
+                        disabled={blocked}
+                        onClick={() => {
+                          setConfirmDelete(false);
+                          actionsButton.current?.focus();
+                        }}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        className={buttonClass}
+                        disabled={blocked || sessionStatus !== 'draft'}
+                        onClick={remove}
+                      >
+                        Confirm delete problem
+                      </button>
                     </div>
-                  ) : null}
-                  <ProblemEditor
-                    key={selected.id}
-                    sessionId={sessionId}
-                    record={selected}
-                    disabled={operation !== null}
-                    onBusyChange={setEditing}
-                    onSaveStateChange={setProblemSaveState}
-                    onSaved={handleProblemSaved}
-                  />
-                  <OfficerSolutions
-                    key={`${sessionId}/${selected.id}`}
-                    sessionId={sessionId}
-                    problemId={selected.id}
-                    structuralChangesAllowed={sessionStatus === 'draft'}
-                    disabled={operation !== null}
-                    onPendingChange={setSolutionPending}
-                    onSaveStateChange={setSolutionSaveState}
-                  />
-                </>
-              )}
+                  )}
+                </div>
+                <section
+                  className="min-w-0 min-[1100px]:h-full min-[1100px]:overflow-y-auto min-[1100px]:overscroll-contain min-[1100px]:pl-5"
+                  aria-labelledby="officer-solutions-heading"
+                >
+                  <h2
+                    id="officer-solutions-heading"
+                    className="mb-3 mt-0 text-2xl font-semibold leading-8"
+                  >
+                    Solutions
+                  </h2>
+                  {selected && (
+                    <>
+                      {sessionStatus === 'live' ? (
+                        <div className="my-3 flex flex-wrap items-center gap-3 border-b border-border-soft py-2 pb-3">
+                          <p className="m-0 flex items-center gap-2 text-sm">
+                            <span
+                              aria-hidden="true"
+                              className={
+                                selected.problem.answersVisible
+                                  ? 'text-success'
+                                  : 'text-muted'
+                              }
+                            >
+                              ●
+                            </span>
+                            <span className="font-semibold">
+                              {selected.problem.answersVisible
+                                ? 'Visible to members'
+                                : 'Hidden from members'}
+                            </span>
+                            <span className="text-muted">
+                              for {selected.problem.title}
+                            </span>
+                          </p>
+                          <button
+                            className={
+                              selected.problem.answersVisible
+                                ? 'min-h-10 rounded-md px-3 py-2 text-sm text-muted hover:bg-hover hover:text-ink disabled:text-muted'
+                                : 'min-h-10 rounded-md border border-accent bg-accent px-3 py-2 text-sm font-semibold text-accent-contrast hover:bg-accent-hover disabled:cursor-default disabled:border-border-strong disabled:bg-raised disabled:text-muted'
+                            }
+                            disabled={blocked}
+                            onClick={toggleAnswers}
+                          >
+                            {selected.problem.answersVisible
+                              ? 'Hide answers'
+                              : 'Show answers'}
+                          </button>
+                        </div>
+                      ) : sessionStatus === 'ended' ? (
+                        <div className="my-3 flex flex-wrap items-center justify-between gap-3 border-b border-border-soft py-2 pb-3">
+                          <p className="m-0">
+                            Solutions are public in ended sessions.
+                          </p>
+                        </div>
+                      ) : null}
+                      <ProblemEditor
+                        key={selected.id}
+                        sessionId={sessionId}
+                        record={selected}
+                        disabled={operation !== null}
+                        onBusyChange={setEditing}
+                        onSaveStateChange={setProblemSaveState}
+                        onSaved={handleProblemSaved}
+                      />
+                      <OfficerSolutions
+                        key={`${sessionId}/${selected.id}`}
+                        sessionId={sessionId}
+                        problemId={selected.id}
+                        structuralChangesAllowed={sessionStatus === 'draft'}
+                        disabled={operation !== null}
+                        onPendingChange={setSolutionPending}
+                        onSaveStateChange={setSolutionSaveState}
+                      />
+                    </>
+                  )}
+                </section>
+              </div>
             </>
           )}
         </>
