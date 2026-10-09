@@ -13,6 +13,7 @@ import { useState } from 'react';
 
 const api = vi.hoisted(() => ({
   createSession: vi.fn(),
+  getSession: vi.fn(),
   listSessions: vi.fn(),
   updateSession: vi.fn(),
   transitionSession: vi.fn(),
@@ -84,6 +85,7 @@ beforeEach(() => {
     removeEventListener: vi.fn(),
   }));
   api.listSessions.mockResolvedValue([record]);
+  api.getSession.mockResolvedValue(record);
   api.listProblems.mockResolvedValue([]);
   api.updateProblem.mockResolvedValue(undefined);
   api.getSolutionsForProblem.mockResolvedValue({
@@ -143,6 +145,14 @@ function RoutedOfficerSessions({
 }
 
 describe('Officer Sessions surface', () => {
+  it('opens a direct Session URL without waiting for the full dashboard query', async () => {
+    render(<OfficerSessions sessionId="session-id" />);
+
+    expect(await screen.findByRole('heading', { name: 'Arrays' })).toBeTruthy();
+    expect(api.getSession).toHaveBeenCalledExactlyOnceWith('session-id');
+    expect(api.listSessions).not.toHaveBeenCalled();
+  });
+
   it('duplicates the persisted Session and shows a useful failure', async () => {
     await openEditor();
     api.duplicateSession.mockRejectedValue(
@@ -213,6 +223,11 @@ describe('Officer Sessions surface', () => {
     ]);
     render(<RoutedOfficerSessions remountOnNavigation />);
     await screen.findByText('No Sessions yet');
+    api.getSession.mockResolvedValueOnce({
+      ...record,
+      id: 'new-session',
+      session: { ...record.session, title: 'Untitled Session' },
+    });
     fireEvent.change(screen.getByLabelText('Branch for new session'), {
       target: { value: 'general' },
     });
@@ -253,6 +268,11 @@ describe('Officer Sessions surface', () => {
       },
     ]);
     await openEditor(true);
+    api.getSession.mockResolvedValueOnce({
+      ...record,
+      id: 'copied-session',
+      session: { ...record.session, title: 'Arrays copy' },
+    });
 
     fireEvent.click(screen.getByRole('button', { name: 'Duplicate session' }));
 
@@ -776,11 +796,12 @@ describe('Officer Sessions surface', () => {
         { ...record, session: { ...record.session, status: 'live' } },
       ])
       .mockResolvedValueOnce([
-        { ...record, session: { ...record.session, status: 'live' } },
-      ])
-      .mockResolvedValueOnce([
         { ...record, session: { ...record.session, status: 'ended' } },
       ]);
+    api.getSession.mockResolvedValue({
+      ...record,
+      session: { ...record.session, status: 'live' },
+    });
     await openEditor(true);
     fireEvent.click(screen.getByRole('button', { name: 'End Session' }));
     expect(confirm).toHaveBeenCalledWith(
@@ -820,9 +841,8 @@ describe('Officer Sessions surface', () => {
   });
 
   it('does not report successful creation as failed when the subsequent read fails', async () => {
-    api.listSessions
-      .mockResolvedValueOnce([])
-      .mockRejectedValueOnce(new Error('offline'));
+    api.listSessions.mockResolvedValueOnce([]);
+    api.getSession.mockRejectedValueOnce(new Error('offline'));
     render(<RoutedOfficerSessions remountOnNavigation />);
     await screen.findByText('No Sessions yet');
     fireEvent.click(screen.getByRole('button', { name: '+ New session' }));
@@ -1289,7 +1309,7 @@ describe('Officer Sessions surface', () => {
       await screen.findByRole('region', { name: 'Session metadata' }),
     ).toBeTruthy();
     cleanup();
-    api.listSessions.mockResolvedValueOnce([]);
+    api.getSession.mockResolvedValueOnce(null);
     render(<OfficerSessions sessionId="deleted-session" />);
     expect(
       await screen.findByRole('region', { name: 'Session unavailable' }),
@@ -1312,6 +1332,10 @@ describe('Officer Sessions surface', () => {
     api.listSessions.mockResolvedValueOnce([
       { ...record, session: { ...record.session, status: 'live' } },
     ]);
+    api.getSession.mockResolvedValueOnce({
+      ...record,
+      session: { ...record.session, status: 'live' },
+    });
     render(<OfficerSessions sessionId="session-id" />);
     const memberLink = await screen.findByRole('link', {
       name: 'View as Member',
@@ -1319,6 +1343,7 @@ describe('Officer Sessions surface', () => {
     expect(memberLink.getAttribute('href')).toBe('/sessions/session-id');
     cleanup();
     api.listSessions.mockResolvedValueOnce([record]);
+    api.getSession.mockResolvedValueOnce(record);
     render(<OfficerSessions sessionId="session-id" />);
     await screen.findByRole('region', { name: 'Session metadata' });
     expect(screen.queryByRole('link', { name: 'View as Member' })).toBeNull();
@@ -1328,6 +1353,10 @@ describe('Officer Sessions surface', () => {
     api.listSessions.mockResolvedValueOnce([
       { ...record, session: { ...record.session, status: 'live' } },
     ]);
+    api.getSession.mockResolvedValueOnce({
+      ...record,
+      session: { ...record.session, status: 'live' },
+    });
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
     render(<OfficerSessions sessionId="session-id" />);
     await screen.findByRole('region', { name: 'Session metadata' });

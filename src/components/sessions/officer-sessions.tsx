@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   createSession,
+  getSession,
   listSessions,
   type SessionRecord,
 } from '@/lib/firebase/sessions';
@@ -19,6 +20,11 @@ import SessionEditor from './session-editor';
 export default function OfficerSessions({ sessionId }: { sessionId?: string }) {
   const router = useRouter();
   const [records, setRecords] = useState<SessionRecord[]>([]);
+  const [directSession, setDirectSession] = useState<SessionRecord | null>(
+    null,
+  );
+  const [loadedSessionId, setLoadedSessionId] = useState<string | null>(null);
+  const [dashboardLoaded, setDashboardLoaded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -28,22 +34,45 @@ export default function OfficerSessions({ sessionId }: { sessionId?: string }) {
 
   useEffect(() => {
     let cancelled = false;
-    listSessions().then(
-      (sessions) => {
-        if (cancelled) return;
-        setRecords(sessions);
-        setLoading(false);
-      },
-      () => {
-        if (cancelled) return;
-        setLoadError(true);
-        setLoading(false);
-      },
-    );
+    setLoading(true);
+    setLoadError(false);
+    if (sessionId) {
+      setLoadedSessionId(null);
+      getSession(sessionId).then(
+        (session) => {
+          if (cancelled) return;
+          setDirectSession(session);
+          setLoadedSessionId(sessionId);
+          setLoading(false);
+        },
+        () => {
+          if (cancelled) return;
+          setDirectSession(null);
+          setLoadedSessionId(sessionId);
+          setLoadError(true);
+          setLoading(false);
+        },
+      );
+    } else {
+      listSessions().then(
+        (sessions) => {
+          if (cancelled) return;
+          setRecords(sessions);
+          setDashboardLoaded(true);
+          setLoading(false);
+        },
+        () => {
+          if (cancelled) return;
+          setDashboardLoaded(true);
+          setLoadError(true);
+          setLoading(false);
+        },
+      );
+    }
     return () => {
       cancelled = true;
     };
-  }, [revision]);
+  }, [revision, sessionId]);
 
   function reload() {
     setLoading(true);
@@ -69,7 +98,9 @@ export default function OfficerSessions({ sessionId }: { sessionId?: string }) {
   }
 
   const selected = sessionId
-    ? records.find((record) => record.id === sessionId)
+    ? loadedSessionId === sessionId
+      ? (directSession ?? undefined)
+      : records.find((record) => record.id === sessionId)
     : undefined;
   if (selected) {
     return (
@@ -102,6 +133,32 @@ export default function OfficerSessions({ sessionId }: { sessionId?: string }) {
         >
           Back to Sessions
         </button>
+      </section>
+    );
+  }
+
+  if (sessionId && loadedSessionId === sessionId && loadError) {
+    return (
+      <section role="alert" aria-label="Session load failed">
+        <h1 className="text-2xl font-semibold">Session could not be loaded</h1>
+        <p>Check your connection and retry loading this Session.</p>
+        <button
+          className="min-h-11 rounded border border-border-strong bg-surface px-3 py-2"
+          onClick={reload}
+        >
+          Retry loading Session
+        </button>
+      </section>
+    );
+  }
+
+  if (sessionId && !selected && (loading || loadedSessionId !== sessionId)) {
+    return (
+      <section
+        className="min-h-56 border-t border-border-soft pt-5"
+        aria-busy="true"
+      >
+        <p role="status">Loading Session…</p>
       </section>
     );
   }
@@ -149,7 +206,7 @@ export default function OfficerSessions({ sessionId }: { sessionId?: string }) {
           session again.
         </p>
       )}
-      {loading ? (
+      {loading || !dashboardLoaded ? (
         <p role="status">Loading sessions…</p>
       ) : loadError ? (
         <div role="alert">

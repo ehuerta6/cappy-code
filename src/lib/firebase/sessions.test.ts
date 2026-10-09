@@ -57,6 +57,7 @@ import { getOfficerAuth } from './auth';
 import {
   createSession,
   deleteSession,
+  getSession,
   listSessions,
   transitionSession,
   updateSession,
@@ -128,6 +129,36 @@ beforeEach(() => {
 });
 
 describe('officer session persistence', () => {
+  it('loads a direct Session and its problem count concurrently without listing every Session', async () => {
+    sdk.getDocFromServer.mockResolvedValueOnce({
+      exists: () => true,
+      data: () => session,
+      metadata: { hasPendingWrites: false },
+    });
+    let resolveCount:
+      ((value: { data: () => { count: number } }) => void) | undefined;
+    sdk.getCountFromServer.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveCount = resolve;
+      }),
+    );
+
+    const pending = getSession('session-id');
+    expect(sdk.getDocFromServer).toHaveBeenCalledWith({
+      path: 'sessions/session-id',
+    });
+    expect(sdk.getCountFromServer).toHaveBeenCalledWith({
+      path: 'sessions/session-id/problems',
+    });
+    resolveCount?.({ data: () => ({ count: 1 }) });
+    await expect(pending).resolves.toEqual({
+      id: 'session-id',
+      session,
+      problemCount: 1,
+    });
+    expect(sdk.getDocsFromServer).not.toHaveBeenCalled();
+  });
+
   it('creates only required fields with draft status and server timestamps', async () => {
     expect(await createSession({ ...metadata, title: ' Arrays ' })).toBe(
       'new-session',

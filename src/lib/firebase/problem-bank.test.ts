@@ -52,6 +52,7 @@ vi.mock('firebase/firestore', async (importOriginal) => ({
 import {
   addBankProblemToSession,
   createBankProblem,
+  getBankProblem,
   deleteBankProblem,
   listMemberBankProblems,
   listBankProblemApproachTags,
@@ -124,6 +125,22 @@ beforeEach(() => {
 });
 
 describe('Problem Bank snapshots', () => {
+  it('loads Bank detail Solutions from Approaches without duplicate legacy reads', async () => {
+    const result = await getBankProblem('source');
+
+    expect(result?.problem.title).toBe('Two Sum');
+    expect(result?.solutions).toEqual(solutions);
+    for (const language of ['python', 'java', 'cpp']) {
+      expect(
+        sdk.getDocFromServer.mock.calls.filter(
+          ([reference]) =>
+            (reference as { path: string }).path ===
+            `problemBank/source/solutions/${language}`,
+        ),
+      ).toHaveLength(1);
+    }
+  });
+
   it('deletes the Bank hierarchy in one batch and leaves Session references alone', async () => {
     const snapshot = (paths: string[]) => ({
       docs: paths.map((path) => ({

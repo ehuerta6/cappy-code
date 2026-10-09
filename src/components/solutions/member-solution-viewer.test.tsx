@@ -4,21 +4,33 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { SolutionApproach } from '@/lib/domain';
 import MemberSolutionViewer from './member-solution-viewer';
 
-vi.mock('@monaco-editor/react', () => ({
-  default: ({
-    value,
-    options,
-  }: {
-    value: string;
-    options: { ariaLabel: string; readOnly: boolean };
-  }) => (
-    <textarea
-      aria-label={options.ariaLabel}
-      readOnly={options.readOnly}
-      value={value}
-    />
-  ),
-}));
+const editorLifecycle = vi.hoisted(() => ({ mounts: 0, unmounts: 0 }));
+vi.mock('@monaco-editor/react', async () => {
+  const React = await import('react');
+  return {
+    default: ({
+      value,
+      options,
+    }: {
+      value: string;
+      options: { ariaLabel: string; readOnly: boolean };
+    }) => {
+      React.useEffect(() => {
+        editorLifecycle.mounts += 1;
+        return () => {
+          editorLifecycle.unmounts += 1;
+        };
+      }, []);
+      return (
+        <textarea
+          aria-label={options.ariaLabel}
+          readOnly={options.readOnly}
+          value={value}
+        />
+      );
+    },
+  };
+});
 
 afterEach(() => cleanup());
 
@@ -53,6 +65,8 @@ const approaches: SolutionApproach[] = [
 
 describe('MemberSolutionViewer', () => {
   it('shows one editor and keeps approach, language, and complexity together', () => {
+    const mounts = editorLifecycle.mounts;
+    const unmounts = editorLifecycle.unmounts;
     const { container } = render(
       <MemberSolutionViewer approaches={approaches} modelPath="member/test" />,
     );
@@ -69,6 +83,8 @@ describe('MemberSolutionViewer', () => {
     expect(
       container.querySelectorAll('[aria-label$="Solution, read-only"]'),
     ).toHaveLength(1);
+    expect(editorLifecycle.mounts).toBe(mounts + 1);
+    expect(editorLifecycle.unmounts).toBe(unmounts);
     expect(screen.getByText('Time: O(n)')).toBeTruthy();
     expect(screen.getByText('One pass.')).toBeTruthy();
 
@@ -83,6 +99,8 @@ describe('MemberSolutionViewer', () => {
     ).toHaveLength(1);
     expect(screen.getByText('Time: O(n log n)')).toBeTruthy();
     expect(screen.queryByText('Time: O(n)')).toBeNull();
+    expect(editorLifecycle.mounts).toBe(mounts + 1);
+    expect(editorLifecycle.unmounts).toBe(unmounts);
 
     fireEvent.change(screen.getByLabelText('Approach'), {
       target: { value: 'brute' },
@@ -91,6 +109,8 @@ describe('MemberSolutionViewer', () => {
       'java brute',
     );
     expect(screen.queryByText('Time: O(n log n)')).toBeNull();
+    expect(editorLifecycle.mounts).toBe(mounts + 1);
+    expect(editorLifecycle.unmounts).toBe(unmounts);
   });
 
   it('identifies a single approach without an interactive approach control', () => {
