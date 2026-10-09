@@ -145,12 +145,7 @@ export function subscribeToMemberSessions(
       (snapshot) => {
         // Cache results can describe a Session that has since gone draft or
         // an obsolete reveal value. Wait for a server-confirmed snapshot.
-        if (snapshot.metadata.fromCache) {
-          onError(
-            new Error('Waiting for a server-confirmed Session snapshot.'),
-          );
-          return;
-        }
+        if (snapshot.metadata.fromCache) return;
         try {
           const records = snapshot.docs.map((document) => {
             if (document.metadata.hasPendingWrites)
