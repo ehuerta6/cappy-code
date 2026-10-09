@@ -7,15 +7,19 @@ import {
   getCountFromServer,
   getDocFromServer,
   getDocsFromServer,
-  query,
   runTransaction,
   serverTimestamp,
   updateDoc,
-  where,
   writeBatch,
 } from 'firebase/firestore';
-import type { Problem, Session } from '../domain';
-import { languages, problemSchema, sessionSchema } from '../domain';
+import type { Problem, Session, SessionBranch } from '../domain';
+import {
+  languages,
+  problemSchema,
+  sessionBranches,
+  sessionBranchLabels,
+  sessionSchema,
+} from '../domain';
 import {
   validateSessionMetadata,
   type SessionMetadata,
@@ -50,6 +54,25 @@ function officerDb() {
     throw new Error('Sign in to Officer Mode to manage sessions.');
   }
   return getFirestoreDb();
+}
+
+function branchFromData(data: Record<string, unknown>): SessionBranch {
+  const branch = data.branch ?? 'intro';
+  if (sessionBranches.includes(branch as SessionBranch))
+    return branch as SessionBranch;
+  throw new Error('This Session has an unsupported CIC branch.');
+}
+
+function bankIdsFromData(data: Record<string, unknown>): string[] {
+  return Array.isArray(data.bankProblemIds)
+    ? [
+        ...new Set(
+          data.bankProblemIds.filter(
+            (value): value is string => typeof value === 'string',
+          ),
+        ),
+      ]
+    : [];
 }
 
 export async function createSession(
@@ -298,20 +321,7 @@ export async function transitionSession(
       throw new Error('Add at least one problem before going live.');
     }
   }
-
-  const liveSessionReference = doc(db, 'sessionControl/liveSession');
-  const legacyLiveSessions =
-    nextStatus === 'live' &&
-    !(await getDocFromServer(liveSessionReference)).exists()
-      ? (
-          await getDocsFromServer(
-            query(collection(db, 'sessions'), where('status', '==', 'live')),
-          )
-        ).docs
-      : [];
-
   await runTransaction(db, async (transaction) => {
-    const liveSessionSnapshot = await transaction.get(liveSessionReference);
     const snapshot = await transaction.get(reference);
     if (!snapshot.exists()) {
       throw new Error('This session no longer exists.');
@@ -326,65 +336,162 @@ export async function transitionSession(
       );
     }
 
-    let liveSessionId: string | null = liveSessionSnapshot.exists()
-      ? (liveSessionSnapshot.data().sessionId as string | null)
+    const targetBranch = branchFromData(snapshot.data());
+    const branchReferences = Object.fromEntries(
+      sessionBranches.map((branch) => [
+        branch,
+        doc(db, `sessionControl/${branch}`),
+      ]),
+    ) as Record<SessionBranch, ReturnType<typeof doc>>;
+    const [legacyControl, ...branchClaims] = await Promise.all([
+      transaction.get(doc(db, 'sessionControl/liveSession')),
+      ...sessionBranches.map((branch) =>
+        transaction.get(branchReferences[branch]),
+      ),
+    ]);
+    const claims = Object.fromEntries(
+      sessionBranches.map((branch, index) => [branch, branchClaims[index]]),
+    ) as Record<SessionBranch, (typeof branchClaims)[number]>;
+    const legacyId = legacyControl.exists()
+      ? legacyControl.data().sessionId
       : null;
+    let legacySnapshot: Awaited<ReturnType<typeof transaction.get>> | null =
+      null;
+    if (typeof legacyId === 'string') {
+      legacySnapshot =
+        legacyId === id
+          ? snapshot
+          : await transaction.get(doc(db, sessionPath(legacyId)));
+    }
+    const legacyData = legacySnapshot?.data() as
+      Record<string, unknown> | undefined;
+    const legacyIsLive =
+      legacySnapshot?.exists() && legacyData?.status === 'live';
+    const legacyBranch = legacyIsLive ? branchFromData(legacyData!) : null;
 
-    if (!liveSessionSnapshot.exists()) {
-      const otherLiveSession = legacyLiveSessions.find(
-        (liveSession) => liveSession.id !== id,
-      );
-
-      if (nextStatus === 'live' && otherLiveSession) {
+    if (nextStatus === 'live') {
+      const claim = claims[targetBranch];
+      const claimedId = claim.exists() ? claim.data().sessionId : null;
+      const legacyBlocksBranch = legacyIsLive && legacyBranch === targetBranch;
+      if (
+        (typeof claimedId === 'string' && claimedId !== id) ||
+        legacyBlocksBranch
+      ) {
         throw new Error(
-          'Another Session is already live. Set it to Not Live or end it before starting this one.',
+          `Another ${sessionBranchLabels[targetBranch]} Session is already live. Set it to Not Live or end it before starting this one.`,
         );
       }
-
-      liveSessionId = legacyLiveSessions[0]?.id ?? null;
-      if (nextStatus !== 'live') liveSessionId = null;
+      if (claim.exists() && claimedId === id) {
+        throw new Error(
+          `The ${sessionBranchLabels[targetBranch]} live claim is stale. Set this Session to Not Live before starting it again.`,
+        );
+      }
     }
 
-    if (nextStatus === 'live' && liveSessionId && liveSessionId !== id) {
-      throw new Error(
-        'Another Session is already live. Set it to Not Live or end it before starting this one.',
-      );
+    const migrateLegacy =
+      typeof legacyId === 'string' &&
+      legacyIsLive &&
+      legacyId !== id &&
+      legacyBranch !== null;
+    if (migrateLegacy && legacyBranch) {
+      const legacyClaim = claims[legacyBranch];
+      const existingId = legacyClaim.exists()
+        ? legacyClaim.data().sessionId
+        : null;
+      if (typeof existingId === 'string' && existingId !== legacyId) {
+        throw new Error(
+          `The existing live ${sessionBranchLabels[legacyBranch]} Session has a conflicting branch claim.`,
+        );
+      }
     }
-    const releasesLiveClaim = nextStatus !== 'live' && liveSessionId === id;
-    const bankProblemIds: string[] = Array.isArray(
-      snapshot.data().bankProblemIds,
-    )
-      ? [
-          ...new Set<string>(
-            snapshot
-              .data()
-              .bankProblemIds.filter(
-                (bankId: unknown): bankId is string =>
-                  typeof bankId === 'string',
-              ),
-          ),
-        ]
-      : [];
-    const bankSnapshots = await Promise.all(
-      (nextStatus === 'live'
-        ? bankProblemIds
-        : releasesLiveClaim
-          ? bankProblemIds
-          : []
-      ).map((bankId) => transaction.get(doc(db, bankProblemPath(bankId)))),
+
+    const releaseTargetClaim =
+      nextStatus !== 'live' &&
+      claims[targetBranch].exists() &&
+      claims[targetBranch].data().sessionId === id;
+    const transitionBankIds = new Set<string>();
+    if (nextStatus === 'live' || releaseTargetClaim) {
+      for (const bankId of bankIdsFromData(snapshot.data()))
+        transitionBankIds.add(bankId);
+    }
+    if (migrateLegacy && legacySnapshot) {
+      for (const bankId of bankIdsFromData(legacyData ?? {}))
+        transitionBankIds.add(bankId);
+    }
+
+    const claimOwners = new Map<
+      SessionBranch,
+      { id: string; data: Record<string, unknown> }
+    >();
+    for (const branch of sessionBranches) {
+      const claim = claims[branch];
+      const ownerId = claim.exists() ? claim.data().sessionId : null;
+      if (
+        typeof ownerId !== 'string' ||
+        (ownerId === id && nextStatus !== 'live')
+      )
+        continue;
+      claimOwners.set(branch, { id: ownerId, data: claim.data() ?? {} });
+    }
+    if (nextStatus === 'live')
+      claimOwners.set(targetBranch, { id, data: snapshot.data() });
+    if (migrateLegacy && legacyBranch && legacySnapshot?.exists())
+      claimOwners.set(legacyBranch, {
+        id: legacyId as string,
+        data: legacyData ?? {},
+      });
+    if (nextStatus !== 'live') claimOwners.delete(targetBranch);
+
+    const bankReferences = [...transitionBankIds].map((bankId) =>
+      doc(db, bankProblemPath(bankId)),
     );
-    if (nextStatus === 'live' || releasesLiveClaim) {
-      transaction.set(liveSessionReference, {
-        sessionId: nextStatus === 'live' ? id : null,
+    const bankSnapshots = await Promise.all(
+      bankReferences.map((bankReference) => transaction.get(bankReference)),
+    );
+
+    if (migrateLegacy && legacyBranch && typeof legacyId === 'string') {
+      if (
+        !claims[legacyBranch].exists() ||
+        claims[legacyBranch].data().sessionId !== legacyId
+      )
+        transaction.set(branchReferences[legacyBranch], {
+          sessionId: legacyId,
+          bankProblemIds: bankIdsFromData(legacyData ?? {}),
+        });
+      transaction.update(doc(db, 'sessionControl/liveSession'), {
+        sessionId: null,
+      });
+    } else if (
+      typeof legacyId === 'string' &&
+      ((legacyId === id && nextStatus !== 'live') || !legacyIsLive)
+    ) {
+      transaction.update(doc(db, 'sessionControl/liveSession'), {
+        sessionId: null,
       });
     }
-    if (nextStatus === 'live' || releasesLiveClaim) {
-      for (const bankSnapshot of bankSnapshots) {
-        if (!bankSnapshot.exists()) continue;
-        transaction.update(bankSnapshot.ref, {
-          hiddenByLiveSessionId: nextStatus === 'live' ? id : null,
-        });
-      }
+    if (nextStatus === 'live')
+      transaction.set(branchReferences[targetBranch], {
+        sessionId: id,
+        bankProblemIds: bankIdsFromData(snapshot.data()),
+      });
+    else if (releaseTargetClaim)
+      transaction.set(branchReferences[targetBranch], {
+        sessionId: null,
+        bankProblemIds: [],
+      });
+
+    for (const bankSnapshot of bankSnapshots) {
+      if (!bankSnapshot.exists()) continue;
+      const currentMarker = bankSnapshot.data().hiddenByLiveSessionId;
+      const users = [...claimOwners.values()]
+        .filter(({ data }) => bankIdsFromData(data).includes(bankSnapshot.id))
+        .map(({ id: ownerId }) => ownerId);
+      const marker =
+        typeof currentMarker === 'string' && users.includes(currentMarker)
+          ? currentMarker
+          : (users[0] ?? null);
+      if (currentMarker !== marker)
+        transaction.update(bankSnapshot.ref, { hiddenByLiveSessionId: marker });
     }
     transaction.update(reference, {
       status: nextStatus,
@@ -410,16 +517,35 @@ export async function deleteSession(id: string): Promise<void> {
     collection(db, `${sessionPath(id)}/problems`),
   );
   const sessionReference = doc(db, sessionPath(id));
-  const liveSessionReference = doc(db, 'sessionControl/liveSession');
-  const [session, liveSession] = await Promise.all([
+  const [session, legacyControl] = await Promise.all([
     getDocFromServer(sessionReference),
-    getDocFromServer(liveSessionReference),
+    getDocFromServer(doc(db, 'sessionControl/liveSession')),
   ]);
+  const branch = session.exists() ? branchFromData(session.data()) : null;
+  const liveBranchReference = branch
+    ? doc(db, `sessionControl/${branch}`)
+    : null;
+  const branchClaims = await Promise.all(
+    sessionBranches.map((item) =>
+      getDocFromServer(doc(db, `sessionControl/${item}`)),
+    ),
+  );
+  const branchOwners = new Map<string, Record<string, unknown>>();
+  for (const claim of branchClaims) {
+    const ownerId = claim.exists() ? claim.data().sessionId : null;
+    if (typeof ownerId !== 'string' || ownerId === id) continue;
+    branchOwners.set(ownerId, claim.data() ?? {});
+  }
+  const branchClaimIndex = branch ? sessionBranches.indexOf(branch) : -1;
+  const branchClaim =
+    branchClaimIndex >= 0 ? branchClaims[branchClaimIndex] : undefined;
   const releasesLiveClaim =
     session.exists() &&
     session.data().status === 'live' &&
-    liveSession.exists() &&
-    liveSession.data().sessionId === id;
+    ((liveBranchReference !== null &&
+      branchClaim?.exists() &&
+      branchClaim.data().sessionId === id) ||
+      (legacyControl.exists() && legacyControl.data().sessionId === id));
   const bankProblemIds: string[] =
     session.exists() && Array.isArray(session.data().bankProblemIds)
       ? [
@@ -457,7 +583,14 @@ export async function deleteSession(id: string): Promise<void> {
   ).length;
   // Keep the entire cascade atomic within Firestore's 500-write batch limit.
   const writeCount =
-    problemWrites + 1 + Number(releasesLiveClaim) + bankVisibilityWrites;
+    problemWrites +
+    1 +
+    Number(releasesLiveClaim) *
+      (Number(branchClaim?.exists() === true) +
+        Number(
+          legacyControl.exists() && legacyControl.data().sessionId === id,
+        )) +
+    bankVisibilityWrites;
   if (writeCount > 500)
     throw new Error('Too many problems to delete this session in one batch.');
   const batch = writeBatch(db);
@@ -471,10 +604,22 @@ export async function deleteSession(id: string): Promise<void> {
     ),
   );
   if (releasesLiveClaim) {
-    batch.update(liveSessionReference, { sessionId: null });
+    if (branchClaim?.exists() && branchClaim.data().sessionId === id)
+      batch.update(liveBranchReference!, {
+        sessionId: null,
+        bankProblemIds: [],
+      });
+    if (legacyControl.exists() && legacyControl.data().sessionId === id)
+      batch.update(doc(db, 'sessionControl/liveSession'), { sessionId: null });
     for (const bank of bankSnapshots) {
       if (bank.exists()) {
-        batch.update(bank.ref, { hiddenByLiveSessionId: null });
+        const remainingUser = [...branchOwners.entries()].find(([, data]) =>
+          bankIdsFromData(data).includes(bank.id),
+        )?.[0];
+        if (bank.data().hiddenByLiveSessionId !== (remainingUser ?? null))
+          batch.update(bank.ref, {
+            hiddenByLiveSessionId: remainingUser ?? null,
+          });
       }
     }
   }

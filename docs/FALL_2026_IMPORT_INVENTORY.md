@@ -26,9 +26,9 @@ production write is authorized.
   `bankProblemId` on the Session Problem snapshot and the corresponding
   distinct ID in the parent Session's `bankProblemIds` list. The latter
   remains the existing Rules/lifecycle reference. There are no counters.
-- Problem Bank content is public by default and is hidden only while used by
-  the active live Session. Imports preserve temporary hiding on existing Bank
-  records and do not store publication intent.
+- Problem Bank content is public by default and stays hidden while used by any
+  live Session. Imports preserve temporary hiding on existing Bank records and
+  do not store publication intent.
 - #131 was updated to remove the unsupported Heap tag and specify both required
   provenance references.
 

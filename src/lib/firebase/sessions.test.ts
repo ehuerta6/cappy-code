@@ -90,16 +90,16 @@ beforeEach(() => {
   sdk.transactionLiveSessionExists = false;
   sdk.getDocFromServer.mockImplementation(async (reference) => ({
     exists: () =>
-      reference.path === 'sessionControl/liveSession'
+      reference.path === 'sessionControl/intro'
         ? sdk.transactionLiveSessionExists
         : true,
     data: () =>
-      reference.path === 'sessionControl/liveSession'
+      reference.path === 'sessionControl/intro'
         ? { sessionId: sdk.transactionLiveSessionId }
         : { status: sdk.transactionStatus },
   }));
   sdk.transactionGet.mockImplementation(async (reference) => {
-    if (reference.path === 'sessionControl/liveSession')
+    if (reference.path === 'sessionControl/intro')
       return {
         exists: () => sdk.transactionLiveSessionExists,
         data: () => ({ sessionId: sdk.transactionLiveSessionId }),
@@ -287,8 +287,8 @@ describe('officer session persistence', () => {
       { status: 'live', updatedAt: 'SERVER_TIMESTAMP' },
     );
     expect(sdk.transactionSet).toHaveBeenCalledWith(
-      { path: 'sessionControl/liveSession' },
-      { sessionId: 'session-id' },
+      { path: 'sessionControl/intro' },
+      { sessionId: 'session-id', bankProblemIds: [] },
     );
     expect(sdk.updateDoc).not.toHaveBeenCalled();
   });
@@ -296,7 +296,7 @@ describe('officer session persistence', () => {
   it('only writes the live-hiding marker when a Session goes Live', async () => {
     sdk.transactionLiveSessionExists = true;
     sdk.transactionGet.mockImplementation(async (reference) => {
-      if (reference.path === 'sessionControl/liveSession')
+      if (reference.path === 'sessionControl/intro')
         return { exists: () => true, data: () => ({ sessionId: null }) };
       if (reference.path === 'sessions/session-id')
         return {
@@ -305,6 +305,7 @@ describe('officer session persistence', () => {
         };
       return {
         exists: () => true,
+        id: reference.path.split('/').at(-1),
         ref: { path: reference.path },
         data: () => ({
           isPublished: false,
@@ -338,7 +339,7 @@ describe('officer session persistence', () => {
       sdk.transactionLiveSessionExists = true;
       sdk.transactionLiveSessionId = 'session-id';
       sdk.transactionGet.mockImplementation(async (reference) => {
-        if (reference.path === 'sessionControl/liveSession')
+        if (reference.path === 'sessionControl/intro')
           return {
             exists: () => true,
             data: () => ({ sessionId: 'session-id' }),
@@ -368,31 +369,188 @@ describe('officer session persistence', () => {
     },
   );
 
-  it('blocks Go Live when legacy-lock initialization finds another live Session', async () => {
-    sdk.getDocsFromServer.mockResolvedValueOnce({
-      docs: [document('problem')],
-    });
-    sdk.getDocsFromServer.mockResolvedValueOnce({
-      docs: [document('already-live', { ...session, status: 'live' })],
-    });
-    await expect(transitionSession('session-id', 'live')).rejects.toThrow(
-      'Another Session is already live',
-    );
-    expect(sdk.transactionSet).not.toHaveBeenCalled();
-    expect(sdk.transactionUpdate).not.toHaveBeenCalled();
-  });
-
-  it('blocks Go Live when the live-session pointer is already claimed', async () => {
+  it('blocks Go Live when the same branch claim is already occupied', async () => {
     sdk.transactionLiveSessionExists = true;
     sdk.transactionLiveSessionId = 'already-live';
     sdk.getDocsFromServer.mockResolvedValueOnce({
       docs: [document('problem')],
     });
     await expect(transitionSession('session-id', 'live')).rejects.toThrow(
-      'Another Session is already live',
+      'Another Intro Session is already live',
     );
     expect(sdk.transactionSet).not.toHaveBeenCalled();
     expect(sdk.transactionUpdate).not.toHaveBeenCalled();
+  });
+
+  it('rejects same-branch claims with a branch-specific conflict message', async () => {
+    sdk.transactionLiveSessionExists = true;
+    sdk.transactionLiveSessionId = 'already-live';
+    sdk.getDocsFromServer.mockResolvedValueOnce({
+      docs: [document('problem')],
+    });
+    await expect(transitionSession('session-id', 'live')).rejects.toThrow(
+      'Another Intro Session is already live',
+    );
+    expect(sdk.transactionSet).not.toHaveBeenCalled();
+    expect(sdk.transactionUpdate).not.toHaveBeenCalled();
+  });
+
+  it('allows a General Session to go live while Intro is live', async () => {
+    sdk.getDocsFromServer.mockResolvedValueOnce({
+      docs: [document('problem')],
+    });
+    sdk.transactionGet.mockImplementation(async (reference) => {
+      if (reference.path === 'sessions/session-id')
+        return {
+          exists: () => true,
+          data: () => ({ ...session, branch: 'general', status: 'draft' }),
+        };
+      if (reference.path === 'sessionControl/liveSession')
+        return { exists: () => true, data: () => ({ sessionId: null }) };
+      if (reference.path === 'sessionControl/intro')
+        return {
+          exists: () => true,
+          data: () => ({ sessionId: 'intro-live' }),
+        };
+      if (reference.path === 'sessionControl/general')
+        return { exists: () => false, data: () => undefined };
+      if (reference.path === 'sessionControl/icpc')
+        return { exists: () => false, data: () => undefined };
+      if (reference.path === 'sessions/intro-live')
+        return {
+          exists: () => true,
+          data: () => ({ ...session, status: 'live', bankProblemIds: [] }),
+        };
+      return { exists: () => false, data: () => undefined };
+    });
+
+    await expect(
+      transitionSession('session-id', 'live'),
+    ).resolves.toBeUndefined();
+    expect(sdk.transactionSet).toHaveBeenCalledWith(
+      { path: 'sessionControl/general' },
+      { sessionId: 'session-id', bankProblemIds: [] },
+    );
+  });
+
+  it('migrates an existing global live Session while preserving its live status', async () => {
+    sdk.getDocsFromServer.mockResolvedValueOnce({
+      docs: [document('problem')],
+    });
+    sdk.transactionGet.mockImplementation(async (reference) => {
+      if (reference.path === 'sessions/session-id')
+        return {
+          exists: () => true,
+          data: () => ({ ...session, branch: 'general', status: 'draft' }),
+        };
+      if (reference.path === 'sessionControl/liveSession')
+        return {
+          exists: () => true,
+          data: () => ({ sessionId: 'legacy-intro' }),
+        };
+      if (reference.path === 'sessions/legacy-intro')
+        return {
+          exists: () => true,
+          data: () => ({
+            ...session,
+            status: 'live',
+            bankProblemIds: ['bank-one'],
+          }),
+        };
+      if (reference.path.startsWith('sessionControl/'))
+        return { exists: () => false, data: () => undefined };
+      if (reference.path === 'problemBank/bank-one')
+        return {
+          exists: () => true,
+          id: 'bank-one',
+          ref: reference,
+          data: () => ({ hiddenByLiveSessionId: 'legacy-intro' }),
+        };
+      return { exists: () => false, data: () => undefined };
+    });
+
+    await transitionSession('session-id', 'live');
+
+    expect(sdk.transactionSet).toHaveBeenCalledWith(
+      { path: 'sessionControl/intro' },
+      { sessionId: 'legacy-intro', bankProblemIds: ['bank-one'] },
+    );
+    expect(sdk.transactionSet).toHaveBeenCalledWith(
+      { path: 'sessionControl/general' },
+      { sessionId: 'session-id', bankProblemIds: [] },
+    );
+    expect(sdk.transactionUpdate).toHaveBeenCalledWith(
+      { path: 'sessionControl/liveSession' },
+      { sessionId: null },
+    );
+    expect(
+      sdk.transactionUpdate.mock.calls.some(
+        ([reference]) => reference.path === 'sessions/legacy-intro',
+      ),
+    ).toBe(false);
+  });
+
+  it('keeps a shared Bank Problem marked hidden when one of two live branches stops', async () => {
+    sdk.transactionStatus = 'live';
+    sdk.transactionLiveSessionExists = true;
+    sdk.transactionLiveSessionId = 'session-id';
+    sdk.transactionGet.mockImplementation(async (reference) => {
+      if (reference.path === 'sessions/session-id')
+        return {
+          exists: () => true,
+          data: () => ({
+            ...session,
+            status: 'live',
+            bankProblemIds: ['bank-one'],
+          }),
+        };
+      if (reference.path === 'sessionControl/liveSession')
+        return { exists: () => true, data: () => ({ sessionId: null }) };
+      if (reference.path === 'sessionControl/intro')
+        return {
+          exists: () => true,
+          data: () => ({ sessionId: 'session-id' }),
+        };
+      if (reference.path === 'sessionControl/general')
+        return {
+          exists: () => true,
+          data: () => ({
+            sessionId: 'general-live',
+            bankProblemIds: ['bank-one'],
+          }),
+        };
+      if (reference.path === 'sessionControl/icpc')
+        return { exists: () => false, data: () => undefined };
+      if (reference.path === 'sessions/general-live')
+        return {
+          exists: () => true,
+          data: () => ({
+            ...session,
+            branch: 'general',
+            status: 'live',
+            bankProblemIds: ['bank-one'],
+          }),
+        };
+      if (reference.path === 'problemBank/bank-one')
+        return {
+          exists: () => true,
+          id: 'bank-one',
+          ref: reference,
+          data: () => ({ hiddenByLiveSessionId: 'session-id' }),
+        };
+      return { exists: () => false, data: () => undefined };
+    });
+
+    await transitionSession('session-id', 'draft');
+
+    expect(sdk.transactionSet).toHaveBeenCalledWith(
+      { path: 'sessionControl/intro' },
+      { sessionId: null, bankProblemIds: [] },
+    );
+    expect(sdk.transactionUpdate).toHaveBeenCalledWith(
+      { path: 'problemBank/bank-one' },
+      { hiddenByLiveSessionId: 'general-live' },
+    );
   });
 
   it('ends only a live Session and changes no Problem answer visibility', async () => {
@@ -409,8 +567,8 @@ describe('officer session persistence', () => {
       'answersVisible',
     );
     expect(sdk.transactionSet).toHaveBeenCalledWith(
-      { path: 'sessionControl/liveSession' },
-      { sessionId: null },
+      { path: 'sessionControl/intro' },
+      { sessionId: null, bankProblemIds: [] },
     );
   });
 
@@ -424,8 +582,8 @@ describe('officer session persistence', () => {
       { status: 'draft', updatedAt: 'SERVER_TIMESTAMP' },
     );
     expect(sdk.transactionSet).toHaveBeenCalledWith(
-      { path: 'sessionControl/liveSession' },
-      { sessionId: null },
+      { path: 'sessionControl/intro' },
+      { sessionId: null, bankProblemIds: [] },
     );
     expect(sdk.transactionUpdate.mock.calls[0][1]).not.toHaveProperty(
       'answersVisible',
@@ -439,7 +597,7 @@ describe('officer session persistence', () => {
       sdk.transactionLiveSessionExists = true;
       sdk.transactionLiveSessionId = 'session-id';
       sdk.transactionGet.mockImplementation(async (reference) => {
-        if (reference.path === 'sessionControl/liveSession')
+        if (reference.path === 'sessionControl/intro')
           return {
             exists: () => true,
             data: () => ({ sessionId: 'session-id' }),
@@ -558,13 +716,74 @@ describe('officer session persistence', () => {
     sdk.getDocsFromServer.mockResolvedValue({ docs: [] });
     await deleteSession('session-id');
     expect(sdk.batchUpdate).toHaveBeenCalledWith(
-      { path: 'sessionControl/liveSession' },
-      { sessionId: null },
+      { path: 'sessionControl/intro' },
+      { sessionId: null, bankProblemIds: [] },
     );
     expect(sdk.batchDelete).toHaveBeenCalledWith({
       path: 'sessions/session-id',
     });
     expect(sdk.batchCommit).toHaveBeenCalledOnce();
+  });
+
+  it('deleting one live branch keeps another branch claim and shared Bank hide', async () => {
+    sdk.getDocsFromServer.mockResolvedValue({ docs: [] });
+    sdk.getDocFromServer.mockImplementation(async (reference) => {
+      if (reference.path === 'sessions/session-id')
+        return {
+          exists: () => true,
+          data: () => ({
+            ...session,
+            status: 'live',
+            bankProblemIds: ['bank-one'],
+          }),
+        };
+      if (reference.path === 'sessionControl/intro')
+        return {
+          exists: () => true,
+          data: () => ({ sessionId: 'session-id' }),
+        };
+      if (reference.path === 'sessionControl/general')
+        return {
+          exists: () => true,
+          data: () => ({
+            sessionId: 'general-live',
+            bankProblemIds: ['bank-one'],
+          }),
+        };
+      if (reference.path === 'sessions/general-live')
+        return {
+          exists: () => true,
+          data: () => ({
+            ...session,
+            branch: 'general',
+            status: 'live',
+            bankProblemIds: ['bank-one'],
+          }),
+        };
+      if (reference.path === 'problemBank/bank-one')
+        return {
+          exists: () => true,
+          id: 'bank-one',
+          ref: reference,
+          data: () => ({ hiddenByLiveSessionId: 'session-id' }),
+        };
+      return { exists: () => false, data: () => undefined };
+    });
+
+    await deleteSession('session-id');
+
+    expect(sdk.batchUpdate).toHaveBeenCalledWith(
+      { path: 'sessionControl/intro' },
+      { sessionId: null, bankProblemIds: [] },
+    );
+    expect(sdk.batchUpdate).toHaveBeenCalledWith(
+      { path: 'problemBank/bank-one' },
+      { hiddenByLiveSessionId: 'general-live' },
+    );
+    expect(sdk.batchUpdate.mock.calls).not.toContainEqual([
+      { path: 'sessionControl/general' },
+      expect.anything(),
+    ]);
   });
 
   it('deletes a Session while releasing a live claim with a missing Bank source', async () => {
@@ -579,7 +798,7 @@ describe('officer session persistence', () => {
             bankProblemIds: ['deleted-source'],
           }),
         };
-      if (reference.path === 'sessionControl/liveSession')
+      if (reference.path === 'sessionControl/intro')
         return {
           exists: () => true,
           data: () => ({ sessionId: 'session-id' }),
@@ -590,8 +809,8 @@ describe('officer session persistence', () => {
     await expect(deleteSession('session-id')).resolves.toBeUndefined();
 
     expect(sdk.batchUpdate).toHaveBeenCalledWith(
-      { path: 'sessionControl/liveSession' },
-      { sessionId: null },
+      { path: 'sessionControl/intro' },
+      { sessionId: null, bankProblemIds: [] },
     );
     expect(sdk.batchDelete).toHaveBeenCalledWith({
       path: 'sessions/session-id',

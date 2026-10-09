@@ -276,7 +276,9 @@ export default function SessionEditor({
     } catch (error) {
       setTransitionError(
         error instanceof Error &&
-          error.message.startsWith('Another Session is already live.')
+          /^Another (Intro|General|ICPC) Session is already live\./.test(
+            error.message,
+          )
           ? error.message
           : isPermissionDenied(error)
             ? 'Permission denied. Sign in to Officer Mode and retry the status change.'
@@ -702,7 +704,9 @@ export default function SessionEditor({
               setSaveError(null);
             }
           }}
-          disabled={saving || deleting || transitionPending}
+          disabled={
+            status === 'live' || saving || deleting || transitionPending
+          }
         >
           {sessionBranches.map((option) => (
             <option key={option} value={option}>
@@ -710,6 +714,11 @@ export default function SessionEditor({
             </option>
           ))}
         </select>
+        {status === 'live' ? (
+          <span className="text-sm text-muted">
+            Set this Session to Not Live before changing its branch.
+          </span>
+        ) : null}
       </label>
       <label className="my-5 flex max-w-3xl flex-col gap-2">
         Session title

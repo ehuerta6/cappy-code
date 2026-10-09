@@ -2,7 +2,7 @@
 
 ## Product definition
 
-CappyCode is **a live solution showcase platform for CIC Intro sessions**. CIC officers prepare interview-style problems and their solutions ahead of time, then present them to members during a session. Members join through an anonymous, read-only public view.
+CappyCode is **a live solution showcase platform for CIC sessions** across Intro, General, and ICPC. CIC officers prepare problems and their solutions ahead of time, then present them to members during a session. Members join through an anonymous, read-only public view.
 
 CappyCode is not an IDE, code translator, transpiler, AI product, online judge, or code-execution tool. Officers prepare Problem examples and source code; the runtime displays that content without generating or executing it.
 
@@ -10,7 +10,7 @@ CappyCode is not an IDE, code translator, transpiler, AI product, online judge, 
 
 ### Officers
 
-CIC Intro officers are the authenticated content managers and presenters. Firebase Authentication is used only for Officer Mode. The proof of concept has one shared CIC officer account. Officers can create and manage sessions, add and order problems, prepare solution content, and control answer visibility.
+CIC officers are the authenticated content managers and presenters. Firebase Authentication is used only for Officer Mode. The proof of concept has one shared CIC officer account. Officers can create and manage sessions, add and order problems, prepare solution content, and control answer visibility.
 
 ### Members
 
@@ -24,11 +24,11 @@ Keep problem metadata separate from solution documents. Metadata includes the pr
 
 Firestore Security Rules are the actual hidden-answer permission boundary. A hidden answer must not be readable by an anonymous member client. Live Solution-document reads require the parent Problem's `answersVisible` to be true. Ended-session Solution reads do not depend on `answersVisible`; draft Solutions remain officer-only. Rules also restrict session and problem management to authenticated officers. UI state such as **Hide Answers** is not a substitute for these rules.
 
-Problem Bank content is public by default and is hidden only while referenced by
-the active live Session. Not Live, End, and supported live Session deletion
-release the temporary hide. Firestore Rules enforce this for Bank metadata and
-nested content, including direct reads protected by the live Session's
-`bankProblemIds` relationship.
+Problem Bank content is public by default and is hidden while referenced by any
+live Session. Intro, General, and ICPC may each have one live Session at the
+same time. Not Live, End, and supported live Session deletion release only that
+Session's references; a shared Bank Problem remains hidden until its final live
+use stops. Firestore Rules enforce this for Bank metadata and nested content.
 
 ## Session model and presentation behavior
 
@@ -64,4 +64,4 @@ Officers prepare common interview-style problems and solutions, including topics
 
 ## Product principle
 
-New work should help CIC Intro officers present prepared solutions clearly and help members follow the live session safely and readably.
+New work should help CIC officers present prepared solutions clearly and help members follow live sessions safely and readably.

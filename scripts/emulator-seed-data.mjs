@@ -22,6 +22,22 @@ const sessions = [
     bankProblemIds: ['bank-live-frequency'],
   },
   {
+    id: 'live-general-graphs',
+    branch: 'general',
+    title: 'CIC General — Graph Algorithms Live',
+    date: '2026-10-09',
+    status: 'live',
+    bankProblemIds: ['bank-live-frequency'],
+  },
+  {
+    id: 'live-icpc-contest',
+    branch: 'icpc',
+    title: 'CIC ICPC — Contest Patterns Live',
+    date: '2026-10-09',
+    status: 'live',
+    bankProblemIds: ['bank-live-frequency'],
+  },
+  {
     id: 'draft-sliding-window',
     branch: 'intro',
     title: 'CIC Intro — Sliding Window Preview',
@@ -570,6 +586,28 @@ const problems = [
     answersVisible: false,
     leetcodeUrl: 'https://leetcode.com/problems/house-robber/',
     solution: 'house-robber',
+  },
+  {
+    sessionId: 'live-general-graphs',
+    id: 'live-campus-graph',
+    title: 'Campus Map Components',
+    description: 'Count connected groups of available campus rooms.',
+    exampleInput: 'map = [[1, 1, 0], [0, 1, 0], [1, 0, 1]]',
+    exampleOutput: '3',
+    constraints: 'Rows and columns are between 1 and 100.',
+    answersVisible: false,
+    solution: 'number-of-islands',
+  },
+  {
+    sessionId: 'live-icpc-contest',
+    id: 'live-contest-route',
+    title: 'Contest Room Route',
+    description: 'Check whether connected rooms include a route to the exit.',
+    exampleInput: 'doors = [[0, 1], [1, 3], [2, 4]], start = 0, end = 3',
+    exampleOutput: 'true',
+    constraints: 'Room identifiers are non-negative integers.',
+    answersVisible: false,
+    solution: 'room-reachability',
   },
   {
     sessionId: 'ended-general-practice',
@@ -1594,7 +1632,7 @@ function assertFixture() {
   if (
     constrainedProblems.length < 10 ||
     constrainedProblems.length === problems.length ||
-    counts.live?.length !== 1 ||
+    counts.live?.length !== 3 ||
     counts.draft?.length < 3 ||
     counts.ended?.length < 1 ||
     ['intro', 'general', 'icpc'].some(
@@ -1604,7 +1642,18 @@ function assertFixture() {
     )
   )
     throw new Error(
-      'The local fixture must cover all branches, one live Session, multiple drafts, and at least three ended Sessions per branch.',
+      'The local fixture must cover all branches, one live Session per branch, multiple drafts, and at least three ended Sessions per branch.',
+    );
+  if (
+    ['intro', 'general', 'icpc'].some(
+      (branch) =>
+        sessions.filter(
+          (session) => session.branch === branch && session.status === 'live',
+        ).length !== 1,
+    )
+  )
+    throw new Error(
+      'The local fixture must have exactly one live Session per branch.',
     );
   const sessionIds = new Set(sessions.map(({ id }) => id));
   const problemIds = new Set();
@@ -1669,13 +1718,16 @@ function assertFixture() {
     );
     if (sessionProblems.length === 0)
       throw new Error(`Seeded Session ${session.id} has no Problems.`);
-    if (session.status === 'live' && sessionProblems.length < 3)
-      throw new Error('The live Session must contain at least three Problems.');
+    if (session.status === 'live' && sessionProblems.length < 1)
+      throw new Error('Every branch live Session must contain a Problem.');
   }
-  const liveSession = sessions.find((session) => session.status === 'live');
-  if (!liveSession || liveSession.bankProblemIds?.length !== 1)
+  const liveSessions = sessions.filter((session) => session.status === 'live');
+  if (
+    liveSessions.length !== 3 ||
+    liveSessions.some((session) => session.bankProblemIds?.length !== 1)
+  )
     throw new Error(
-      'The live Session must reference one reusable bank Problem.',
+      'Each branch live Session must reference one reusable bank Problem.',
     );
   const bankIds = new Set(bankProblems.map(({ id }) => id));
   if (
@@ -1696,17 +1748,23 @@ function assertFixture() {
       (category) =>
         !bankProblems.some((problem) => problem.category === category),
     ) ||
-    liveSession.bankProblemIds.some((id) => !bankIds.has(id))
+    liveSessions.some((session) =>
+      session.bankProblemIds.some((id) => !bankIds.has(id)),
+    )
   )
     throw new Error(
       'Problem Bank fixture categories or live references are invalid.',
     );
   const hiddenLiveBankProblem = bankProblems.find(
-    (problem) => problem.id === liveSession.bankProblemIds?.[0],
+    (problem) => problem.id === liveSessions[0].bankProblemIds?.[0],
   );
   if (
     !hiddenLiveBankProblem ||
-    hiddenLiveBankProblem.hiddenByLiveSessionId !== liveSession.id
+    !liveSessions.some(
+      (session) =>
+        session.bankProblemIds?.includes(hiddenLiveBankProblem.id) &&
+        hiddenLiveBankProblem.hiddenByLiveSessionId === session.id,
+    )
   )
     throw new Error(
       'The live Session bank Problem must be hidden from Members.',
@@ -1814,7 +1872,25 @@ export async function seedEmulatorData() {
     ...solutionDocuments,
     ...bankDocuments,
     ...bankSolutionDocuments,
-    ['sessionControl/liveSession', { sessionId: 'live-hash-maps' }],
+    ['sessionControl/liveSession', { sessionId: null }],
+    [
+      'sessionControl/intro',
+      { sessionId: 'live-hash-maps', bankProblemIds: ['bank-live-frequency'] },
+    ],
+    [
+      'sessionControl/general',
+      {
+        sessionId: 'live-general-graphs',
+        bankProblemIds: ['bank-live-frequency'],
+      },
+    ],
+    [
+      'sessionControl/icpc',
+      {
+        sessionId: 'live-icpc-contest',
+        bankProblemIds: ['bank-live-frequency'],
+      },
+    ],
   ];
 
   const environment = await initializeTestEnvironment({
