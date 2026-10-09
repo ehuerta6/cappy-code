@@ -41,8 +41,9 @@ Emulator:
 This credential is for the local Auth Emulator only. Never use it with
 production Firebase; it is unrelated to and must not modify the production
 Officer account. Members stay anonymous. The deterministic fixture contains
-one Live Session, two Draft Sessions, and twelve Past Sessions dated across
-multiple weeks. It intentionally includes linked LeetCode and custom Problems,
+one Live Session per branch, two Draft Sessions, and twelve Past Sessions dated
+across multiple weeks. The three live Sessions share a Bank Problem to exercise
+independent live hiding. It intentionally includes linked LeetCode and custom Problems,
 mixed reveal states, multiple Problems per Session, and prepared Python, Java,
 and C++ Solutions for every Problem. This gives the Member archive,
 Officer Past history, reveal controls, Monaco panels, and explicit Save flows
@@ -196,14 +197,15 @@ responses. Firestore Security Rules independently enforce backend access.
 
 `src/lib/domain.ts` defines document fields, with IDs held in document paths rather than duplicated inside records:
 
-| Path                                                             | Type         | Fields                                                                                                                    |
-| ---------------------------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------- |
-| `sessions/{sessionId}`                                           | `Session`    | `title`, `date`, `status`, `createdAt`, `updatedAt`                                                                       |
-| `sessions/{sessionId}/problems/{problemId}`                      | `Problem`    | `title`, `description`, `exampleInput`, `exampleOutput`, `constraints`, `order`, `answersVisible`, optional `leetcodeUrl` |
-| `sessionControl/liveSession`                                     | control      | `sessionId` (active Session ID, or `null` when no Session is live)                                                        |
-| `sessions/{sessionId}/problems/{problemId}/solutions/{language}` | `Solution`   | `code`                                                                                                                    |
-| `problemBank/{problemId}`                                        | Bank Problem | Problem content, `hiddenByLiveSessionId`                                                                                  |
-| `problemBank/{problemId}/solutions/{language}`                   | `Solution`   | `code`                                                                                                                    |
+| Path                                                             | Type           | Fields                                                                                                                    |
+| ---------------------------------------------------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `sessions/{sessionId}`                                           | `Session`      | `title`, `date`, `status`, `createdAt`, `updatedAt`                                                                       |
+| `sessions/{sessionId}/problems/{problemId}`                      | `Problem`      | `title`, `description`, `exampleInput`, `exampleOutput`, `constraints`, `order`, `answersVisible`, optional `leetcodeUrl` |
+| `sessionControl/{branch}`                                        | control        | `sessionId` (live Session ID or `null`), `bankProblemIds` (its reusable Problem IDs, or `[]` when unclaimed)              |
+| `sessionControl/liveSession`                                     | legacy control | `sessionId` (read only for compatibility migration; `null` after migration)                                               |
+| `sessions/{sessionId}/problems/{problemId}/solutions/{language}` | `Solution`     | `code`                                                                                                                    |
+| `problemBank/{problemId}`                                        | Bank Problem   | Problem content, `hiddenByLiveSessionId`                                                                                  |
+| `problemBank/{problemId}/solutions/{language}`                   | `Solution`     | `code`                                                                                                                    |
 
 - `Language` is exactly `python | java | cpp`; each language identifies its own Solution document.
 - `SessionStatus` is `draft | live | ended`.
@@ -221,12 +223,13 @@ Anonymous Solution reads for live Sessions require the parent Problem's `answers
 
 ### Problem Bank visibility
 
-Problem Bank content is public by default and is hidden only while referenced by
-the active live Session. `hiddenByLiveSessionId` is set when a Session goes Live
-and cleared when it becomes Not Live, Ended, or is deleted. Member listings query
-the unhidden marker; Firestore Rules also check the active Session's
-`bankProblemIds` for direct parent and nested content reads, so a stale marker
-cannot expose a live-used Problem. Rules remain the authorization boundary.
+Problem Bank content is public by default and is hidden while referenced by any
+live Session. `hiddenByLiveSessionId` stays non-null while at least one branch
+claim references the Problem and clears only after the last live use stops.
+Member listings query the unhidden marker; Firestore Rules also check every
+branch claim and the legacy pointer during compatibility migration, so a stale
+marker cannot expose a live-used Problem. Rules remain the authorization
+boundary, and Officers retain access while an entry is hidden.
 
 ## Officer Session preparation (#38)
 
@@ -277,7 +280,7 @@ Solution document is readable for ended Sessions. Anonymous writes are denied.
 A broad Session query does not filter drafts through Rules; public discovery uses
 separate queries constrained to `live` and `ended`.
 
-Deploy these rules to the intended Firebase project **before using Session CRUD**:
+Deploy these rules to the intended Firebase project before using Session CRUD:
 
 ```bash
 npx firebase-tools deploy --only firestore:rules --project YOUR_PROJECT_ID
@@ -290,24 +293,56 @@ is an operator task.
 ## Session lifecycle and history (#44)
 
 `src/lib/firebase/sessions.ts` provides `transitionSession`, which accepts only
-`live`, `draft`, or `ended` as requested targets and uses a Firestore transaction
-to verify the persisted transition. Only `draft → live`, `live → draft`, and
-`live → ended` are allowed; ended Sessions are terminal. Go Live also requires at
-least one Problem and atomically claims `sessionControl/liveSession`. If this
-control document is missing, the client checks for legacy live Sessions before
-the transaction. The transaction then claims the singleton document, whose
-concurrent creation/update conflicts make a competing transition retry and read
-the current claim. Firestore Rules require Session lifecycle changes and the live
-pointer to agree in the same write, preventing concurrent clients from claiming
-different live Sessions.
-Not Live clears the pointer and changes only the Session status; it preserves
+`live`, `draft`, or `ended` targets and uses a Firestore transaction to verify the
+persisted transition. Only `draft → live`, `live → draft`, and `live → ended`
+are allowed; ended Sessions are terminal. Go Live requires at least one Problem
+and atomically claims `sessionControl/{branch}`. Intro, General,
+and ICPC each have an independent claim, so up to three Sessions may be live at
+once. Firestore Rules require the Session status and matching branch claim to
+agree in the same write. Not Live clears only that branch claim and changes only
+the Session status; it preserves
 Problems, Solutions, ordering, and each Problem's `answersVisible` value. The
 Officer dashboard groups rows by persisted status: live, draft (Upcoming), and
 ended (Past Sessions). Dates sort rows within each group but do not determine
 status. Ended Sessions remain editable and public. Ending changes only the
-Session status and pointer; it does not alter any Problem's `answersVisible`
+Session status and branch claim; it does not alter any Problem's `answersVisible`
 value. The ended status itself makes all fixed-language Solutions publicly
 readable.
+
+### Branch live-control rollout and legacy compatibility
+
+`sessionControl/liveSession` remains readable by the compatibility code and
+Rules until its `sessionId` is cleared. Rules also consider that legacy Session
+when enforcing Problem Bank hiding. On the first new lifecycle transition, the
+client reads the old pointer and live Session in a transaction. If another
+branch starts, it moves the still-live Session into the correct branch claim
+while retaining `live`; if that Session stops, ends, or is deleted, it clears
+the old pointer atomically. Migration never ends a Session as a side effect.
+New lifecycle actions use only the branch documents after that conversion.
+
+Production rollout requirements:
+
+1. Export/backup Firestore. Inspect the old `sessionControl/liveSession`
+   document, every live Session's branch and `bankProblemIds`, and the Bank
+   hiding markers. Confirm there is at most one live Session per branch.
+2. If the old pointer identifies a live Session, keep it live and confirm its
+   branch. Do not clear it manually or end it as a migration shortcut.
+3. Deploy the new Rules, then deploy the compatible application. Pause Officer
+   lifecycle changes until the new application is available. Older clients can
+   read current public Sessions, but their global-pointer Go Live writes are
+   denied by the new Rules.
+4. Verify the old pointer is null; every live Session has one matching branch
+   claim; empty branches have no active claim; and shared Bank Problems stay
+   hidden until their final live use stops. Verify anonymous reads, Officer
+   writes, answer reveal, Not Live, End, and live deletion against the deployed
+   Rules and application.
+
+Compatibility risk: while the old pointer is present, it continues to protect
+its live Session's Bank Problems. Older clients cannot start Sessions after the
+Rules deployment. If rollout verification fails, restore the backup and roll
+back Rules and application together. This change does not deploy Rules or modify
+production data; production deployment and migration need separate
+authorization.
 
 Normal unit tests mock Firebase and require no project. Rules tests use the actual
 emulator to verify officer access, public status access, answer reveal/revocation,

@@ -99,6 +99,26 @@ describe('anonymous member persistence', () => {
     ]);
   });
 
+  it('returns simultaneous live Sessions from all branches and leaves drafts to Rules', async () => {
+    sdk.getDocsFromServer
+      .mockResolvedValueOnce({
+        docs: [
+          snapshot('intro-live', live),
+          snapshot('general-live', { ...live, branch: 'general' }),
+          snapshot('icpc-live', { ...live, branch: 'icpc' }),
+        ],
+      })
+      .mockResolvedValueOnce({ docs: [] });
+
+    const sessions = await listMemberSessions();
+
+    expect(sessions.map(({ id, session }) => [id, session.branch])).toEqual([
+      ['general-live', 'general'],
+      ['icpc-live', 'icpc'],
+      ['intro-live', 'intro'],
+    ]);
+  });
+
   it('subscribes to the public live and ended lifecycle and reports changes', () => {
     const onValue = vi.fn();
     const onError = vi.fn();

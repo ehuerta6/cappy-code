@@ -14,6 +14,7 @@ import {
   getDoc,
   getDocs,
   query,
+  runTransaction,
   setDoc,
   updateDoc,
   where,
@@ -77,8 +78,9 @@ beforeEach(async () => {
       },
     );
     writes.push(
-      setDoc(doc(database, 'sessionControl/liveSession'), {
+      setDoc(doc(database, 'sessionControl/intro'), {
         sessionId: 'live',
+        bankProblemIds: ['used-live', 'used-private'],
       }),
       setDoc(doc(database, 'problemBank/used-live'), {
         title: 'Used during live Session',
@@ -314,6 +316,7 @@ describe('Firestore security rules', () => {
     expect((await getDoc(legacy)).data()).not.toHaveProperty('branch');
     await assertFails(updateDoc(legacy, { branch: 'advanced' }));
     await assertSucceeds(updateDoc(legacy, { branch: 'general' }));
+    await assertFails(updateDoc(doc(db, 'sessions/live'), { branch: 'icpc' }));
 
     const modern = doc(db, 'sessions/new-intro');
     await assertSucceeds(updateDoc(modern, { branch: 'icpc' }));
@@ -406,25 +409,357 @@ describe('Firestore security rules', () => {
     await assertFails(getDocs(collection(db, 'sessions')));
   });
 
-  it('requires an atomic live-session pointer and allows only one live Session', async () => {
+  it('requires an atomic branch claim when a Session goes live', async () => {
     const db = officerDb();
     await assertFails(updateDoc(doc(db, 'sessions/draft'), { status: 'live' }));
 
     const staleWrite = writeBatch(db);
     staleWrite.update(doc(db, 'sessions/draft'), { status: 'live' });
-    staleWrite.update(doc(db, 'sessionControl/liveSession'), {
+    staleWrite.update(doc(db, 'sessionControl/intro'), {
       sessionId: 'draft',
+      bankProblemIds: [],
     });
     await assertFails(staleWrite.commit());
 
     const transition = writeBatch(db);
     transition.update(doc(db, 'sessions/live'), { status: 'draft' });
     transition.update(doc(db, 'sessions/draft'), { status: 'live' });
-    transition.update(doc(db, 'sessionControl/liveSession'), {
+    transition.update(doc(db, 'sessionControl/intro'), {
       sessionId: 'draft',
+      bankProblemIds: [],
     });
     await assertSucceeds(transition.commit());
     await assertSucceeds(getDoc(doc(db, 'sessions/draft')));
+  });
+
+  it('allows one live Session per branch and rejects direct same-branch bypasses', async () => {
+    const db = officerDb();
+    await environment.withSecurityRulesDisabled(async (context) => {
+      const admin = context.firestore();
+      for (const [id, branch] of [
+        ['general-draft', 'general'],
+        ['icpc-draft', 'icpc'],
+        ['intro-second', 'intro'],
+        ['general-second', 'general'],
+        ['icpc-second', 'icpc'],
+      ] as const) {
+        await setDoc(doc(admin, `sessions/${id}`), {
+          title: id,
+          date: '2026-10-09',
+          branch,
+          status: 'draft',
+        });
+      }
+    });
+
+    await assertFails(
+      updateDoc(doc(db, 'sessions/general-draft'), { status: 'live' }),
+    );
+    const crossBranchStart = writeBatch(db);
+    crossBranchStart.update(doc(db, 'sessions/general-draft'), {
+      status: 'live',
+    });
+    crossBranchStart.set(doc(db, 'sessionControl/general'), {
+      sessionId: 'general-draft',
+      bankProblemIds: [],
+    });
+    crossBranchStart.update(doc(db, 'sessions/icpc-draft'), { status: 'live' });
+    crossBranchStart.set(doc(db, 'sessionControl/icpc'), {
+      sessionId: 'icpc-draft',
+      bankProblemIds: [],
+    });
+    await assertSucceeds(crossBranchStart.commit());
+    await assertSucceeds(getDoc(doc(db, 'sessions/live')));
+    await assertSucceeds(getDoc(doc(db, 'sessions/general-draft')));
+    await assertSucceeds(getDoc(doc(db, 'sessions/icpc-draft')));
+
+    const conflictingIntro = writeBatch(db);
+    conflictingIntro.update(doc(db, 'sessions/intro-second'), {
+      status: 'live',
+    });
+    conflictingIntro.update(doc(db, 'sessionControl/intro'), {
+      sessionId: 'intro-second',
+      bankProblemIds: [],
+    });
+    await assertFails(conflictingIntro.commit());
+
+    const conflictingGeneral = writeBatch(db);
+    conflictingGeneral.update(doc(db, 'sessions/general-second'), {
+      status: 'live',
+    });
+    conflictingGeneral.set(doc(db, 'sessionControl/general'), {
+      sessionId: 'general-second',
+      bankProblemIds: [],
+    });
+    await assertFails(conflictingGeneral.commit());
+
+    const conflictingIcpc = writeBatch(db);
+    conflictingIcpc.update(doc(db, 'sessions/icpc-second'), { status: 'live' });
+    conflictingIcpc.set(doc(db, 'sessionControl/icpc'), {
+      sessionId: 'icpc-second',
+      bankProblemIds: [],
+    });
+    await assertFails(conflictingIcpc.commit());
+
+    const stopIntro = writeBatch(db);
+    stopIntro.update(doc(db, 'sessions/live'), { status: 'draft' });
+    stopIntro.update(doc(db, 'sessionControl/intro'), {
+      sessionId: null,
+      bankProblemIds: [],
+    });
+    await assertSucceeds(stopIntro.commit());
+    await assertSucceeds(getDoc(doc(db, 'sessions/general-draft')));
+    await assertSucceeds(getDoc(doc(db, 'sessions/icpc-draft')));
+  });
+
+  it('serializes concurrent Go Live attempts through the branch claim document', async () => {
+    const db = officerDb();
+    await environment.withSecurityRulesDisabled(async (context) => {
+      const admin = context.firestore();
+      await setDoc(doc(admin, 'sessionControl/intro'), {
+        sessionId: null,
+        bankProblemIds: [],
+      });
+      for (const id of ['intro-a', 'intro-b'])
+        await setDoc(doc(admin, `sessions/${id}`), {
+          title: id,
+          date: '2026-10-09',
+          branch: 'intro',
+          status: 'draft',
+        });
+    });
+
+    const start = (id: string) =>
+      runTransaction(db, async (transaction) => {
+        const claim = await transaction.get(doc(db, 'sessionControl/intro'));
+        if (claim.data()?.sessionId != null)
+          throw new Error('Intro is already live');
+        transaction.update(doc(db, `sessions/${id}`), { status: 'live' });
+        transaction.set(doc(db, 'sessionControl/intro'), {
+          sessionId: id,
+          bankProblemIds: [],
+        });
+      });
+    const attempts = await Promise.allSettled([
+      start('intro-a'),
+      start('intro-b'),
+    ]);
+    expect(
+      attempts.filter((attempt) => attempt.status === 'fulfilled'),
+    ).toHaveLength(1);
+    const introClaim = await getDoc(doc(db, 'sessionControl/intro'));
+    expect(['intro-a', 'intro-b']).toContain(introClaim.data()?.sessionId);
+    const statuses = await Promise.all(
+      ['intro-a', 'intro-b'].map((id) => getDoc(doc(db, `sessions/${id}`))),
+    );
+    expect(
+      statuses.filter((snapshot) => snapshot.data()?.status === 'live'),
+    ).toHaveLength(1);
+  });
+
+  it('migrates a legacy global live pointer without ending its Session', async () => {
+    const db = officerDb();
+    await environment.withSecurityRulesDisabled(async (context) => {
+      const admin = context.firestore();
+      await deleteDoc(doc(admin, 'sessionControl/intro'));
+      await setDoc(doc(admin, 'sessionControl/liveSession'), {
+        sessionId: 'live',
+      });
+      await setDoc(doc(admin, 'sessions/general-new'), {
+        title: 'General live',
+        date: '2026-10-09',
+        branch: 'general',
+        status: 'draft',
+        bankProblemIds: [],
+      });
+    });
+    const migration = writeBatch(db);
+    migration.set(doc(db, 'sessionControl/intro'), {
+      sessionId: 'live',
+      bankProblemIds: ['used-live', 'used-private'],
+    });
+    migration.update(doc(db, 'sessionControl/liveSession'), {
+      sessionId: null,
+    });
+    migration.update(doc(db, 'sessions/general-new'), { status: 'live' });
+    migration.set(doc(db, 'sessionControl/general'), {
+      sessionId: 'general-new',
+      bankProblemIds: [],
+    });
+    await assertSucceeds(migration.commit());
+    expect((await getDoc(doc(db, 'sessions/live'))).data()?.status).toBe(
+      'live',
+    );
+    expect(
+      (await getDoc(doc(db, 'sessionControl/intro'))).data()?.sessionId,
+    ).toBe('live');
+    expect(
+      (await getDoc(doc(db, 'sessionControl/liveSession'))).data()?.sessionId,
+    ).toBeNull();
+  });
+
+  it('keeps a shared Bank Problem hidden until the final live branch releases it', async () => {
+    const member = anonymousDb();
+    const officer = officerDb();
+    await environment.withSecurityRulesDisabled(async (context) => {
+      const admin = context.firestore();
+      await setDoc(doc(admin, 'sessions/general-live'), {
+        title: 'General live',
+        date: '2026-10-09',
+        branch: 'general',
+        status: 'live',
+        bankProblemIds: ['used-live'],
+      });
+      await setDoc(doc(admin, 'sessionControl/general'), {
+        sessionId: 'general-live',
+        bankProblemIds: ['used-live'],
+      });
+      await setDoc(doc(admin, 'sessions/icpc-live'), {
+        title: 'ICPC live',
+        date: '2026-10-09',
+        branch: 'icpc',
+        status: 'live',
+        bankProblemIds: ['used-live'],
+      });
+      await setDoc(doc(admin, 'sessionControl/icpc'), {
+        sessionId: 'icpc-live',
+        bankProblemIds: ['used-live'],
+      });
+    });
+    await assertFails(getDoc(doc(member, 'problemBank/used-live')));
+    await assertSucceeds(getDoc(doc(member, 'problemBank/public')));
+    await assertSucceeds(
+      getDoc(doc(member, 'problemBank/public/solutions/python')),
+    );
+    const stopIntro = writeBatch(officer);
+    stopIntro.update(doc(officer, 'sessions/live'), { status: 'draft' });
+    stopIntro.update(doc(officer, 'sessionControl/intro'), {
+      sessionId: null,
+      bankProblemIds: [],
+    });
+    stopIntro.update(doc(officer, 'problemBank/used-live'), {
+      hiddenByLiveSessionId: 'general-live',
+    });
+    await assertSucceeds(stopIntro.commit());
+    await assertFails(getDoc(doc(member, 'problemBank/used-live')));
+
+    const stopGeneral = writeBatch(officer);
+    stopGeneral.update(doc(officer, 'sessions/general-live'), {
+      status: 'ended',
+    });
+    stopGeneral.update(doc(officer, 'sessionControl/general'), {
+      sessionId: null,
+      bankProblemIds: [],
+    });
+    stopGeneral.update(doc(officer, 'problemBank/used-live'), {
+      hiddenByLiveSessionId: 'icpc-live',
+    });
+    await assertSucceeds(stopGeneral.commit());
+    await assertFails(getDoc(doc(member, 'problemBank/used-live')));
+
+    const stopIcpc = writeBatch(officer);
+    stopIcpc.update(doc(officer, 'sessions/icpc-live'), { status: 'ended' });
+    stopIcpc.update(doc(officer, 'sessionControl/icpc'), {
+      sessionId: null,
+      bankProblemIds: [],
+    });
+    stopIcpc.update(doc(officer, 'problemBank/used-live'), {
+      hiddenByLiveSessionId: null,
+    });
+    await assertSucceeds(stopIcpc.commit());
+    await assertSucceeds(getDoc(doc(member, 'problemBank/used-live')));
+  });
+
+  it('retries live Session deletion when another branch claims the same Bank Problem during deletion', async () => {
+    const db = officerDb();
+    await environment.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'sessions/general-arrives'), {
+        title: 'General arrives during deletion',
+        date: '2026-10-09',
+        branch: 'general',
+        status: 'draft',
+        bankProblemIds: ['used-live'],
+      });
+    });
+
+    let signalDeletionReads!: () => void;
+    let releaseDeletion!: () => void;
+    const deletionReadsReady = new Promise<void>((resolve) => {
+      signalDeletionReads = resolve;
+    });
+    const deletionMayCommit = new Promise<void>((resolve) => {
+      releaseDeletion = resolve;
+    });
+    let deletionAttempts = 0;
+    const deletion = runTransaction(db, async (transaction) => {
+      deletionAttempts += 1;
+      const [session, ...controls] = await Promise.all([
+        transaction.get(doc(db, 'sessions/live')),
+        transaction.get(doc(db, 'sessionControl/liveSession')),
+        transaction.get(doc(db, 'sessionControl/intro')),
+        transaction.get(doc(db, 'sessionControl/general')),
+        transaction.get(doc(db, 'sessionControl/icpc')),
+        transaction.get(doc(db, 'problemBank/used-live')),
+      ]);
+      const intro = controls[1]!;
+      const general = controls[2]!;
+      const icpc = controls[3]!;
+      const bank = controls[4]!;
+      if (deletionAttempts === 1) {
+        signalDeletionReads();
+        await deletionMayCommit;
+      }
+      const remainingClaim = [intro, general, icpc].find(
+        (claim) =>
+          claim.exists() &&
+          claim.data().sessionId !== 'live' &&
+          claim.data().bankProblemIds?.includes('used-live'),
+      );
+      const remainingOwner = remainingClaim?.exists()
+        ? remainingClaim.data().sessionId
+        : null;
+      transaction.update(doc(db, 'sessionControl/intro'), {
+        sessionId: null,
+        bankProblemIds: [],
+      });
+      if (bank.data()?.hiddenByLiveSessionId !== (remainingOwner ?? null))
+        transaction.update(doc(db, 'problemBank/used-live'), {
+          hiddenByLiveSessionId: remainingOwner ?? null,
+        });
+      transaction.delete(doc(db, 'sessions/live'));
+      expect(session.data()?.status).toBe('live');
+    });
+
+    await deletionReadsReady;
+    await runTransaction(db, async (transaction) => {
+      await Promise.all([
+        transaction.get(doc(db, 'sessions/general-arrives')),
+        transaction.get(doc(db, 'sessionControl/general')),
+        transaction.get(doc(db, 'problemBank/used-live')),
+      ]);
+      transaction.update(doc(db, 'sessions/general-arrives'), {
+        status: 'live',
+      });
+      transaction.set(doc(db, 'sessionControl/general'), {
+        sessionId: 'general-arrives',
+        bankProblemIds: ['used-live'],
+      });
+      transaction.update(doc(db, 'problemBank/used-live'), {
+        hiddenByLiveSessionId: 'general-arrives',
+      });
+    });
+    releaseDeletion();
+    await deletion;
+
+    expect(deletionAttempts).toBeGreaterThan(1);
+    expect(
+      (await getDoc(doc(db, 'sessions/general-arrives'))).data()?.status,
+    ).toBe('live');
+    expect(
+      (await getDoc(doc(db, 'problemBank/used-live'))).data()
+        ?.hiddenByLiveSessionId,
+    ).toBe('general-arrives');
+    await assertFails(getDoc(doc(anonymousDb(), 'problemBank/used-live')));
   });
 
   it('allows Not Live only with the pointer cleared and preserves prepared Problem data', async () => {
@@ -433,8 +768,9 @@ describe('Firestore security rules', () => {
 
     const transition = writeBatch(db);
     transition.update(doc(db, 'sessions/live'), { status: 'draft' });
-    transition.update(doc(db, 'sessionControl/liveSession'), {
+    transition.update(doc(db, 'sessionControl/intro'), {
       sessionId: null,
+      bankProblemIds: [],
     });
     await assertSucceeds(transition.commit());
     const problem = await getDoc(doc(db, 'sessions/live/problems/hidden'));
@@ -509,14 +845,109 @@ describe('Firestore security rules', () => {
     );
   });
 
-  it('allows deleting a live Session only when its live claim is released atomically', async () => {
+  it('allows atomic deletion of a live Session hierarchy only when its live claim is released', async () => {
     const db = officerDb();
+    await environment.withSecurityRulesDisabled(async (context) => {
+      const admin = context.firestore();
+      await setDoc(doc(admin, 'sessions/general-live'), {
+        title: 'General live',
+        date: '2026-10-09',
+        branch: 'general',
+        status: 'live',
+        bankProblemIds: ['used-live'],
+      });
+      await setDoc(doc(admin, 'sessionControl/general'), {
+        sessionId: 'general-live',
+        bankProblemIds: ['used-live'],
+      });
+    });
     await assertFails(deleteDoc(doc(db, 'sessions/live')));
+    await assertFails(deleteDoc(doc(db, 'sessions/live/problems/hidden')));
+    await assertFails(
+      deleteDoc(doc(db, 'sessions/live/problems/hidden/approaches/primary')),
+    );
 
     const deletion = writeBatch(db);
-    deletion.update(doc(db, 'sessionControl/liveSession'), { sessionId: null });
+    deletion.update(doc(db, 'sessionControl/intro'), {
+      sessionId: null,
+      bankProblemIds: [],
+    });
+    deletion.update(doc(db, 'problemBank/used-live'), {
+      hiddenByLiveSessionId: 'general-live',
+    });
+    deletion.update(doc(db, 'problemBank/used-private'), {
+      hiddenByLiveSessionId: null,
+    });
+    for (const problemId of ['hidden', 'revealed']) {
+      for (const language of ['python', 'java', 'cpp']) {
+        deletion.delete(
+          doc(db, `sessions/live/problems/${problemId}/solutions/${language}`),
+        );
+        deletion.delete(
+          doc(
+            db,
+            `sessions/live/problems/${problemId}/approaches/primary/solutions/${language}`,
+          ),
+        );
+      }
+      deletion.delete(
+        doc(db, `sessions/live/problems/${problemId}/approaches/primary`),
+      );
+      deletion.delete(doc(db, `sessions/live/problems/${problemId}`));
+    }
     deletion.delete(doc(db, 'sessions/live'));
     await assertSucceeds(deletion.commit());
+    expect(
+      (await getDoc(doc(db, 'sessionControl/general'))).data()?.sessionId,
+    ).toBe('general-live');
+    expect(
+      (await getDoc(doc(db, 'problemBank/used-live'))).data()
+        ?.hiddenByLiveSessionId,
+    ).toBe('general-live');
+    expect(
+      (await getDoc(doc(db, 'problemBank/used-private'))).data()
+        ?.hiddenByLiveSessionId,
+    ).toBeNull();
+    for (const problemId of ['hidden', 'revealed']) {
+      expect(
+        (
+          await getDoc(
+            doc(db, `sessions/live/problems/${problemId}/approaches/primary`),
+          )
+        ).exists(),
+      ).toBe(false);
+      expect(
+        (await getDoc(doc(db, `sessions/live/problems/${problemId}`))).exists(),
+      ).toBe(false);
+    }
+    await assertFails(getDoc(doc(anonymousDb(), 'problemBank/used-live')));
+  });
+
+  it('allows atomic deletion of an ended Session with nested content', async () => {
+    const db = officerDb();
+    const deletion = writeBatch(db);
+    for (const language of ['python', 'java', 'cpp']) {
+      deletion.delete(
+        doc(db, `sessions/ended/problems/hidden/solutions/${language}`),
+      );
+      deletion.delete(
+        doc(
+          db,
+          `sessions/ended/problems/hidden/approaches/primary/solutions/${language}`,
+        ),
+      );
+    }
+    deletion.delete(
+      doc(db, 'sessions/ended/problems/hidden/approaches/primary'),
+    );
+    deletion.delete(doc(db, 'sessions/ended/problems/hidden'));
+    deletion.delete(doc(db, 'sessions/ended'));
+
+    await assertSucceeds(deletion.commit());
+    expect((await getDoc(doc(db, 'sessions/ended'))).exists()).toBe(false);
+    expect(
+      (await getDoc(doc(db, 'sessions/ended/problems/hidden'))).exists(),
+    ).toBe(false);
   });
 
   it('denies draft and live hidden Solutions and permits all ended Solutions for fixed languages', async () => {
@@ -687,7 +1118,7 @@ describe('Firestore security rules', () => {
 
   it('allows a public bank entry before the first live Session exists', async () => {
     await environment.withSecurityRulesDisabled(async (context) => {
-      await deleteDoc(doc(context.firestore(), 'sessionControl/liveSession'));
+      await deleteDoc(doc(context.firestore(), 'sessionControl/intro'));
     });
     await assertSucceeds(
       setDoc(doc(officerDb(), 'problemBank/first'), {
@@ -726,8 +1157,9 @@ describe('Firestore security rules', () => {
       const officer = officerDb();
       const transition = writeBatch(officer);
       transition.update(doc(officer, 'sessions/live'), { status: nextStatus });
-      transition.update(doc(officer, 'sessionControl/liveSession'), {
+      transition.update(doc(officer, 'sessionControl/intro'), {
         sessionId: null,
+        bankProblemIds: [],
       });
       transition.update(doc(officer, 'problemBank/used-live'), {
         hiddenByLiveSessionId: null,
@@ -767,8 +1199,9 @@ describe('Firestore security rules', () => {
       const officer = officerDb();
       const releaseInitial = writeBatch(officer);
       releaseInitial.update(doc(officer, 'sessions/live'), { status: 'draft' });
-      releaseInitial.update(doc(officer, 'sessionControl/liveSession'), {
+      releaseInitial.update(doc(officer, 'sessionControl/intro'), {
         sessionId: null,
+        bankProblemIds: [],
       });
       releaseInitial.update(doc(officer, 'problemBank/used-live'), {
         hiddenByLiveSessionId: null,
@@ -785,8 +1218,9 @@ describe('Firestore security rules', () => {
 
       const goLive = writeBatch(officer);
       goLive.update(doc(officer, 'sessions/draft'), { status: 'live' });
-      goLive.update(doc(officer, 'sessionControl/liveSession'), {
+      goLive.update(doc(officer, 'sessionControl/intro'), {
         sessionId: 'draft',
+        bankProblemIds: ['public', 'used-private'],
       });
       goLive.update(doc(officer, 'problemBank/public'), {
         hiddenByLiveSessionId: 'draft',
@@ -803,8 +1237,9 @@ describe('Firestore security rules', () => {
 
       const stopLive = writeBatch(officer);
       stopLive.update(doc(officer, 'sessions/draft'), { status: nextStatus });
-      stopLive.update(doc(officer, 'sessionControl/liveSession'), {
+      stopLive.update(doc(officer, 'sessionControl/intro'), {
         sessionId: null,
+        bankProblemIds: [],
       });
       stopLive.update(doc(officer, 'problemBank/public'), {
         hiddenByLiveSessionId: null,
@@ -825,8 +1260,9 @@ describe('Firestore security rules', () => {
     const member = anonymousDb();
     const officer = officerDb();
     const deletion = writeBatch(officer);
-    deletion.update(doc(officer, 'sessionControl/liveSession'), {
+    deletion.update(doc(officer, 'sessionControl/intro'), {
       sessionId: null,
+      bankProblemIds: [],
     });
     deletion.update(doc(officer, 'problemBank/used-live'), {
       hiddenByLiveSessionId: null,

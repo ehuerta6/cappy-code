@@ -25,8 +25,14 @@ test('Members can browse live, ended, and bank content without selection fallbac
     name: 'ICPC session history',
   });
   await expect(introHistory.getByRole('link')).toHaveCount(11);
-  await expect(generalHistory.getByRole('link')).toHaveCount(3);
-  await expect(icpcHistory.getByRole('link')).toHaveCount(3);
+  await expect(generalHistory.getByRole('link')).toHaveCount(4);
+  await expect(icpcHistory.getByRole('link')).toHaveCount(4);
+  await expect(
+    generalHistory.getByRole('link', { name: /Graph Algorithms Live/ }),
+  ).toBeVisible();
+  await expect(
+    icpcHistory.getByRole('link', { name: /Contest Patterns Live/ }),
+  ).toBeVisible();
   const historyCounts = [
     await introHistory.getByRole('link').count(),
     await generalHistory.getByRole('link').count(),

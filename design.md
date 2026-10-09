@@ -114,10 +114,11 @@ controls within reach without obscuring code or crowding the workspace.
 
 ### Current
 
-The Member Bank is public, except that the exact Bank Problem used by the active
-live Session is temporarily hidden. Members can organize and filter by category
-and branch, and see difficulty badges and neutral DSA/algorithm tags. They do
-not see usage counts, history, or planning metadata.
+The Member Bank is public, except that a Bank Problem used by any live Session
+is temporarily hidden. It remains hidden until the last live Session using it
+stops. Members can organize and filter by category and branch, and see
+difficulty badges and neutral DSA/algorithm tags. They do not see usage counts,
+history, or planning metadata.
 
 The Officer Bank uses the same visual vocabulary and adds management, usage,
 and history information. Neither view uses publication-state controls.

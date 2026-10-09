@@ -23,18 +23,27 @@ service cloud.firestore {
       ).data.answersVisible == true;
     }
 
-    function liveSessionPath() {
-      return /databases/$(database)/documents/sessionControl/liveSession;
+    function branchLiveSessionPath(branch) {
+      return /databases/$(database)/documents/sessionControl/$(branch);
     }
 
     function liveSessionAfterIs(sessionId) {
-      return existsAfter(liveSessionPath())
-        && getAfter(liveSessionPath()).data.sessionId == sessionId;
+      let session = getAfter(
+        /databases/$(database)/documents/sessions/$(sessionId)
+      ).data;
+      let branch = session.get('branch', 'intro');
+      return session.get('branch', 'intro') in ['intro', 'general', 'icpc']
+        && existsAfter(branchLiveSessionPath(branch))
+        && getAfter(branchLiveSessionPath(branch)).data.sessionId == sessionId
+        && getAfter(branchLiveSessionPath(branch)).data.get('bankProblemIds', [])
+          == session.get('bankProblemIds', []);
     }
 
-    function liveSessionClearedAfter(sessionId) {
-      return !existsAfter(liveSessionPath())
-        || getAfter(liveSessionPath()).data.sessionId != sessionId;
+    function liveSessionClearedAfter(sessionId, branch) {
+      return (!existsAfter(branchLiveSessionPath(branch))
+          || getAfter(branchLiveSessionPath(branch)).data.sessionId != sessionId)
+        && (!existsAfter(/databases/$(database)/documents/sessionControl/liveSession)
+          || getAfter(/databases/$(database)/documents/sessionControl/liveSession).data.get('sessionId', null) != sessionId);
     }
 
     function sessionInactiveAfter(sessionId) {
@@ -44,6 +53,12 @@ service cloud.firestore {
         || getAfter(
           /databases/$(database)/documents/sessions/$(sessionId)
         ).data.status != 'live';
+    }
+
+    function sessionDeletedAfter(sessionId) {
+      return !existsAfter(
+        /databases/$(database)/documents/sessions/$(sessionId)
+      );
     }
 
     function hasSupportedBranch(data) {
@@ -93,11 +108,28 @@ service cloud.firestore {
       ]);
     }
 
+    function branchUsesBankProblem(branch, problemId) {
+      return exists(branchLiveSessionPath(branch))
+        ? (get(branchLiveSessionPath(branch)).data.get('sessionId', null) is string
+            ? (get(branchLiveSessionPath(branch)).data.get('bankProblemIds', []) is list
+                ? get(branchLiveSessionPath(branch)).data.get('bankProblemIds', []).hasAny([problemId])
+                : false)
+            : false)
+        : false;
+    }
+
     function bankProblemUsedByActiveSession(problemId) {
-      return exists(liveSessionPath())
-        ? (get(liveSessionPath()).data.get('sessionId', null) is string
+      return branchUsesBankProblem('intro', problemId)
+        || branchUsesBankProblem('general', problemId)
+        || branchUsesBankProblem('icpc', problemId)
+        || legacySessionUsesBankProblem(problemId);
+    }
+
+    function legacySessionUsesBankProblem(problemId) {
+      return exists(/databases/$(database)/documents/sessionControl/liveSession)
+        ? (get(/databases/$(database)/documents/sessionControl/liveSession).data.get('sessionId', null) is string
             ? activeSessionUsesBankProblem(
-                get(liveSessionPath()).data.sessionId,
+                get(/databases/$(database)/documents/sessionControl/liveSession).data.sessionId,
                 problemId
               )
             : false)
@@ -147,16 +179,25 @@ service cloud.firestore {
         && ((!resource.data.keys().hasAny(['branch'])
             && !request.resource.data.keys().hasAny(['branch']))
           || hasSupportedBranch(request.resource.data))
+        && (resource.data.status != 'live'
+          || request.resource.data.get('branch', 'intro')
+            == resource.data.get('branch', 'intro'))
         && (request.resource.data.status == resource.data.status
           || (resource.data.status == 'draft'
             && request.resource.data.status == 'live'
             && liveSessionAfterIs(sessionId))
           || (resource.data.status == 'live'
             && request.resource.data.status in ['draft', 'ended']
-            && liveSessionClearedAfter(sessionId)));
+            && liveSessionClearedAfter(
+              sessionId,
+              resource.data.get('branch', 'intro')
+            )));
       allow delete: if isOfficer()
         && (resource.data.status != 'live'
-          || liveSessionClearedAfter(sessionId));
+          || liveSessionClearedAfter(
+            sessionId,
+            resource.data.get('branch', 'intro')
+          ));
 
       match /problems/{problemId} {
         allow read: if isOfficer() || sessionIsPublic(sessionId);
@@ -169,7 +210,8 @@ service cloud.firestore {
             || (get(/databases/$(database)/documents/sessions/$(sessionId)).data.status == 'ended'
               && changesOnlyProblemContent()));
         allow delete: if isOfficer()
-          && get(/databases/$(database)/documents/sessions/$(sessionId)).data.status == 'draft';
+          && (get(/databases/$(database)/documents/sessions/$(sessionId)).data.status == 'draft'
+            || sessionDeletedAfter(sessionId));
 
         match /solutions/{language} {
           allow read: if (isOfficer() && language in ['python', 'java', 'cpp']) ||
@@ -190,7 +232,8 @@ service cloud.firestore {
             && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.tags is list
             && request.resource.data.tags.hasOnly(['Arrays', 'Hash Map', 'Two Pointers', 'Binary Search', 'Stack', 'Queue', 'Linked List', 'Tree', 'Graph', 'DFS', 'BFS', 'Dynamic Programming', 'Greedy', 'Backtracking', 'Union Find', 'Shortest Path'])
             && request.resource.data.order is int && request.resource.data.order >= 0;
-          allow delete: if isOfficer() && sessionState() == 'draft';
+          allow delete: if isOfficer()
+            && (sessionState() == 'draft' || sessionDeletedAfter(sessionId));
           allow update: if isOfficer() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'tags', 'order'])
             && request.resource.data.keys().hasAll(['name', 'tags', 'order']) && request.resource.data.keys().hasOnly(['name', 'tags', 'order'])
             && request.resource.data.name is string && request.resource.data.name.size() > 0
@@ -211,22 +254,43 @@ service cloud.firestore {
 
     match /sessionControl/liveSession {
       allow read: if isOfficer();
-      allow create: if isOfficer()
-        && request.resource.data.keys().hasOnly(['sessionId'])
-        && request.resource.data.sessionId != null
-        && getAfter(/databases/$(database)/documents/sessions/$(request.resource.data.sessionId)).data.status == 'live';
       allow update: if isOfficer()
         && request.resource.data.keys().hasOnly(['sessionId'])
+        && request.resource.data.sessionId == null
+        && resource.data.get('sessionId', null) is string
+        && (sessionInactiveAfter(resource.data.sessionId)
+          || liveSessionAfterIs(resource.data.sessionId));
+      allow create, delete: if false;
+    }
+
+    match /sessionControl/{branch} {
+      allow read: if isOfficer();
+      allow create: if isOfficer()
+        && branch in ['intro', 'general', 'icpc']
+        && request.resource.data.keys().hasOnly(['sessionId', 'bankProblemIds'])
+        && request.resource.data.get('bankProblemIds', []) is list
         && (request.resource.data.sessionId == null
-          ? (resource.data.sessionId == null
-            || sessionInactiveAfter(resource.data.sessionId))
-          : getAfter(/databases/$(database)/documents/sessions/$(request.resource.data.sessionId)).data.status == 'live'
+          ? request.resource.data.get('bankProblemIds', []) == []
+          : (request.resource.data.sessionId is string
+            && getAfter(/databases/$(database)/documents/sessions/$(request.resource.data.sessionId)).data.status == 'live'
+            && getAfter(/databases/$(database)/documents/sessions/$(request.resource.data.sessionId)).data.get('branch', 'intro') == branch
+            && getAfter(/databases/$(database)/documents/sessions/$(request.resource.data.sessionId)).data.get('bankProblemIds', []) == request.resource.data.get('bankProblemIds', [])));
+      allow update: if isOfficer()
+        && branch in ['intro', 'general', 'icpc']
+        && request.resource.data.keys().hasOnly(['sessionId', 'bankProblemIds'])
+        && request.resource.data.get('bankProblemIds', []) is list
+        && (request.resource.data.sessionId == null
+          ? (request.resource.data.get('bankProblemIds', []) == []
             && (resource.data.sessionId == null
-              || resource.data.sessionId == request.resource.data.sessionId
-              || sessionInactiveAfter(resource.data.sessionId)));
-      allow delete: if isOfficer()
-        && (resource.data.sessionId == null
-          || sessionInactiveAfter(resource.data.sessionId));
+              || (resource.data.sessionId is string
+                && sessionInactiveAfter(resource.data.sessionId))))
+          : ((resource.data.sessionId == null
+              || (resource.data.sessionId is string
+                && sessionInactiveAfter(resource.data.sessionId)))
+            && getAfter(/databases/$(database)/documents/sessions/$(request.resource.data.sessionId)).data.status == 'live'
+            && getAfter(/databases/$(database)/documents/sessions/$(request.resource.data.sessionId)).data.get('branch', 'intro') == branch
+            && getAfter(/databases/$(database)/documents/sessions/$(request.resource.data.sessionId)).data.get('bankProblemIds', []) == request.resource.data.get('bankProblemIds', [])));
+      allow delete: if false;
     }
 
     match /problemBank/{problemId} {

@@ -813,17 +813,36 @@ describe('Officer Sessions surface', () => {
     expect(screen.getByRole('button', { name: 'Go Live' })).toBeTruthy();
   });
 
-  it('explains when another Session is already live', async () => {
+  it('explains when another Session in the same branch is already live', async () => {
     api.transitionSession.mockRejectedValueOnce(
       new Error(
-        'Another Session is already live. Set it to Not Live or end it before starting this one.',
+        'Another Intro Session is already live. Set it to Not Live or end it before starting this one.',
       ),
     );
     await openEditor();
     fireEvent.click(screen.getByRole('button', { name: 'Go Live' }));
     expect((await screen.findByRole('alert')).textContent).toContain(
-      'Another Session is already live. Set it to Not Live or end it before starting this one.',
+      'Another Intro Session is already live. Set it to Not Live or end it before starting this one.',
     );
+  });
+
+  it('locks the branch selector while a Session is live', async () => {
+    const liveRecord = {
+      ...record,
+      session: { ...record.session, status: 'live' },
+    };
+    api.listSessions.mockResolvedValueOnce([liveRecord]);
+    api.getSession.mockResolvedValueOnce(liveRecord);
+    await openEditor();
+
+    expect(
+      screen.getByLabelText('Session branch').hasAttribute('disabled'),
+    ).toBe(true);
+    expect(
+      screen.getByText(
+        'Set this Session to Not Live before changing its branch.',
+      ),
+    ).toBeTruthy();
   });
 
   it('returns a live Session to draft without confirmation and keeps the content manager available', async () => {

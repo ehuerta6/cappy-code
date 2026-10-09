@@ -180,14 +180,21 @@ describe('public member UI scaffold', () => {
 
   it('groups public Sessions by branch, keeps Past newest-first, and bounds each branch history independently', () => {
     const sessions: PublicSessionSummary[] = [
+      { ...liveSession, id: 'intro-live' },
       { ...liveSession, status: 'ended', id: 'intro-old', date: '2026-09-01' },
       { ...liveSession, status: 'ended', id: 'intro-new', date: '2026-10-01' },
+      {
+        ...liveSession,
+        branch: 'general',
+        id: 'general-live',
+      },
       {
         ...liveSession,
         branch: 'general',
         status: 'ended',
         id: 'general-past',
       },
+      { ...liveSession, branch: 'icpc', id: 'icpc-live' },
       { ...liveSession, branch: 'icpc', status: 'ended', id: 'icpc-past' },
     ];
     const { container } = render(
@@ -198,9 +205,19 @@ describe('public member UI scaffold', () => {
       Array.from(within(intro).getAllByRole('link')).map((link) =>
         link.getAttribute('href'),
       ),
-    ).toEqual(['/sessions/intro-new', '/sessions/intro-old']);
+    ).toEqual([
+      '/sessions/intro-live',
+      '/sessions/intro-new',
+      '/sessions/intro-old',
+    ]);
     expect(
       container.querySelector('a[href="/sessions/general-past"]'),
+    ).toBeTruthy();
+    expect(
+      container.querySelector('a[href="/sessions/general-live"]'),
+    ).toBeTruthy();
+    expect(
+      container.querySelector('a[href="/sessions/icpc-live"]'),
     ).toBeTruthy();
     expect(
       container.querySelector('a[href="/sessions/icpc-past"]'),

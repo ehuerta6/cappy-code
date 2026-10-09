@@ -71,7 +71,7 @@ test('Officer edits and reuses a bank Problem as an independent Session snapshot
       officer.getByRole('button', { name: 'Save changes' }),
     ).toBeDisabled();
     await officer.goto('/officer');
-    await officer.getByLabel('Branch for new session').selectOption('general');
+    await officer.getByLabel('Branch for new session').selectOption('intro');
     await officer.getByRole('button', { name: '+ New session' }).click();
     await expect(officer).toHaveURL(/\/officer\/sessions\/[^/]+$/);
     await expect(
