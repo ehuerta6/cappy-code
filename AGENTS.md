@@ -64,6 +64,8 @@ Use the applicable skill for procedural work:
 
 Project-specific requirements override reusable defaults.
 
+For the repeatable process to compare and update adopted configuration against canonical `ai-setup`, follow [docs/AI_CONFIGURATION.md](docs/AI_CONFIGURATION.md).
+
 ## Git
 
 Follow `docs/GIT_CONVENTIONS.md`.

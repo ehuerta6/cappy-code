@@ -101,12 +101,14 @@ For agents also determine:
 Keep configuration compact.
 
 Prefer:
+
 - clear responsibilities;
 - behavior over explanation;
 - references to canonical sources;
 - progressive disclosure.
 
 Avoid:
+
 - duplicated rules;
 - giant instruction files;
 - speculative capabilities;

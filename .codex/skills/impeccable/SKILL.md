@@ -8,6 +8,8 @@ metadata:
 
 # Impeccable
 
+> This adapted file has been modified. See `THIRD_PARTY_NOTICES.md` for the applicable license notice.
+
 Use this skill for frontend design and UX work.
 
 Applicable tasks include:

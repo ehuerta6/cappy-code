@@ -15,8 +15,9 @@ Read:
 - current skills, agents, rules, and templates;
 - product and architecture sources;
 - Git workflow;
-- `ai-setup/README.md`;
-- `ai-setup/WORKFLOWS.md`.
+- the canonical `ai-setup/README.md` and `ai-setup/WORKFLOWS.md` from the latest available source.
+
+If `ai-setup` is not checked out locally, use the canonical repository source supplied by the project or task through an available GitHub connection. If neither source is available, report that comparison gap rather than assuming local copies are current.
 
 ## Classify
 
