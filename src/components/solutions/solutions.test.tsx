@@ -108,6 +108,14 @@ async function openOfficer(
   return view;
 }
 
+function selectLanguage(name: 'Python' | 'Java' | 'C++') {
+  fireEvent.change(screen.getByLabelText('Language'), {
+    target: {
+      value: name === 'Python' ? 'python' : name === 'Java' ? 'java' : 'cpp',
+    },
+  });
+}
+
 describe('solution workspace', () => {
   it('shows an unavailable state instead of a blank Member editor for an unprepared language', () => {
     render(
@@ -195,9 +203,7 @@ describe('solution workspace', () => {
     ]);
     const saveState = vi.fn();
     await openOfficer(vi.fn(), saveState);
-    const alternate = screen.getByRole('button', {
-      name: 'Alternate Approach',
-    });
+    const alternate = screen.getByLabelText('Approach') as HTMLSelectElement;
     const add = screen.getByRole('button', { name: 'Add Approach' });
     const remove = screen.getByRole('button', { name: 'Delete Approach' });
     const earlier = screen.getByRole('button', {
@@ -209,7 +215,7 @@ describe('solution workspace', () => {
     });
     for (const button of [alternate, add, remove, earlier, later])
       expect((button as HTMLButtonElement).disabled).toBe(true);
-    fireEvent.click(alternate);
+    fireEvent.change(alternate, { target: { value: 'alternate' } });
     expect(
       (
         screen.getByLabelText(
@@ -218,10 +224,8 @@ describe('solution workspace', () => {
       ).value,
     ).toBe('unsaved Python');
     await act(async () => saveState.mock.calls.at(-1)?.[0].save());
-    await waitFor(() =>
-      expect((alternate as HTMLButtonElement).disabled).toBe(false),
-    );
-    fireEvent.click(alternate);
+    await waitFor(() => expect(alternate.disabled).toBe(false));
+    fireEvent.change(alternate, { target: { value: 'alternate' } });
     expect(
       (
         screen.getByLabelText(
@@ -233,23 +237,19 @@ describe('solution workspace', () => {
     fireEvent.change(screen.getByLabelText('Approach name'), {
       target: { value: 'Unsaved name' },
     });
-    const primary = screen.getByRole('button', { name: 'Primary Approach' });
-    expect((primary as HTMLButtonElement).disabled).toBe(true);
+    const primary = screen.getByLabelText('Approach') as HTMLSelectElement;
+    expect(primary.disabled).toBe(true);
     expect((add as HTMLButtonElement).disabled).toBe(true);
     expect((remove as HTMLButtonElement).disabled).toBe(true);
-    fireEvent.click(primary);
+    fireEvent.change(primary, { target: { value: 'primary' } });
     expect(
       (screen.getByLabelText('Approach name') as HTMLTextAreaElement).value,
     ).toBe('Unsaved name');
     fireEvent.click(
       screen.getByRole('button', { name: 'Save approach details' }),
     );
-    await waitFor(() =>
-      expect(
-        screen.getByRole('button', { name: 'Primary Approach' }),
-      ).toHaveProperty('disabled', false),
-    );
-    fireEvent.click(screen.getByRole('button', { name: 'Primary Approach' }));
+    await waitFor(() => expect(primary).toHaveProperty('disabled', false));
+    fireEvent.change(primary, { target: { value: 'primary' } });
     expect(
       (screen.getByLabelText('Approach name') as HTMLTextAreaElement).value,
     ).toBe('Primary Approach');
@@ -279,6 +279,7 @@ describe('solution workspace', () => {
     const onPending = vi.fn();
     const saveState = vi.fn();
     await openOfficer(onPending, saveState);
+    selectLanguage('Java');
     const editor = screen.getByLabelText(
       'Java Solution, editable',
     ) as HTMLTextAreaElement;
@@ -297,6 +298,36 @@ describe('solution workspace', () => {
       'primary',
     );
     expect(onPending).toHaveBeenLastCalledWith(false);
+  });
+  it('prepares Python, Java, and C++ through one selected editor and saves each draft', async () => {
+    const saveState = vi.fn();
+    await openOfficer(vi.fn(), saveState);
+    expect(screen.getAllByLabelText(/Solution, editable/)).toHaveLength(1);
+
+    fireEvent.change(screen.getByLabelText('Python Solution, editable'), {
+      target: { value: 'prepared Python' },
+    });
+    selectLanguage('Java');
+    fireEvent.change(screen.getByLabelText('Java Solution, editable'), {
+      target: { value: 'prepared Java' },
+    });
+    selectLanguage('C++');
+    fireEvent.change(screen.getByLabelText('C++ Solution, editable'), {
+      target: { value: 'prepared C++' },
+    });
+
+    await act(async () => saveState.mock.calls.at(-1)?.[0].save());
+    expect(persistence.save).toHaveBeenCalledTimes(3);
+    expect(
+      persistence.save.mock.calls.map(([, , language, solution]) => [
+        language,
+        solution.code,
+      ]),
+    ).toEqual([
+      ['python', 'prepared Python'],
+      ['java', 'prepared Java'],
+      ['cpp', 'prepared C++'],
+    ]);
   });
   it('edits and explicitly saves complexity with its language Solution', async () => {
     const saveState = vi.fn();
@@ -401,6 +432,7 @@ describe('solution workspace', () => {
     const onPending = vi.fn();
     const saveState = vi.fn();
     await openOfficer(onPending, saveState);
+    selectLanguage('C++');
     let resolve: () => void = () => {};
     persistence.save.mockImplementationOnce(
       () =>
@@ -449,6 +481,7 @@ describe('solution workspace', () => {
     const pending = vi.fn();
     const saveState = vi.fn();
     await openOfficer(pending, saveState);
+    selectLanguage('Python');
     persistence.save.mockRejectedValueOnce(new Error('offline'));
     fireEvent.change(screen.getByLabelText('Python Solution, editable'), {
       target: { value: 'failed change' },
@@ -465,6 +498,7 @@ describe('solution workspace', () => {
     const pending = vi.fn();
     const saveState = vi.fn();
     await openOfficer(pending, saveState);
+    selectLanguage('Python');
     let reject: (error: Error) => void = () => {};
     persistence.save.mockImplementationOnce(
       () =>

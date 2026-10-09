@@ -10,6 +10,7 @@ import {
 import type { SaveStateReporter } from '@/components/officer-save-state';
 import type { ProblemCategory } from '@/lib/domain';
 import { isPermissionDenied } from '@/lib/firebase/errors';
+import { ProblemDifficultyBadge } from './problem-bank-metadata';
 
 export default function ProblemEditor({
   sessionId,
@@ -122,6 +123,15 @@ export default function ProblemEditor({
           required
         />
       </label>
+      <div className="-mt-3 mb-4" aria-label="Problem difficulty preview">
+        <ProblemDifficultyBadge
+          difficulty={
+            content.difficulty
+              ? (content.difficulty as 'easy' | 'medium' | 'hard')
+              : undefined
+          }
+        />
+      </div>
       <label className="my-5 flex max-w-xs flex-col gap-2">
         Problem category
         <select

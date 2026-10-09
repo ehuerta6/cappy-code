@@ -174,6 +174,40 @@ function actions() {
   fireEvent.click(screen.getByRole('button', { name: 'Manage Two Sum' }));
 }
 describe('Officer Problem workspace', () => {
+  it('keeps Problem editing in the Problem column and Solution editing in Solutions', async () => {
+    await loaded();
+
+    const problemColumn = screen.getByRole('region', { name: 'Problem' });
+    const solutionsColumn = screen.getByRole('region', { name: 'Solutions' });
+
+    expect(
+      within(problemColumn).getByRole('tablist', { name: 'Problems' }),
+    ).toBeTruthy();
+    expect(
+      within(problemColumn).getByRole('textbox', { name: 'Problem title' }),
+    ).toBeTruthy();
+    expect(
+      within(problemColumn).getByRole('combobox', {
+        name: 'Problem category',
+      }),
+    ).toBeTruthy();
+    expect(
+      within(problemColumn).queryByLabelText('Python Solution, editable'),
+    ).toBeNull();
+
+    expect(
+      await within(solutionsColumn).findByLabelText(
+        'Python Solution, editable',
+      ),
+    ).toBeTruthy();
+    expect(
+      within(solutionsColumn).getAllByRole('heading', { name: 'Solutions' }),
+    ).toHaveLength(1);
+    expect(
+      within(solutionsColumn).queryByLabelText('Problem title'),
+    ).toBeNull();
+  });
+
   it('duplicates a saved draft Problem from its actions and selects the adjacent copy', async () => {
     await loaded();
     actions();
@@ -270,8 +304,14 @@ describe('Officer Problem workspace', () => {
         target: { value: 'python prepared' },
       },
     );
+    fireEvent.change(screen.getByLabelText('Language'), {
+      target: { value: 'java' },
+    });
     fireEvent.change(screen.getByLabelText('Java Solution, editable'), {
       target: { value: 'java prepared' },
+    });
+    fireEvent.change(screen.getByLabelText('Language'), {
+      target: { value: 'cpp' },
     });
     fireEvent.change(screen.getByLabelText('C++ Solution, editable'), {
       target: { value: 'cpp prepared' },
@@ -769,6 +809,9 @@ describe('Officer Problem workspace', () => {
     );
     fireEvent.change(screen.getByLabelText('Expected output'), {
       target: { value: 'shared expected result' },
+    });
+    fireEvent.change(screen.getByLabelText('Language'), {
+      target: { value: 'cpp' },
     });
     fireEvent.change(screen.getByLabelText('C++ Solution, editable'), {
       target: { value: 'updated C++ source' },

@@ -8,6 +8,8 @@ import type { ProblemSolutions } from '@/lib/firebase/solutions';
 import type { ProblemDifficulty } from '@/lib/domain';
 import AppHeader from '@/components/app-header';
 import ProblemMarkdown from '@/components/member/problem-markdown';
+import { ProblemDifficultyBadge } from '@/components/problems/problem-bank-metadata';
+import { sessionProblemWorkspaceClass } from '@/components/problems/session-problem-workspace';
 import { formatCalendarDate } from '@/lib/calendar-date';
 import MemberSolutionViewer from '@/components/solutions/member-solution-viewer';
 import { useAnswersVisible } from '@/hooks/use-answer-visibility';
@@ -500,7 +502,7 @@ function ProblemContent({
   );
 
   return (
-    <div className="grid min-w-0 gap-5 pt-2 min-[1100px]:h-[calc(100dvh-11rem)] min-[1100px]:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)] min-[1100px]:gap-0 min-[1100px]:overflow-hidden min-[1100px]:divide-x min-[1100px]:divide-border-soft">
+    <div className={sessionProblemWorkspaceClass}>
       <div
         className="min-w-0 min-[1100px]:h-full min-[1100px]:overflow-y-auto min-[1100px]:overscroll-contain min-[1100px]:pr-5 min-[1100px]:focus-visible:outline-2 min-[1100px]:focus-visible:outline-offset-[-2px] min-[1100px]:focus-visible:outline-accent"
         role="region"
@@ -525,12 +527,7 @@ function ProblemContent({
             <h2 className="m-0 text-2xl font-semibold leading-8">
               {problem.title}
             </h2>
-            {problem.difficulty ? (
-              <span className="rounded border border-border-strong bg-raised px-2 py-0.5 text-sm font-medium text-ink">
-                {problem.difficulty[0].toUpperCase() +
-                  problem.difficulty.slice(1)}
-              </span>
-            ) : null}
+            <ProblemDifficultyBadge difficulty={problem.difficulty} />
           </div>
           {problem.leetcodeUrl ? (
             <a

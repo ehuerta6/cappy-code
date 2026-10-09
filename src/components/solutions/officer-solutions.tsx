@@ -24,6 +24,7 @@ import type {
 } from '@/components/officer-save-state';
 import { isPermissionDenied } from '@/lib/firebase/errors';
 import { problemPath } from '@/lib/firebase/paths';
+import { ProblemApproachTags } from '@/components/problems/problem-bank-metadata';
 
 const buttonClass =
   'min-h-10 rounded border border-border-strong bg-surface px-3 py-2 text-ink hover:bg-hover disabled:cursor-default disabled:bg-raised disabled:text-muted';
@@ -56,9 +57,13 @@ function ProblemSolutionsEditor({
   structuralChangesAllowed = true,
 }: Props) {
   const [solutions, setSolutions] = useState<ProblemSolutions | null>(null);
+  const [savedSolutions, setSavedSolutions] = useState<ProblemSolutions | null>(
+    null,
+  );
   const [approaches, setApproaches] = useState<SolutionApproach[]>([]);
   const [approachesLoaded, setApproachesLoaded] = useState(false);
   const [approachId, setApproachId] = useState('primary');
+  const [language, setLanguage] = useState<Language>('python');
   const [approachName, setApproachName] = useState('Primary Approach');
   const [approachTags, setApproachTags] = useState('');
   const [currentCode, setCurrentCode] = useState<Record<
@@ -143,6 +148,15 @@ function ProblemSolutionsEditor({
         saveStates[language] ? saveStates[language]?.save() : true,
       ),
     );
+    setSaveStates(
+      (previous) =>
+        Object.fromEntries(
+          languages.map((language, index) => [
+            language,
+            results[index] ? null : previous[language],
+          ]),
+        ) as Record<Language, OfficerSaveState | null>,
+    );
     const metadataSaved = await saveApproachMetadata();
     return results.every(Boolean) && metadataSaved;
   }, [saveApproachMetadata, saveStates]);
@@ -163,6 +177,24 @@ function ProblemSolutionsEditor({
         },
       })
     : 0;
+  const reportSolutionChange = useCallback(
+    (next: Solution) => {
+      setSolutions((current) =>
+        current ? { ...current, [language]: next } : current,
+      );
+      setCurrentCode((current) =>
+        current ? { ...current, [language]: next.code } : current,
+      );
+    },
+    [language],
+  );
+  const reportPersisted = useCallback(
+    (next: Solution) =>
+      setSavedSolutions((current) =>
+        current ? { ...current, [language]: next } : current,
+      ),
+    [language],
+  );
   useEffect(() => {
     onPendingChange?.(hasUnsavedContent);
   }, [hasUnsavedContent, onPendingChange]);
@@ -210,6 +242,11 @@ function ProblemSolutionsEditor({
           setApproachName(selected?.name ?? 'Primary Approach');
           setApproachTags(selected?.tags.join(', ') ?? '');
           setSolutions(selected?.solutions ?? null);
+          setSavedSolutions(selected?.solutions ?? null);
+          setLanguage(
+            languages.find((item) => selected?.solutions[item].code.trim()) ??
+              'python',
+          );
           setCurrentCode(
             selected
               ? {
@@ -229,36 +266,46 @@ function ProblemSolutionsEditor({
     };
   }, [sessionId, problemId, attempt, parentPath]);
   return (
-    <section aria-label="Solutions">
-      <h2>Solutions</h2>
+    <section aria-label="Solution editor">
+      <h2>Approach editor</h2>
       {approaches.length > 1 && (
-        <div
-          className="mb-3 flex flex-wrap gap-2"
-          aria-label="Solution approaches"
-        >
-          {approaches.map((approach) => (
-            <button
-              key={approach.id}
-              className={buttonClass}
-              type="button"
-              disabled={actionLocked}
-              aria-pressed={approach.id === approachId}
-              onClick={() => {
-                setApproachId(approach.id);
-                setApproachName(approach.name);
-                setApproachTags(approach.tags.join(', '));
-                setSolutions(approach.solutions);
-                setCurrentCode({
-                  python: approach.solutions.python.code,
-                  java: approach.solutions.java.code,
-                  cpp: approach.solutions.cpp.code,
-                });
-              }}
-            >
-              {approach.name}
-            </button>
-          ))}
-        </div>
+        <label className="mb-3 grid max-w-sm gap-1 text-sm font-semibold">
+          Approach
+          <select
+            className="min-h-11 min-w-0 rounded border border-border-strong bg-surface px-3 text-ink"
+            value={approachId}
+            aria-label="Approach"
+            disabled={actionLocked}
+            onChange={(event) => {
+              if (actionLocked) return;
+              const approach = approaches.find(
+                ({ id }) => id === event.target.value,
+              );
+              if (!approach) return;
+              setApproachId(approach.id);
+              setApproachName(approach.name);
+              setApproachTags(approach.tags.join(', '));
+              setSolutions(approach.solutions);
+              setSavedSolutions(approach.solutions);
+              setLanguage(
+                languages.find((item) =>
+                  approach.solutions[item].code.trim(),
+                ) ?? 'python',
+              );
+              setCurrentCode({
+                python: approach.solutions.python.code,
+                java: approach.solutions.java.code,
+                cpp: approach.solutions.cpp.code,
+              });
+            }}
+          >
+            {approaches.map((approach) => (
+              <option key={approach.id} value={approach.id}>
+                {approach.name}
+              </option>
+            ))}
+          </select>
+        </label>
       )}
       {approachesLoaded && (
         <div className="mb-4 flex flex-wrap items-end gap-2">
@@ -282,6 +329,8 @@ function ProblemSolutionsEditor({
                   setApproachName(added.name);
                   setApproachTags('');
                   setSolutions(added.solutions);
+                  setSavedSolutions(added.solutions);
+                  setLanguage('python');
                   setCurrentCode({ python: '', java: '', cpp: '' });
                 } catch {
                   setActionError('Approach could not be added. Retry.');
@@ -295,6 +344,12 @@ function ProblemSolutionsEditor({
           )}
           {selectedApproach && (
             <>
+              <ProblemApproachTags
+                tags={approachTags
+                  .split(',')
+                  .map((tag) => tag.trim())
+                  .filter(Boolean)}
+              />
               <label>
                 Approach name
                 <input
@@ -340,6 +395,7 @@ function ProblemSolutionsEditor({
                     setApproachName(next?.name ?? '');
                     setApproachTags(next?.tags.join(', ') ?? '');
                     setSolutions(next?.solutions ?? null);
+                    setSavedSolutions(next?.solutions ?? null);
                     setCurrentCode(
                       next
                         ? {
@@ -449,41 +505,39 @@ function ProblemSolutionsEditor({
         <p role="status">Loading solutions…</p>
       ) : (
         <>
-          <p className="text-sm leading-5 text-muted">
-            Python, Java, and C++ solutions for this Problem.
-          </p>
-          <div
-            className="overflow-x-auto p-1 -m-1 [scrollbar-width:thin] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-            tabIndex={0}
-            aria-label="Three-language solution comparison"
-          >
-            <div className="grid grid-cols-[repeat(3,minmax(min(360px,calc(100vw-40px)),1fr))] items-stretch gap-4">
-              {languages.map((language) => (
-                <EditableSolution
-                  key={`${approachId}/${language}`}
-                  sessionId={sessionId}
-                  problemId={problemId}
-                  approachId={approachId}
-                  language={language}
-                  initial={solutions[language]}
-                  editorHeight={editorHeight}
-                  disabled={disabled}
-                  onSaveStateChange={reportSaveState}
-                  onCodeChange={(code) =>
-                    setCurrentCode((previous) =>
-                      previous?.[language] === code
-                        ? previous
-                        : {
-                            python: previous?.python ?? solutions.python.code,
-                            java: previous?.java ?? solutions.java.code,
-                            cpp: previous?.cpp ?? solutions.cpp.code,
-                            [language]: code,
-                          },
-                    )
-                  }
-                />
+          <label className="mb-3 grid max-w-sm gap-1 text-sm font-semibold">
+            Language
+            <select
+              className="min-h-11 min-w-0 rounded border border-border-strong bg-surface px-3 text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              value={language}
+              onChange={(event) => setLanguage(event.target.value as Language)}
+              aria-label="Language"
+            >
+              {languages.map((item) => (
+                <option key={item} value={item}>
+                  {languageNames[item]}
+                </option>
               ))}
-            </div>
+            </select>
+          </label>
+          <div
+            className="min-w-0"
+            aria-label={`${languageNames[language]} solution workspace`}
+          >
+            <EditableSolution
+              key={`${approachId}/${language}`}
+              sessionId={sessionId}
+              problemId={problemId}
+              approachId={approachId}
+              language={language}
+              initial={solutions[language]}
+              savedInitial={savedSolutions?.[language] ?? solutions[language]}
+              editorHeight={editorHeight}
+              disabled={disabled}
+              onSaveStateChange={reportSaveState}
+              onSolutionChange={reportSolutionChange}
+              onPersisted={reportPersisted}
+            />
           </div>
         </>
       )}
@@ -497,26 +551,30 @@ function EditableSolution({
   approachId,
   language,
   initial,
+  savedInitial,
   editorHeight,
   disabled,
   onSaveStateChange,
-  onCodeChange,
+  onSolutionChange,
+  onPersisted,
 }: {
   sessionId: string;
   problemId: string;
   approachId: string;
   language: Language;
   initial: Solution;
+  savedInitial: Solution;
   editorHeight: number;
   disabled?: boolean;
   onSaveStateChange: (
     language: Language,
     state: OfficerSaveState | null,
   ) => void;
-  onCodeChange: (code: string) => void;
+  onSolutionChange: (solution: Solution) => void;
+  onPersisted: (solution: Solution) => void;
 }) {
   const [draft, setDraft] = useState(initial);
-  const [saved, setSaved] = useState(initial);
+  const [saved, setSaved] = useState(savedInitial);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const busy = useRef(false);
@@ -540,6 +598,7 @@ function EditableSolution({
         submitted,
         approachId,
       );
+      onPersisted(submitted);
       setSaved(submitted);
       return true;
     } catch (error) {
@@ -553,7 +612,7 @@ function EditableSolution({
       busy.current = false;
       setSaving(false);
     }
-  }, [dirty, sessionId, problemId, language, draft, approachId]);
+  }, [dirty, sessionId, problemId, language, draft, approachId, onPersisted]);
   useEffect(() => {
     const isDirty = dirty;
     onSaveStateChange(
@@ -582,7 +641,7 @@ function EditableSolution({
         disabled={disabled}
         onChange={(next) => {
           setDraft(next);
-          if (next.code !== draft.code) onCodeChange(next.code);
+          onSolutionChange(next);
           if (
             next.code === saved.code &&
             next.timeComplexity === saved.timeComplexity &&
