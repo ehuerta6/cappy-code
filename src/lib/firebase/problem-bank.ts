@@ -208,24 +208,16 @@ export async function getBankProblem(
       parentData.hiddenByLiveSessionId.length > 0,
   };
   const approaches = await getApproaches(bankProblemPath(problemId));
-  const entries = await Promise.all(
-    languages.map(async (language) => {
-      const snapshot = await getDocFromServer(
-        doc(db, bankSolutionPath(problemId, language)),
-      );
-      if (snapshot.metadata.hasPendingWrites)
-        throw new Error('Solution changes are awaiting confirmation.');
-      return [
-        language,
-        snapshot.exists() ? validateSolution(snapshot.data()) : { code: '' },
-      ] as const;
-    }),
-  );
   return {
     problem,
-    solutions:
-      approaches[0]?.solutions ??
-      (Object.fromEntries(entries) as BankSolutions),
+    // getApproaches includes the legacy primary Solution documents when no
+    // Approach records exist. Reading them again here duplicated three reads
+    // on every Bank detail open.
+    solutions: approaches[0]?.solutions ?? {
+      python: { code: '' },
+      java: { code: '' },
+      cpp: { code: '' },
+    },
     approaches,
   };
 }

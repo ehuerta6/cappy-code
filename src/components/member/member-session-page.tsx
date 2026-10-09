@@ -99,15 +99,16 @@ export default function MemberSessionPage({
     (problemId: string) => getMemberApproaches(sessionId, problemId),
     [sessionId],
   );
+  const currentSession = session?.id === sessionId ? session : null;
 
   let state: SessionState;
-  if (!session && sessionStatus === 'error') {
+  if (!currentSession && sessionStatus === 'error') {
     state = {
       status: 'error',
       errorKind: sessionErrorKind,
       onRetry: () => setRetryVersion((value) => value + 1),
     };
-  } else if (!session) {
+  } else if (!currentSession) {
     state =
       sessionStatus === 'unavailable'
         ? { status: 'unavailable', kind: 'session' }
@@ -116,8 +117,8 @@ export default function MemberSessionPage({
     state = {
       status: 'ready',
       session: {
-        id: session.id,
-        ...session.session,
+        id: currentSession.id,
+        ...currentSession.session,
       } satisfies PublicSessionSummary,
       selectedProblemId: problemId,
       problems:

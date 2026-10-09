@@ -71,6 +71,7 @@ export default function OfficerProblemBank() {
   );
   const [approachId, setApproachId] = useState('primary');
   const [language, setLanguage] = useState<Language>('python');
+  const [loadedContentFor, setLoadedContentFor] = useState<string | null>(null);
   const activeApproach = approaches.find(({ id }) => id === approachId);
   const [savedSolutions, setSavedSolutions] = useState<BankSolutions | null>(
     null,
@@ -202,6 +203,7 @@ export default function OfficerProblemBank() {
 
   useEffect(() => {
     if (!selectedId) {
+      setLoadedContentFor(null);
       setContent(null);
       setSavedContent(null);
       setSolutions(null);
@@ -232,6 +234,7 @@ export default function OfficerProblemBank() {
         setSavedSolutions(result.solutions);
         setApproaches(result.approaches);
         setSavedApproaches(result.approaches);
+        setLoadedContentFor(selectedId);
         setApproachId(result.approaches[0]?.id ?? 'primary');
         setLanguage(
           languages.find((item) =>
@@ -472,7 +475,11 @@ export default function OfficerProblemBank() {
               );
             })}
           </nav>
-          {filteredRecords.length > 0 && selected && content && solutions ? (
+          {filteredRecords.length > 0 &&
+          selected &&
+          content &&
+          solutions &&
+          loadedContentFor === selected.id ? (
             <section className="min-w-0" aria-label={`Edit ${selected.title}`}>
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <button
@@ -929,8 +936,12 @@ export default function OfficerProblemBank() {
                 failed={usageFailed}
               />
             </section>
-          ) : filteredRecords.length === 0 || error ? null : (
-            <p role="status">Loading selected Problem…</p>
+          ) : filteredRecords.length === 0 || !selected ? null : (
+            <p role={error ? 'alert' : 'status'}>
+              {error
+                ? 'Problem details could not be loaded. Use Reload above to retry.'
+                : 'Loading selected Problem…'}
+            </p>
           )}
         </div>
       )}

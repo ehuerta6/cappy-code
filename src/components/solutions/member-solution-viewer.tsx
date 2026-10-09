@@ -115,7 +115,6 @@ export default function MemberSolutionViewer({
         </p>
       ) : null}
       <SolutionPanel
-        key={`${selected.id}/${language}`}
         mode="member"
         language={language}
         solution={selected.solutions[language]}

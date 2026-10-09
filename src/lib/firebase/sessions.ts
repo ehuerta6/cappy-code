@@ -250,6 +250,32 @@ export async function listSessions(): Promise<SessionRecord[]> {
   );
 }
 
+export async function getSession(id: string): Promise<SessionRecord | null> {
+  const db = officerDb();
+  const [snapshot, problemCount] = await Promise.all([
+    getDocFromServer(doc(db, sessionPath(id))),
+    getCountFromServer(collection(db, `${sessionPath(id)}/problems`))
+      .then((result) => result.data().count)
+      .catch(() => null),
+  ]);
+  if (!snapshot.exists()) return null;
+  if (snapshot.metadata.hasPendingWrites)
+    throw new Error('Session changes are awaiting confirmation.');
+  const parsed = sessionSchema.safeParse(snapshot.data());
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    const message = issue?.message;
+    if (issue?.path[0] === 'date' || issue?.path[0] === 'title')
+      throw new Error(message);
+    throw new Error(
+      message === 'Choose Intro, General, or ICPC for this session.'
+        ? message
+        : 'A stored session has invalid fields. Check its Firestore document.',
+    );
+  }
+  return { id, session: parsed.data, problemCount };
+}
+
 export async function transitionSession(
   id: string,
   nextStatus: 'live' | 'draft' | 'ended',

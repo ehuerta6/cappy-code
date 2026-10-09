@@ -18,7 +18,7 @@ import {
   type BankProblemRecord,
 } from '@/lib/firebase/problem-bank';
 import { listProblemUsageSummaries } from '@/lib/firebase/problem-usage';
-import type { ProblemUsageSummary } from '@/lib/problem-usage';
+import { isPermissionDenied } from '@/lib/firebase/errors';
 import { problemApproachTags } from '@/lib/problem-bank-filters';
 import ProblemBankFilters from '@/components/problems/problem-bank-filters';
 import {
@@ -26,6 +26,10 @@ import {
   filterProblemBank,
   type ProblemBankFilters as Filters,
 } from '@/lib/problem-bank-filters';
+import type { SessionBranch } from '@/lib/domain';
+
+type MetadataLoad<T> =
+  { status: 'loading' } | { status: 'failed' } | { status: 'ready'; value: T };
 
 const labels = {
   custom: 'Custom',
@@ -40,46 +44,47 @@ export function MemberProblemBank() {
     | { status: 'ready'; records: BankProblemRecord[] }
   >({ status: 'loading' });
   const [retry, setRetry] = useState(0);
-  const [usage, setUsage] = useState<Record<string, ProblemUsageSummary>>({});
-  const [tagsByProblem, setTagsByProblem] = useState<Record<string, string[]>>(
-    {},
-  );
+  const [metadataRetry, setMetadataRetry] = useState(0);
+  const [branchMetadata, setBranchMetadata] = useState<
+    MetadataLoad<Record<string, SessionBranch[]>>
+  >({ status: 'loading' });
+  const [tagMetadata, setTagMetadata] = useState<
+    MetadataLoad<Record<string, string[]>>
+  >({ status: 'loading' });
   const [filters, setFilters] = useState<Filters>(emptyProblemBankFilters);
+  const branchFiltersReady = branchMetadata.status === 'ready';
+  const tagFiltersReady = tagMetadata.status === 'ready';
+  const branchFilterPending = filters.branch.length > 0 && !branchFiltersReady;
+  const tagFilterPending = filters.tag.length > 0 && !tagFiltersReady;
+  const hasDeferredMetadataFilters = branchFilterPending || tagFilterPending;
+  const availableFilters = {
+    ...filters,
+    branch: branchFiltersReady ? filters.branch : [],
+    tag: tagFiltersReady ? filters.tag : [],
+  };
   const filteredRecords =
     state.status === 'ready'
-      ? filterProblemBank(state.records, filters, tagsByProblem, usage)
+      ? filterProblemBank(
+          state.records,
+          availableFilters,
+          tagMetadata.status === 'ready' ? tagMetadata.value : {},
+          branchMetadata.status === 'ready' ? branchMetadata.value : {},
+        )
       : [];
   useEffect(() => {
     let active = true;
     setState({ status: 'loading' });
-    setUsage({});
-    setTagsByProblem({});
+    setBranchMetadata({ status: 'loading' });
+    setTagMetadata({ status: 'loading' });
     setFilters(emptyProblemBankFilters);
     listMemberBankProblems().then(
       (records) => {
         if (!active) return;
         setState({ status: 'ready', records });
         if (records.length === 0) {
-          setUsage({});
-          setTagsByProblem({});
-          return;
+          setBranchMetadata({ status: 'ready', value: {} });
+          setTagMetadata({ status: 'ready', value: {} });
         }
-        listBankProblemApproachTags(records.map(({ id }) => id)).then(
-          (tags) => {
-            if (active) setTagsByProblem(tags);
-          },
-          () => {
-            if (active) setState({ status: 'error' });
-          },
-        );
-        listProblemUsageSummaries(records.map(({ id }) => id)).then(
-          (summaries) => {
-            if (active) setUsage(summaries);
-          },
-          () => {
-            if (active) setUsage({});
-          },
-        );
       },
       () => {
         if (active) setState({ status: 'error' });
@@ -89,6 +94,43 @@ export function MemberProblemBank() {
       active = false;
     };
   }, [retry]);
+  useEffect(() => {
+    if (state.status !== 'ready' || state.records.length === 0) return;
+    let active = true;
+    const problemIds = state.records.map(({ id }) => id);
+    setBranchMetadata({ status: 'loading' });
+    setTagMetadata({ status: 'loading' });
+    listBankProblemApproachTags(problemIds).then(
+      (tags) => {
+        if (active) setTagMetadata({ status: 'ready', value: tags });
+      },
+      () => {
+        if (active) setTagMetadata({ status: 'failed' });
+      },
+    );
+    listProblemUsageSummaries(problemIds).then(
+      (summaries) => {
+        if (!active) return;
+        setBranchMetadata({
+          status: 'ready',
+          // Members need branch filter data only. Do not retain counts,
+          // last-used details, or Officer planning history in this view.
+          value: Object.fromEntries(
+            Object.entries(summaries).map(([id, summary]) => [
+              id,
+              summary.branches,
+            ]),
+          ),
+        });
+      },
+      () => {
+        if (active) setBranchMetadata({ status: 'failed' });
+      },
+    );
+    return () => {
+      active = false;
+    };
+  }, [metadataRetry, state]);
   return (
     <main className="min-h-screen bg-canvas text-ink">
       <AppHeader>
@@ -110,7 +152,12 @@ export function MemberProblemBank() {
           Browse prepared CIC Problems and compare all three Solutions.
         </p>
         {state.status === 'loading' ? (
-          <p role="status">Loading Problem Bank…</p>
+          <div
+            className="mt-5 min-h-56 border-t border-border-soft pt-5"
+            aria-busy="true"
+          >
+            <p role="status">Loading Problem Bank…</p>
+          </div>
         ) : state.status === 'error' ? (
           <div role="alert">
             <p>Problem Bank could not be loaded.</p>
@@ -127,9 +174,39 @@ export function MemberProblemBank() {
           <div className="grid gap-7 md:grid-cols-3">
             <div className="md:col-span-3">
               <ProblemBankFilters value={filters} onChange={setFilters} />
+              {(branchMetadata.status !== 'ready' ||
+                tagMetadata.status !== 'ready') && (
+                <p className="-mt-3 mb-4 text-sm text-muted" role="status">
+                  {[
+                    branchMetadata.status !== 'ready' && 'CIC branch',
+                    tagMetadata.status !== 'ready' && 'DSA / algorithm',
+                  ]
+                    .filter(Boolean)
+                    .join(' and ')}{' '}
+                  filter details{' '}
+                  {branchMetadata.status === 'failed' ||
+                  tagMetadata.status === 'failed'
+                    ? 'could not be loaded.'
+                    : 'are loading.'}{' '}
+                  {hasDeferredMetadataFilters
+                    ? 'Selected filters are not applied yet; showing Problems that match the available filters.'
+                    : 'Category and difficulty filters remain available.'}{' '}
+                  {(branchMetadata.status === 'failed' ||
+                    tagMetadata.status === 'failed') && (
+                    <button
+                      className="underline underline-offset-2"
+                      onClick={() => setMetadataRetry((value) => value + 1)}
+                    >
+                      Retry filter details
+                    </button>
+                  )}
+                </p>
+              )}
               {filteredRecords.length === 0 && (
                 <p role="status">
-                  No Problems match these filters.{' '}
+                  {hasDeferredMetadataFilters
+                    ? 'No Problems match the available filters; selected branch or DSA filters are not applied yet.'
+                    : 'No Problems match these filters.'}{' '}
                   <button
                     className="min-h-11 rounded border border-border-strong bg-surface px-3 py-2"
                     onClick={() => setFilters(emptyProblemBankFilters)}
@@ -176,7 +253,11 @@ export function MemberProblemBank() {
                               difficulty={record.difficulty}
                             />
                             <ProblemApproachTags
-                              tags={tagsByProblem[record.id] ?? []}
+                              tags={
+                                tagMetadata.status === 'ready'
+                                  ? (tagMetadata.value[record.id] ?? [])
+                                  : []
+                              }
                             />
                           </div>
                         </li>
@@ -201,6 +282,7 @@ export function MemberBankProblemPage({ problemId }: { problemId: string }) {
   const [state, setState] = useState<
     | { status: 'loading' }
     | { status: 'unavailable' }
+    | { status: 'error' }
     | {
         status: 'ready';
         problem: BankProblemRecord;
@@ -218,14 +300,21 @@ export function MemberBankProblemPage({ problemId }: { problemId: string }) {
             result ? { status: 'ready', ...result } : { status: 'unavailable' },
           );
       },
-      () => {
-        if (active) setState({ status: 'unavailable' });
+      (error: unknown) => {
+        if (active)
+          setState({
+            status: isPermissionDenied(error) ? 'unavailable' : 'error',
+          });
       },
     );
     return () => {
       active = false;
     };
   }, [problemId, retry]);
+  const currentState =
+    state.status === 'ready' && state.problem.id !== problemId
+      ? { status: 'loading' as const }
+      : state;
   return (
     <main className="min-h-screen bg-canvas text-ink">
       <AppHeader>
@@ -238,11 +327,16 @@ export function MemberBankProblemPage({ problemId }: { problemId: string }) {
         className="mx-auto w-[calc(100%-32px)] max-w-[1440px] py-5 sm:w-[calc(100%-48px)]"
         aria-labelledby="bank-problem-heading"
       >
-        {state.status === 'loading' ? (
-          <p id="bank-problem-heading" role="status">
-            Loading Problem…
-          </p>
-        ) : state.status === 'unavailable' ? (
+        {currentState.status === 'loading' ? (
+          <div
+            className="mt-4 min-h-[50vh] border-t border-border-soft pt-5"
+            aria-busy="true"
+          >
+            <p id="bank-problem-heading" role="status">
+              Loading Problem…
+            </p>
+          </div>
+        ) : currentState.status === 'unavailable' ? (
           <div role="alert">
             <h1 className="text-[28px]" id="bank-problem-heading">
               Problem unavailable
@@ -250,6 +344,20 @@ export function MemberBankProblemPage({ problemId }: { problemId: string }) {
             <p>
               This Problem is unavailable or is being used by the live Session.
             </p>
+            <Link href="/problem-bank">← Problem Bank</Link>
+            <button
+              className="ml-3 min-h-11 rounded border border-border-strong bg-surface px-3 py-2"
+              onClick={() => setRetry((value) => value + 1)}
+            >
+              Retry
+            </button>
+          </div>
+        ) : currentState.status === 'error' ? (
+          <div role="alert">
+            <h1 className="text-[28px]" id="bank-problem-heading">
+              Problem could not be loaded
+            </h1>
+            <p>Check your connection and retry loading this Problem.</p>
             <Link href="/problem-bank">← Problem Bank</Link>
             <button
               className="ml-3 min-h-11 rounded border border-border-strong bg-surface px-3 py-2"
@@ -276,23 +384,23 @@ export function MemberBankProblemPage({ problemId }: { problemId: string }) {
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <p className="m-0 text-sm font-semibold text-muted">
-                      {labels[state.problem.category]}
+                      {labels[currentState.problem.category]}
                     </p>
                     <h1
                       className="mb-0 mt-1 text-[28px] font-semibold leading-9 tracking-tight"
                       id="bank-problem-heading"
                     >
-                      {state.problem.title}
+                      {currentState.problem.title}
                     </h1>
                   </div>
                   <div className="flex flex-wrap items-center gap-3">
                     <ProblemDifficultyBadge
-                      difficulty={state.problem.difficulty}
+                      difficulty={currentState.problem.difficulty}
                     />
-                    {state.problem.leetcodeUrl && (
+                    {currentState.problem.leetcodeUrl && (
                       <a
                         className="text-accent underline-offset-4 hover:underline"
-                        href={state.problem.leetcodeUrl}
+                        href={currentState.problem.leetcodeUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                       >
@@ -303,11 +411,13 @@ export function MemberBankProblemPage({ problemId }: { problemId: string }) {
                 </div>
                 <div className="mt-3">
                   <ProblemApproachTags
-                    tags={problemApproachTags(state.approaches)}
+                    tags={problemApproachTags(currentState.approaches)}
                   />
                 </div>
-                <ProblemMarkdown>{state.problem.description}</ProblemMarkdown>
-                {state.problem.constraints && (
+                <ProblemMarkdown>
+                  {currentState.problem.description}
+                </ProblemMarkdown>
+                {currentState.problem.constraints && (
                   <section
                     className="mt-5 max-w-[80ch]"
                     aria-labelledby="bank-constraints"
@@ -319,7 +429,7 @@ export function MemberBankProblemPage({ problemId }: { problemId: string }) {
                       Constraints
                     </h2>
                     <p className="m-0 max-w-[80ch] whitespace-pre-wrap break-words text-base leading-[26px]">
-                      {state.problem.constraints}
+                      {currentState.problem.constraints}
                     </p>
                   </section>
                 )}
@@ -331,7 +441,7 @@ export function MemberBankProblemPage({ problemId }: { problemId: string }) {
                         Input
                       </h3>
                       <pre className="m-0 max-w-full overflow-x-auto rounded-md border border-border-soft bg-surface px-3 py-3 font-mono text-[15px] leading-6">
-                        {state.problem.exampleInput || '—'}
+                        {currentState.problem.exampleInput || '—'}
                       </pre>
                     </div>
                     <div>
@@ -339,7 +449,7 @@ export function MemberBankProblemPage({ problemId }: { problemId: string }) {
                         Expected output
                       </h3>
                       <pre className="m-0 max-w-full overflow-x-auto rounded-md border border-border-soft bg-surface px-3 py-3 font-mono text-[15px] leading-6">
-                        {state.problem.exampleOutput || '—'}
+                        {currentState.problem.exampleOutput || '—'}
                       </pre>
                     </div>
                   </div>
@@ -361,7 +471,7 @@ export function MemberBankProblemPage({ problemId }: { problemId: string }) {
                   >
                     Prepared Solutions
                   </h2>
-                  {state.approaches.length === 0 ? (
+                  {currentState.approaches.length === 0 ? (
                     <p
                       className="rounded-md border border-border-soft bg-surface p-4"
                       role="status"
@@ -371,7 +481,7 @@ export function MemberBankProblemPage({ problemId }: { problemId: string }) {
                   ) : (
                     <MemberSolutionViewer
                       key={problemId}
-                      approaches={state.approaches}
+                      approaches={currentState.approaches}
                       modelPath={`bank/${problemId}`}
                     />
                   )}
