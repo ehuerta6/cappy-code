@@ -267,7 +267,7 @@ function ProblemSolutionsEditor({
   }, [sessionId, problemId, attempt, parentPath]);
   return (
     <section aria-label="Solution editor">
-      <h2>Solutions</h2>
+      <h2>Approach editor</h2>
       {approaches.length > 1 && (
         <label className="mb-3 grid max-w-sm gap-1 text-sm font-semibold">
           Approach

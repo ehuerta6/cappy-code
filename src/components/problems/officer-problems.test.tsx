@@ -201,6 +201,9 @@ describe('Officer Problem workspace', () => {
       ),
     ).toBeTruthy();
     expect(
+      within(solutionsColumn).getAllByRole('heading', { name: 'Solutions' }),
+    ).toHaveLength(1);
+    expect(
       within(solutionsColumn).queryByLabelText('Problem title'),
     ).toBeNull();
   });
