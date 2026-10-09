@@ -7,7 +7,6 @@ import {
   type ProblemDifficulty,
   type SessionBranch,
 } from './domain';
-import type { ProblemUsageSummary } from './problem-usage';
 
 export interface FilterableBankProblem {
   id: string;
@@ -41,9 +40,16 @@ export function filterProblemBank<T extends FilterableBankProblem>(
   problems: T[],
   filters: ProblemBankFilters,
   tagsByProblem: Record<string, string[]>,
-  usage: Record<string, ProblemUsageSummary>,
+  branchesByProblem: Record<
+    string,
+    SessionBranch[] | { branches: SessionBranch[] }
+  >,
 ): T[] {
   return problems.filter((problem) => {
+    const branchData = branchesByProblem[problem.id];
+    const problemBranches = Array.isArray(branchData)
+      ? branchData
+      : branchData?.branches;
     if (
       filters.difficulty.length > 0 &&
       (!problem.difficulty || !filters.difficulty.includes(problem.difficulty))
@@ -56,9 +62,7 @@ export function filterProblemBank<T extends FilterableBankProblem>(
       return false;
     if (
       filters.branch.length > 0 &&
-      !usage[problem.id]?.branches.some((branch) =>
-        filters.branch.includes(branch),
-      )
+      !problemBranches?.some((branch) => filters.branch.includes(branch))
     )
       return false;
     if (

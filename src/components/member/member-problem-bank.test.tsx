@@ -143,21 +143,101 @@ describe('Member Problem Bank metadata', () => {
     expect(await screen.findByRole('link', { name: 'Two Sum' })).toBeTruthy();
     expect(
       await screen.findByText(
-        'Some filter details could not be loaded. Results may be incomplete.',
+        /DSA \/ algorithm filter details could not be loaded\./,
       ),
     ).toBeTruthy();
     expect(api.listProblemUsageSummaries).toHaveBeenCalledOnce();
     expect(api.listBankProblemApproachTags).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByText('DSA / algorithm'));
+    fireEvent.click(screen.getByLabelText('Arrays'));
+    expect(screen.getByRole('link', { name: 'Two Sum' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Graph Search' })).toBeTruthy();
+    expect(screen.queryByText('No Problems match these filters.')).toBeNull();
 
     fireEvent.click(
       screen.getByRole('button', { name: 'Retry filter details' }),
     );
 
     await waitFor(() =>
-      expect(api.listBankProblemApproachTags).toHaveBeenCalledTimes(2),
+      expect(screen.queryByRole('link', { name: 'Graph Search' })).toBeNull(),
     );
+    expect(api.listBankProblemApproachTags).toHaveBeenCalledTimes(2);
     expect(api.listMemberBankProblems).toHaveBeenCalledOnce();
     expect(screen.getByRole('link', { name: 'Two Sum' })).toBeTruthy();
+  });
+
+  it('keeps branch-filter matches honest while tag and branch metadata is loading', async () => {
+    let resolveTags!: (value: Record<string, string[]>) => void;
+    let resolveUsage!: (value: typeof usage) => void;
+    api.listBankProblemApproachTags.mockReturnValue(
+      new Promise((resolve) => {
+        resolveTags = resolve;
+      }),
+    );
+    api.listProblemUsageSummaries.mockReturnValue(
+      new Promise((resolve) => {
+        resolveUsage = resolve;
+      }),
+    );
+    render(<MemberProblemBank />);
+
+    expect(await screen.findByRole('link', { name: 'Two Sum' })).toBeTruthy();
+    fireEvent.click(screen.getByText('CIC branch'));
+    fireEvent.click(screen.getByLabelText('Intro'));
+    fireEvent.click(screen.getByText('DSA / algorithm'));
+    fireEvent.click(screen.getByLabelText('Arrays'));
+
+    expect(
+      screen.getByText(
+        /Selected filters are not applied yet; showing Problems that match the available filters\./,
+      ),
+    ).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Two Sum' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Graph Search' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Untagged Problem' })).toBeTruthy();
+    expect(screen.queryByText('No Problems match these filters.')).toBeNull();
+
+    resolveTags({
+      'two-sum': ['Arrays'],
+      'graph-search': ['Graph'],
+      untagged: [],
+    });
+    resolveUsage(usage);
+    await waitFor(() =>
+      expect(screen.queryByRole('link', { name: 'Graph Search' })).toBeNull(),
+    );
+    expect(screen.getByRole('link', { name: 'Two Sum' })).toBeTruthy();
+    expect(screen.queryByRole('link', { name: 'Untagged Problem' })).toBeNull();
+  });
+
+  it('does not report zero branch matches when branch metadata fails', async () => {
+    api.listProblemUsageSummaries.mockRejectedValueOnce(
+      new Error('branch metadata unavailable'),
+    );
+    render(<MemberProblemBank />);
+
+    expect(
+      await screen.findByText(
+        /CIC branch filter details could not be loaded\./,
+      ),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByText('CIC branch'));
+    fireEvent.click(screen.getByLabelText('Intro'));
+
+    expect(screen.getByRole('link', { name: 'Two Sum' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Graph Search' })).toBeTruthy();
+    expect(
+      screen.getByText(/Selected filters are not applied yet/),
+    ).toBeTruthy();
+    expect(screen.queryByText('No Problems match these filters.')).toBeNull();
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Retry filter details' }),
+    );
+    await waitFor(() =>
+      expect(screen.queryByRole('link', { name: 'Graph Search' })).toBeNull(),
+    );
+    expect(api.listMemberBankProblems).toHaveBeenCalledOnce();
   });
 
   it('does not render the previous Bank Problem while a new detail URL loads', async () => {

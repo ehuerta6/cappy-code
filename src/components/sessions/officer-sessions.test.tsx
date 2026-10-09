@@ -128,19 +128,31 @@ async function openEditor(remountOnNavigation = false) {
 function RoutedOfficerSessions({
   initialSessionId,
   remountOnNavigation = false,
+  allowRouteSwitch = false,
 }: {
   initialSessionId?: string;
   remountOnNavigation?: boolean;
+  allowRouteSwitch?: boolean;
 }) {
   const [sessionId, setSessionId] = useState(initialSessionId);
   navigation.push.mockImplementation((url: string) => {
     const match = url.match(/^\/officer\/sessions\/([^/]+)$/);
     setSessionId(match ? decodeURIComponent(match[1]) : undefined);
   });
-  return remountOnNavigation ? (
+  const sessions = remountOnNavigation ? (
     <OfficerSessions key={sessionId ?? 'session-list'} sessionId={sessionId} />
   ) : (
     <OfficerSessions sessionId={sessionId} />
+  );
+  return (
+    <>
+      {allowRouteSwitch && (
+        <button onClick={() => setSessionId('next-session')}>
+          Navigate to another Session URL
+        </button>
+      )}
+      {sessions}
+    </>
   );
 }
 
@@ -151,6 +163,44 @@ describe('Officer Sessions surface', () => {
     expect(await screen.findByRole('heading', { name: 'Arrays' })).toBeTruthy();
     expect(api.getSession).toHaveBeenCalledExactlyOnceWith('session-id');
     expect(api.listSessions).not.toHaveBeenCalled();
+  });
+
+  it('does not show the previous Session or unavailable state during an in-place route change', async () => {
+    render(
+      <RoutedOfficerSessions initialSessionId="session-id" allowRouteSwitch />,
+    );
+    expect(
+      await screen.findByRole('region', { name: 'Session metadata' }),
+    ).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Arrays' })).toBeTruthy();
+
+    let resolveNext!: (value: typeof record) => void;
+    api.getSession.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveNext = resolve;
+      }),
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Navigate to another Session URL' }),
+    );
+
+    expect(await screen.findByText('Loading Session…')).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: 'Arrays' })).toBeNull();
+    expect(
+      screen.queryByRole('region', { name: 'Session unavailable' }),
+    ).toBeNull();
+
+    resolveNext({
+      ...record,
+      id: 'next-session',
+      session: { ...record.session, title: 'Second Session' },
+    });
+    expect(
+      await screen.findByRole('heading', { name: 'Second Session' }),
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole('region', { name: 'Session unavailable' }),
+    ).toBeNull();
   });
 
   it('duplicates the persisted Session and shows a useful failure', async () => {
@@ -604,6 +654,7 @@ describe('Officer Sessions surface', () => {
 
   it('starts a draft session with pending and error states and keeps empty sessions disabled', async () => {
     api.listSessions.mockResolvedValueOnce([{ ...record, problemCount: 0 }]);
+    api.getSession.mockResolvedValueOnce({ ...record, problemCount: 0 });
     await openEditor();
     expect(
       (screen.getByRole('button', { name: 'Go Live' }) as HTMLButtonElement)
@@ -725,6 +776,7 @@ describe('Officer Sessions surface', () => {
 
   it('keeps Go Live visible while the Problem count loads or is unavailable', async () => {
     api.listSessions.mockResolvedValueOnce([{ ...record, problemCount: null }]);
+    api.getSession.mockResolvedValueOnce({ ...record, problemCount: null });
     await openEditor();
     const unavailableButton = screen.getByRole('button', { name: 'Go Live' });
     expect(unavailableButton).toBeTruthy();
@@ -779,6 +831,10 @@ describe('Officer Sessions surface', () => {
     api.listSessions.mockResolvedValueOnce([
       { ...record, session: { ...record.session, status: 'live' } },
     ]);
+    api.getSession.mockResolvedValueOnce({
+      ...record,
+      session: { ...record.session, status: 'live' },
+    });
     await openEditor();
     fireEvent.click(screen.getByRole('button', { name: 'Not Live' }));
     expect(api.transitionSession).toHaveBeenCalledWith('session-id', 'draft');

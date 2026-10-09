@@ -20,10 +20,25 @@ import SessionEditor from './session-editor';
 export default function OfficerSessions({ sessionId }: { sessionId?: string }) {
   const router = useRouter();
   const [records, setRecords] = useState<SessionRecord[]>([]);
-  const [directSession, setDirectSession] = useState<SessionRecord | null>(
-    null,
-  );
-  const [loadedSessionId, setLoadedSessionId] = useState<string | null>(null);
+  const [sessionRequest, setSessionRequest] = useState<
+    | {
+        sessionId: string;
+        revision: number;
+        status: 'loading';
+      }
+    | {
+        sessionId: string;
+        revision: number;
+        status: 'ready';
+        record: SessionRecord | null;
+      }
+    | {
+        sessionId: string;
+        revision: number;
+        status: 'error';
+      }
+    | null
+  >(null);
   const [dashboardLoaded, setDashboardLoaded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -37,18 +52,20 @@ export default function OfficerSessions({ sessionId }: { sessionId?: string }) {
     setLoading(true);
     setLoadError(false);
     if (sessionId) {
-      setLoadedSessionId(null);
       getSession(sessionId).then(
         (session) => {
           if (cancelled) return;
-          setDirectSession(session);
-          setLoadedSessionId(sessionId);
+          setSessionRequest({
+            sessionId,
+            revision,
+            status: 'ready',
+            record: session,
+          });
           setLoading(false);
         },
         () => {
           if (cancelled) return;
-          setDirectSession(null);
-          setLoadedSessionId(sessionId);
+          setSessionRequest({ sessionId, revision, status: 'error' });
           setLoadError(true);
           setLoading(false);
         },
@@ -97,11 +114,26 @@ export default function OfficerSessions({ sessionId }: { sessionId?: string }) {
     }
   }
 
-  const selected = sessionId
-    ? loadedSessionId === sessionId
-      ? (directSession ?? undefined)
-      : records.find((record) => record.id === sessionId)
-    : undefined;
+  const currentSessionRequest =
+    sessionId &&
+    sessionRequest?.sessionId === sessionId &&
+    sessionRequest.revision === revision
+      ? sessionRequest
+      : null;
+  const selected =
+    currentSessionRequest?.status === 'ready'
+      ? (currentSessionRequest.record ?? undefined)
+      : undefined;
+  if (sessionId && !currentSessionRequest) {
+    return (
+      <section
+        className="min-h-56 border-t border-border-soft pt-5"
+        aria-busy="true"
+      >
+        <p role="status">Loading Session…</p>
+      </section>
+    );
+  }
   if (selected) {
     return (
       <SessionEditor
@@ -117,7 +149,11 @@ export default function OfficerSessions({ sessionId }: { sessionId?: string }) {
     );
   }
 
-  if (sessionId && !loading && !loadError) {
+  if (
+    sessionId &&
+    currentSessionRequest?.status === 'ready' &&
+    currentSessionRequest.record === null
+  ) {
     return (
       <section
         className="mx-auto w-full max-w-[1440px]"
@@ -137,7 +173,7 @@ export default function OfficerSessions({ sessionId }: { sessionId?: string }) {
     );
   }
 
-  if (sessionId && loadedSessionId === sessionId && loadError) {
+  if (sessionId && currentSessionRequest?.status === 'error') {
     return (
       <section role="alert" aria-label="Session load failed">
         <h1 className="text-2xl font-semibold">Session could not be loaded</h1>
@@ -152,7 +188,7 @@ export default function OfficerSessions({ sessionId }: { sessionId?: string }) {
     );
   }
 
-  if (sessionId && !selected && (loading || loadedSessionId !== sessionId)) {
+  if (sessionId && currentSessionRequest?.status === 'loading') {
     return (
       <section
         className="min-h-56 border-t border-border-soft pt-5"

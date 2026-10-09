@@ -19,7 +19,6 @@ import {
 } from '@/lib/firebase/problem-bank';
 import { listProblemUsageSummaries } from '@/lib/firebase/problem-usage';
 import { isPermissionDenied } from '@/lib/firebase/errors';
-import type { ProblemUsageSummary } from '@/lib/problem-usage';
 import { problemApproachTags } from '@/lib/problem-bank-filters';
 import ProblemBankFilters from '@/components/problems/problem-bank-filters';
 import {
@@ -27,6 +26,10 @@ import {
   filterProblemBank,
   type ProblemBankFilters as Filters,
 } from '@/lib/problem-bank-filters';
+import type { SessionBranch } from '@/lib/domain';
+
+type MetadataLoad<T> =
+  { status: 'loading' } | { status: 'failed' } | { status: 'ready'; value: T };
 
 const labels = {
   custom: 'Custom',
@@ -42,30 +45,45 @@ export function MemberProblemBank() {
   >({ status: 'loading' });
   const [retry, setRetry] = useState(0);
   const [metadataRetry, setMetadataRetry] = useState(0);
-  const [usage, setUsage] = useState<Record<string, ProblemUsageSummary>>({});
-  const [tagsByProblem, setTagsByProblem] = useState<Record<string, string[]>>(
-    {},
-  );
-  const [metadataError, setMetadataError] = useState(false);
+  const [branchMetadata, setBranchMetadata] = useState<
+    MetadataLoad<Record<string, SessionBranch[]>>
+  >({ status: 'loading' });
+  const [tagMetadata, setTagMetadata] = useState<
+    MetadataLoad<Record<string, string[]>>
+  >({ status: 'loading' });
   const [filters, setFilters] = useState<Filters>(emptyProblemBankFilters);
+  const branchFiltersReady = branchMetadata.status === 'ready';
+  const tagFiltersReady = tagMetadata.status === 'ready';
+  const branchFilterPending = filters.branch.length > 0 && !branchFiltersReady;
+  const tagFilterPending = filters.tag.length > 0 && !tagFiltersReady;
+  const hasDeferredMetadataFilters = branchFilterPending || tagFilterPending;
+  const availableFilters = {
+    ...filters,
+    branch: branchFiltersReady ? filters.branch : [],
+    tag: tagFiltersReady ? filters.tag : [],
+  };
   const filteredRecords =
     state.status === 'ready'
-      ? filterProblemBank(state.records, filters, tagsByProblem, usage)
+      ? filterProblemBank(
+          state.records,
+          availableFilters,
+          tagMetadata.status === 'ready' ? tagMetadata.value : {},
+          branchMetadata.status === 'ready' ? branchMetadata.value : {},
+        )
       : [];
   useEffect(() => {
     let active = true;
     setState({ status: 'loading' });
-    setUsage({});
-    setTagsByProblem({});
-    setMetadataError(false);
+    setBranchMetadata({ status: 'loading' });
+    setTagMetadata({ status: 'loading' });
     setFilters(emptyProblemBankFilters);
     listMemberBankProblems().then(
       (records) => {
         if (!active) return;
         setState({ status: 'ready', records });
         if (records.length === 0) {
-          setUsage({});
-          setTagsByProblem({});
+          setBranchMetadata({ status: 'ready', value: {} });
+          setTagMetadata({ status: 'ready', value: {} });
         }
       },
       () => {
@@ -80,18 +98,35 @@ export function MemberProblemBank() {
     if (state.status !== 'ready' || state.records.length === 0) return;
     let active = true;
     const problemIds = state.records.map(({ id }) => id);
-    setMetadataError(false);
-    Promise.allSettled([
-      listBankProblemApproachTags(problemIds),
-      listProblemUsageSummaries(problemIds),
-    ]).then(([tagsResult, usageResult]) => {
-      if (!active) return;
-      if (tagsResult.status === 'fulfilled') setTagsByProblem(tagsResult.value);
-      if (usageResult.status === 'fulfilled') setUsage(usageResult.value);
-      setMetadataError(
-        tagsResult.status === 'rejected' || usageResult.status === 'rejected',
-      );
-    });
+    setBranchMetadata({ status: 'loading' });
+    setTagMetadata({ status: 'loading' });
+    listBankProblemApproachTags(problemIds).then(
+      (tags) => {
+        if (active) setTagMetadata({ status: 'ready', value: tags });
+      },
+      () => {
+        if (active) setTagMetadata({ status: 'failed' });
+      },
+    );
+    listProblemUsageSummaries(problemIds).then(
+      (summaries) => {
+        if (!active) return;
+        setBranchMetadata({
+          status: 'ready',
+          // Members need branch filter data only. Do not retain counts,
+          // last-used details, or Officer planning history in this view.
+          value: Object.fromEntries(
+            Object.entries(summaries).map(([id, summary]) => [
+              id,
+              summary.branches,
+            ]),
+          ),
+        });
+      },
+      () => {
+        if (active) setBranchMetadata({ status: 'failed' });
+      },
+    );
     return () => {
       active = false;
     };
@@ -139,21 +174,39 @@ export function MemberProblemBank() {
           <div className="grid gap-7 md:grid-cols-3">
             <div className="md:col-span-3">
               <ProblemBankFilters value={filters} onChange={setFilters} />
-              {metadataError && (
+              {(branchMetadata.status !== 'ready' ||
+                tagMetadata.status !== 'ready') && (
                 <p className="-mt-3 mb-4 text-sm text-muted" role="status">
-                  Some filter details could not be loaded. Results may be
-                  incomplete.{' '}
-                  <button
-                    className="underline underline-offset-2"
-                    onClick={() => setMetadataRetry((value) => value + 1)}
-                  >
-                    Retry filter details
-                  </button>
+                  {[
+                    branchMetadata.status !== 'ready' && 'CIC branch',
+                    tagMetadata.status !== 'ready' && 'DSA / algorithm',
+                  ]
+                    .filter(Boolean)
+                    .join(' and ')}{' '}
+                  filter details{' '}
+                  {branchMetadata.status === 'failed' ||
+                  tagMetadata.status === 'failed'
+                    ? 'could not be loaded.'
+                    : 'are loading.'}{' '}
+                  {hasDeferredMetadataFilters
+                    ? 'Selected filters are not applied yet; showing Problems that match the available filters.'
+                    : 'Category and difficulty filters remain available.'}{' '}
+                  {(branchMetadata.status === 'failed' ||
+                    tagMetadata.status === 'failed') && (
+                    <button
+                      className="underline underline-offset-2"
+                      onClick={() => setMetadataRetry((value) => value + 1)}
+                    >
+                      Retry filter details
+                    </button>
+                  )}
                 </p>
               )}
               {filteredRecords.length === 0 && (
                 <p role="status">
-                  No Problems match these filters.{' '}
+                  {hasDeferredMetadataFilters
+                    ? 'No Problems match the available filters; selected branch or DSA filters are not applied yet.'
+                    : 'No Problems match these filters.'}{' '}
                   <button
                     className="min-h-11 rounded border border-border-strong bg-surface px-3 py-2"
                     onClick={() => setFilters(emptyProblemBankFilters)}
@@ -200,7 +253,11 @@ export function MemberProblemBank() {
                               difficulty={record.difficulty}
                             />
                             <ProblemApproachTags
-                              tags={tagsByProblem[record.id] ?? []}
+                              tags={
+                                tagMetadata.status === 'ready'
+                                  ? (tagMetadata.value[record.id] ?? [])
+                                  : []
+                              }
                             />
                           </div>
                         </li>
