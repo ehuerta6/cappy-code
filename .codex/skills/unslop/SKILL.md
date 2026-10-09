@@ -11,6 +11,8 @@ metadata:
 
 Improve technical prose by removing vague, formulaic, inflated, or synthetic-sounding writing.
 
+Use `unslop` for information density and technical writing quality; this project does not currently adopt a separate voice-matching workflow.
+
 Use this for:
 
 - README files;
@@ -21,8 +23,6 @@ Use this for:
 - UI copy;
 - project descriptions;
 - engineering notes.
-
-Use `unslop` when the main goal is improving information density and technical writing quality.
 
 ## Modes
 

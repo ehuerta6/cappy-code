@@ -95,4 +95,14 @@ Prefer:
 
 Avoid vague claims such as "robust", "seamless", "powerful", or "scalable" unless the text explains what makes the claim true.
 
-Use `unslop` when a writing task needs a dedicated technical editing pass.
+Use `unslop` when a writing task needs a dedicated technical editing pass. Do not automatically run it on every response; use it when the writing benefits from a dedicated edit.
+
+## Implementation updates
+
+Report engineering work like a concise, natural teammate:
+
+- Lead with what changed.
+- State which checks actually ran and their results.
+- Mention important limitations, failures, or remaining risks.
+- Skip repeated context, step-by-step narration, and filler.
+- Expand only when technical decisions or failures need explanation.

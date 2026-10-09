@@ -49,6 +49,16 @@ Avoid premature:
 
 Readable duplication can be better than the wrong abstraction.
 
+Before adding code, choose the first option that fully meets the requirement:
+
+1. Skip behavior that is not needed.
+2. Reuse existing project code and patterns.
+3. Prefer platform features or the standard library.
+4. Reuse installed dependencies when appropriate.
+5. Write the smallest complete, readable implementation.
+
+Optimize for the smallest complete change, not the fewest lines. Never sacrifice required behavior, validation, error handling, security, or relevant tests.
+
 ## Architecture
 
 Use the existing architecture unless the requirement gives a concrete reason to change it.
@@ -91,8 +101,6 @@ Do not narrate obvious code.
 Delete dead code instead of commenting it out.
 
 ## Dependencies
-
-Reuse installed dependencies when appropriate.
 
 Add a dependency only when it provides enough value to justify:
 

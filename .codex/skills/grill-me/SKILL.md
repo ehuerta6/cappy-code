@@ -27,7 +27,14 @@ The goal is shared understanding, not implementation.
    - recommend an option and explain why;
    - leave the final decision to the user.
 7. Recompute the unresolved decision frontier after every round.
-8. Stop when implementation would no longer require guessing about product behavior, scope, architecture, or important constraints.
+8. During design discussions, sharpen domain language where it affects behavior:
+   - identify ambiguous or overloaded terms and ask what each means in this project;
+   - distinguish concepts, entities, relationships, invariants, and state transitions when those distinctions matter;
+   - check proposed behavior against established decisions and relevant existing code, and surface contradictions;
+   - use concrete edge cases to test domain boundaries.
+9. When terminology has been resolved and will recur, consider proposing a project-specific `GLOSSARY.md` containing domain terms and their meanings only. Do not include implementation details, use it as a scratchpad, or create one automatically.
+10. When a decision is important, non-obvious, and likely to matter later, consider recording it with the existing `templates/DECISION.md`. Skip routine or easily reversible choices. Do not create a record automatically.
+11. If a concrete uncertainty is best answered by trying alternatives, the optional `prototype` workflow may be used before `to-spec`. Keep grilling focused on the unresolved question; do not turn it into implementation or document generation.
 
 ## Rules
 
@@ -36,8 +43,9 @@ The goal is shared understanding, not implementation.
 - Do not expand the feature while clarifying it.
 - Do not turn every detail into a decision.
 - Do not implement the result unless explicitly asked.
-- Preserve established project terminology.
+- Preserve established project terminology, while calling out conflicts or ambiguity.
 - Explicit project decisions override generic recommendations.
+- Documents are optional aids to preserve resolved domain language and durable decisions, not required outputs of a grilling session.
 
 ## Completion
 

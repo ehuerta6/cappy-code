@@ -47,6 +47,7 @@ Project documentation lives in [`docs/`](docs/).
 - [Feature Tracker](docs/FEATURES.md) — implementation checklist and product roadmap.
 - [Git & Pull Request Conventions](docs/GIT_CONVENTIONS.md) — branch, commit, PR, and merge rules.
 - [AI Development Guidelines](docs/AI_GUIDELINES.md) — guardrails for AI coding assistants developing the repository. AI is outside the product runtime.
+- [AI Configuration Adoption](docs/AI_CONFIGURATION.md) — repeatable manual comparison with canonical `ai-setup`.
 - [Firebase Foundation](docs/FIREBASE.md) — local Firebase configuration, client access, and persisted document types.
 
 ## Development workflow
