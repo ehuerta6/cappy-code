@@ -141,7 +141,15 @@ test('Officer edits and reuses a bank Problem as an independent Session snapshot
     ).not.toContainText(updatedBankPython);
 
     await member.goto('/problem-bank');
+    await expect(
+      member.getByRole('heading', { name: 'Problem Bank' }),
+    ).toBeVisible();
+    await expect(member.getByText(/Used \d+ times?/)).toHaveCount(0);
     await member.getByRole('link', { name: bankTitle }).click();
+    await expect(
+      member.getByRole('heading', { name: 'Used in Sessions' }),
+    ).toHaveCount(0);
+    await expect(member.getByText(/Used \d+ times?/)).toHaveCount(0);
     await expect(
       member.getByText('Updated in the bank after reuse.'),
     ).toBeVisible();

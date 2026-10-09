@@ -14,6 +14,7 @@ const api = vi.hoisted(() => ({
   getBankProblem: vi.fn(),
   listBankProblemApproachTags: vi.fn(),
   listOfficerBankProblems: vi.fn(),
+  listProblemUsageSummaries: vi.fn(),
   updateBankProblem: vi.fn(),
   updateBankSolution: vi.fn(),
   updateBankApproach: vi.fn(),
@@ -21,6 +22,9 @@ const api = vi.hoisted(() => ({
 
 vi.mock('client-only', () => ({}));
 vi.mock('@/lib/firebase/problem-bank', () => api);
+vi.mock('@/lib/firebase/problem-usage', () => ({
+  listProblemUsageSummaries: api.listProblemUsageSummaries,
+}));
 vi.mock('@/lib/firebase/solutions', () => ({
   createApproach: vi.fn(),
   deleteApproach: vi.fn(),
@@ -79,6 +83,24 @@ beforeEach(() => {
   api.listBankProblemApproachTags.mockResolvedValue({
     'two-sum': ['Arrays', 'Hash Map', 'Two Pointers'],
   });
+  api.listProblemUsageSummaries.mockResolvedValue({
+    'two-sum': {
+      count: 2,
+      lastUsed: null,
+      branches: ['intro'],
+      history: [
+        {
+          sessionId: 'past-intro',
+          title: 'Past Intro Session',
+          branch: 'intro',
+          date: '2026-10-01',
+          relativeDate: '8 days ago',
+          status: 'ended',
+          href: '/sessions/past-intro',
+        },
+      ],
+    },
+  });
   api.getBankProblem.mockResolvedValue({
     problem: record,
     approaches: [
@@ -115,6 +137,19 @@ describe('Officer Problem Bank', () => {
     api.deleteBankProblem.mockReturnValueOnce(deletion.promise);
     render(<OfficerProblemBank />);
     await screen.findByLabelText('Problem title');
+    expect(
+      await screen.findByText(
+        (_, element) =>
+          element?.tagName === 'P' &&
+          (element.textContent?.includes('Used 2 times') ?? false),
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole('heading', { name: 'Used in Sessions' }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole('link', { name: 'Past Intro Session' }),
+    ).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Delete Problem' }));
 
     expect(confirm).toHaveBeenCalledWith(
