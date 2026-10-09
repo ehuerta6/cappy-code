@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import AppHeader from '@/components/app-header';
 import ProblemMarkdown from '@/components/member/problem-markdown';
-import SolutionWorkspace from '@/components/solutions/solution-workspace';
+import MemberSolutionViewer from '@/components/solutions/member-solution-viewer';
 import {
   ProblemApproachTags,
   ProblemDifficultyBadge,
@@ -16,7 +16,6 @@ import {
   listBankProblemApproachTags,
   listMemberBankProblems,
   type BankProblemRecord,
-  type BankSolutions,
 } from '@/lib/firebase/problem-bank';
 import { listProblemUsageSummaries } from '@/lib/firebase/problem-usage';
 import type { ProblemUsageSummary } from '@/lib/problem-usage';
@@ -205,16 +204,13 @@ export function MemberBankProblemPage({ problemId }: { problemId: string }) {
     | {
         status: 'ready';
         problem: BankProblemRecord;
-        solutions: BankSolutions;
         approaches: SolutionApproach[];
       }
   >({ status: 'loading' });
   const [retry, setRetry] = useState(0);
-  const [approachId, setApproachId] = useState('primary');
   useEffect(() => {
     let active = true;
     setState({ status: 'loading' });
-    setApproachId('primary');
     getBankProblem(problemId).then(
       (result) => {
         if (active)
@@ -270,114 +266,118 @@ export function MemberBankProblemPage({ problemId }: { problemId: string }) {
             >
               ← Problem Bank
             </Link>
-            <div className="mt-4 flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <p className="m-0 text-sm font-semibold text-muted">
-                  {labels[state.problem.category]}
-                </p>
-                <h1
-                  className="mb-0 mt-1 text-[28px] font-semibold leading-9 tracking-tight"
-                  id="bank-problem-heading"
-                >
-                  {state.problem.title}
-                </h1>
-              </div>
-              <div className="flex flex-wrap items-center gap-3">
-                <ProblemDifficultyBadge difficulty={state.problem.difficulty} />
-                {state.problem.leetcodeUrl && (
-                  <a
-                    className="text-accent underline-offset-4 hover:underline"
-                    href={state.problem.leetcodeUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    LeetCode source
-                  </a>
-                )}
-              </div>
-            </div>
-            <div className="mt-3">
-              <ProblemApproachTags
-                tags={problemApproachTags(state.approaches)}
-              />
-            </div>
-            <ProblemMarkdown>{state.problem.description}</ProblemMarkdown>
-            {state.problem.constraints && (
-              <section
-                className="mt-5 max-w-[80ch]"
-                aria-labelledby="bank-constraints"
+            <div className="mt-4 grid min-w-0 gap-6 min-[1100px]:h-[calc(100dvh-9rem)] min-[1100px]:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)] min-[1100px]:gap-0 min-[1100px]:overflow-hidden min-[1100px]:divide-x min-[1100px]:divide-border-soft">
+              <div
+                className="min-w-0 min-[1100px]:h-full min-[1100px]:overflow-y-auto min-[1100px]:overscroll-contain min-[1100px]:pr-5"
+                role="region"
+                aria-label="Problem"
+                tabIndex={0}
               >
-                <h2
-                  className="mb-2 mt-0 text-base font-semibold"
-                  id="bank-constraints"
-                >
-                  Constraints
-                </h2>
-                <p className="m-0 max-w-[80ch] whitespace-pre-wrap break-words text-base leading-[26px]">
-                  {state.problem.constraints}
-                </p>
-              </section>
-            )}
-            <section className="mt-6" aria-label="Shared example">
-              <h2 className="mb-3 mt-0 text-lg font-semibold">Example</h2>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <h3 className="mb-1 mt-0 text-sm font-semibold text-muted">
-                    Input
-                  </h3>
-                  <pre className="m-0 max-w-full overflow-x-auto rounded-md border border-border-soft bg-surface px-3 py-3 font-mono text-[15px] leading-6">
-                    {state.problem.exampleInput || '—'}
-                  </pre>
-                </div>
-                <div>
-                  <h3 className="mb-1 mt-0 text-sm font-semibold text-muted">
-                    Expected output
-                  </h3>
-                  <pre className="m-0 max-w-full overflow-x-auto rounded-md border border-border-soft bg-surface px-3 py-3 font-mono text-[15px] leading-6">
-                    {state.problem.exampleOutput || '—'}
-                  </pre>
-                </div>
-              </div>
-            </section>
-            <section className="mt-7" aria-labelledby="bank-solutions-heading">
-              <h2
-                className="mb-3 mt-0 text-lg font-semibold"
-                id="bank-solutions-heading"
-              >
-                Prepared Solutions
-              </h2>
-              {state.approaches.length === 0 ? (
-                <p>No solution approaches are available.</p>
-              ) : (
-                <>
-                  {state.approaches.length > 1 && (
-                    <div
-                      className="mb-4 flex flex-wrap gap-2"
-                      aria-label="Solution approaches"
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="m-0 text-sm font-semibold text-muted">
+                      {labels[state.problem.category]}
+                    </p>
+                    <h1
+                      className="mb-0 mt-1 text-[28px] font-semibold leading-9 tracking-tight"
+                      id="bank-problem-heading"
                     >
-                      {state.approaches.map((approach) => (
-                        <button
-                          key={approach.id}
-                          type="button"
-                          aria-pressed={approach.id === approachId}
-                          className="rounded border border-border-strong bg-surface px-3 py-2"
-                          onClick={() => setApproachId(approach.id)}
-                        >
-                          {approach.name}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  <SolutionWorkspace
-                    solutions={
-                      state.approaches.find(({ id }) => id === approachId)
-                        ?.solutions ?? state.solutions
-                    }
-                    modelPath={`bank/${problemId}/${approachId}`}
+                      {state.problem.title}
+                    </h1>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <ProblemDifficultyBadge
+                      difficulty={state.problem.difficulty}
+                    />
+                    {state.problem.leetcodeUrl && (
+                      <a
+                        className="text-accent underline-offset-4 hover:underline"
+                        href={state.problem.leetcodeUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        LeetCode source
+                      </a>
+                    )}
+                  </div>
+                </div>
+                <div className="mt-3">
+                  <ProblemApproachTags
+                    tags={problemApproachTags(state.approaches)}
                   />
-                </>
-              )}
-            </section>
+                </div>
+                <ProblemMarkdown>{state.problem.description}</ProblemMarkdown>
+                {state.problem.constraints && (
+                  <section
+                    className="mt-5 max-w-[80ch]"
+                    aria-labelledby="bank-constraints"
+                  >
+                    <h2
+                      className="mb-2 mt-0 text-base font-semibold"
+                      id="bank-constraints"
+                    >
+                      Constraints
+                    </h2>
+                    <p className="m-0 max-w-[80ch] whitespace-pre-wrap break-words text-base leading-[26px]">
+                      {state.problem.constraints}
+                    </p>
+                  </section>
+                )}
+                <section className="mt-6" aria-label="Shared example">
+                  <h2 className="mb-3 mt-0 text-lg font-semibold">Example</h2>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <h3 className="mb-1 mt-0 text-sm font-semibold text-muted">
+                        Input
+                      </h3>
+                      <pre className="m-0 max-w-full overflow-x-auto rounded-md border border-border-soft bg-surface px-3 py-3 font-mono text-[15px] leading-6">
+                        {state.problem.exampleInput || '—'}
+                      </pre>
+                    </div>
+                    <div>
+                      <h3 className="mb-1 mt-0 text-sm font-semibold text-muted">
+                        Expected output
+                      </h3>
+                      <pre className="m-0 max-w-full overflow-x-auto rounded-md border border-border-soft bg-surface px-3 py-3 font-mono text-[15px] leading-6">
+                        {state.problem.exampleOutput || '—'}
+                      </pre>
+                    </div>
+                  </div>
+                </section>
+              </div>
+              <section
+                className="min-w-0 min-[1100px]:h-full min-[1100px]:overflow-y-auto min-[1100px]:overscroll-contain min-[1100px]:pl-5"
+                role="region"
+                aria-label="Solutions"
+                tabIndex={0}
+              >
+                <section
+                  className="mt-7"
+                  aria-labelledby="bank-solutions-heading"
+                >
+                  <h2
+                    className="mb-3 mt-0 text-lg font-semibold"
+                    id="bank-solutions-heading"
+                  >
+                    Prepared Solutions
+                  </h2>
+                  {state.approaches.length === 0 ? (
+                    <p
+                      className="rounded-md border border-border-soft bg-surface p-4"
+                      role="status"
+                    >
+                      No solution approaches are available yet.
+                    </p>
+                  ) : (
+                    <MemberSolutionViewer
+                      key={problemId}
+                      approaches={state.approaches}
+                      modelPath={`bank/${problemId}`}
+                    />
+                  )}
+                </section>
+              </section>
+            </div>
           </>
         )}
       </section>

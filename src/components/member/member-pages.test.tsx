@@ -192,7 +192,7 @@ describe('public member page integration', () => {
     expect(screen.queryByText('Find the pair.')).toBeNull();
   });
 
-  it('requests revealed Solutions and renders all three editors read-only', async () => {
+  it('requests revealed Solutions and renders one editor read-only', async () => {
     realtime.answersVisible = true;
     api.listMemberProblems.mockResolvedValueOnce([
       { ...problem, problem: { ...problem.problem, answersVisible: true } },
@@ -205,8 +205,9 @@ describe('public member page integration', () => {
       'intro',
       'arrays',
     );
-    expect(screen.getByLabelText('Java Solution, read-only')).toBeTruthy();
-    expect(screen.getByLabelText('C++ Solution, read-only')).toBeTruthy();
+    expect(screen.queryByLabelText('Java Solution, read-only')).toBeNull();
+    expect(screen.queryByLabelText('C++ Solution, read-only')).toBeNull();
+    expect(screen.getByLabelText('Language')).toBeTruthy();
   });
 
   it('keeps the public archive useful with no live session and lists past sessions', async () => {
@@ -267,8 +268,8 @@ describe('public member page integration', () => {
     expect(
       await screen.findByLabelText('Python Solution, read-only'),
     ).toBeTruthy();
-    expect(screen.getByLabelText('Java Solution, read-only')).toBeTruthy();
-    expect(screen.getByLabelText('C++ Solution, read-only')).toBeTruthy();
+    expect(screen.queryByLabelText('Java Solution, read-only')).toBeNull();
+    expect(screen.queryByLabelText('C++ Solution, read-only')).toBeNull();
     expect(screen.queryByText('Answers hidden')).toBeNull();
     expect(api.getMemberSolutions).toHaveBeenCalledExactlyOnceWith(
       'intro',

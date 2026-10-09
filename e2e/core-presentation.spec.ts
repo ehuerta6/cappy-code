@@ -204,21 +204,16 @@ test('Officer prepares and presents a Session through its public lifecycle', asy
       member.getByRole('link', { name: /LeetCode/ }),
     ).toHaveAttribute('href', 'https://leetcode.com/problems/two-sum/');
     await expect(member.getByText('python-answer-secret')).toBeVisible();
+    await expect(member.getByLabel('Language')).toHaveValue('python');
+    await member.getByLabel('Language').selectOption('java');
     await expect(member.getByText('java-answer-secret')).toBeVisible();
+    await expect(member.getByText('python-answer-secret')).toHaveCount(0);
+    await member.getByLabel('Language').selectOption('cpp');
     await expect(member.getByText('cpp-answer-secret')).toBeVisible();
     await expect(
       member.getByRole('button', { name: 'New Approach' }),
     ).toHaveCount(0);
-    await expect(member.getByText('Time: O(n)', { exact: true })).toHaveCount(
-      2,
-    );
-    await expect(member.getByText('Time: O(n log n)')).toBeVisible();
-    await expect(member.getByText('Space: O(n)', { exact: true })).toHaveCount(
-      2,
-    );
-    await expect(member.getByText('Space: O(1)', { exact: true })).toHaveCount(
-      1,
-    );
+    await expect(member.getByLabel('Language')).toHaveValue('cpp');
     const bankProblemId = new URL(member.url()).pathname.split('/').at(-1);
     expect(bankProblemId).toBeTruthy();
     await member.goto('/');
@@ -348,37 +343,31 @@ test('Officer prepares and presents a Session through its public lifecycle', asy
     await expect(
       member.getByText('python-corrected-answer-secret'),
     ).toBeVisible();
+    await expect(member.getByText('java-answer-secret')).toHaveCount(0);
+    await member.getByLabel('Language').selectOption('java');
     await expect(member.getByText('java-answer-secret')).toBeVisible();
-    await expect(member.getByText('cpp-answer-secret')).toBeVisible();
-    await expect(member.getByText('Time: O(n)', { exact: true })).toHaveCount(
-      1,
-    );
-    await expect(member.getByText('Space: O(n)', { exact: true })).toHaveCount(
-      2,
-    );
-    await expect(member.getByText('Time: O(n log n)')).toHaveCount(2);
-    await expect(member.getByText('Space: O(1)')).toBeVisible();
-    await expect(member.getByText('Python time analysis.')).toBeVisible();
-    await expect(member.getByText('Java time analysis.')).toBeVisible();
-    await expect(member.getByText('C++ time analysis.')).toBeVisible();
-    await expect(member.getByText('Python space analysis.')).toBeVisible();
-    await expect(member.getByText('Java space analysis.')).toBeVisible();
-    await expect(member.getByText('C++ space analysis.')).toBeVisible();
     await expect(
-      member.getByRole('button', { name: 'New Approach' }),
-    ).toBeVisible();
-    await member.getByRole('button', { name: 'New Approach' }).click();
-    await expect(member.getByText('alternate-python-secret')).toBeVisible();
-    await expect(member.getByText('alternate-java-secret')).toBeVisible();
+      member.getByText('python-corrected-answer-secret'),
+    ).toHaveCount(0);
+    await member.getByLabel('Language').selectOption('cpp');
+    await expect(member.getByText('cpp-answer-secret')).toBeVisible();
+    await expect(member.getByText('C++ time analysis.')).toBeVisible();
+    await member.getByLabel('Approach').selectOption({ label: 'New Approach' });
     await expect(member.getByText('alternate-cpp-secret')).toBeVisible();
-    await member.getByRole('button', { name: 'Primary Approach' }).click();
+    await member.getByLabel('Language').selectOption('java');
+    await expect(member.getByText('alternate-java-secret')).toBeVisible();
+    await member.getByLabel('Language').selectOption('python');
+    await expect(member.getByText('alternate-python-secret')).toBeVisible();
+    await member
+      .getByLabel('Approach')
+      .selectOption({ label: 'Primary Approach' });
     const revealedLiveUrl = member.url();
     await member.reload();
     await expect(member).toHaveURL(revealedLiveUrl);
     await expect(
       member.getByText('python-corrected-answer-secret'),
     ).toBeVisible();
-    await expect(member.getByText('Time: O(n log n)')).toHaveCount(2);
+    await expect(member.getByText('Time: O(n log n)')).toHaveCount(1);
     await officer.getByRole('button', { name: 'Hide answers' }).click();
     await expect(
       member.getByText('Waiting for the officer to reveal the solution…'),
@@ -449,6 +438,7 @@ test('Officer prepares and presents a Session through its public lifecycle', asy
     await member.goto(endedURL);
     await member.reload();
     await expect(member.getByText('Ended', { exact: true })).toBeVisible();
+    await member.getByLabel('Language').selectOption('cpp');
     await expect(member.getByText('cpp-answer-secret')).toBeVisible();
     await member.goto('/');
     await expect(

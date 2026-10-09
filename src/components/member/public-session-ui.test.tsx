@@ -418,7 +418,7 @@ describe('public member UI scaffold', () => {
     expect(load).not.toHaveBeenCalled();
   });
 
-  it('loads revealed solutions into the existing read-only workspace', async () => {
+  it('loads revealed solutions into one selected read-only editor', async () => {
     presentation.answersVisible = true;
     const load = vi.fn().mockResolvedValue(solutions);
     render(
@@ -437,13 +437,18 @@ describe('public member UI scaffold', () => {
         ) as HTMLTextAreaElement
       ).readOnly,
     ).toBe(true);
-    expect(screen.getByLabelText('Java Solution, read-only')).toBeTruthy();
-    expect(screen.getByLabelText('C++ Solution, read-only')).toBeTruthy();
+    expect(screen.queryByLabelText('Java Solution, read-only')).toBeNull();
+    expect(screen.queryByLabelText('C++ Solution, read-only')).toBeNull();
+    expect((screen.getByLabelText('Language') as HTMLSelectElement).value).toBe(
+      'python',
+    );
+    fireEvent.change(screen.getByLabelText('Language'), {
+      target: { value: 'java' },
+    });
     expect(
-      screen.getByRole('region', {
-        name: 'Three-language solution comparison',
-      }),
+      await screen.findByLabelText('Java Solution, read-only'),
     ).toBeTruthy();
+    expect(screen.queryByLabelText('Python Solution, read-only')).toBeNull();
     expect(screen.getAllByText('Expected output')).toHaveLength(1);
     expect(screen.queryByText('hello')).toBeNull();
     expect(screen.queryByText('java output')).toBeNull();
@@ -485,8 +490,8 @@ describe('public member UI scaffold', () => {
       'Python Solution, read-only',
     );
     expect(darkPython.getAttribute('data-editor-theme')).toBe('cappy-dark');
-    expect(screen.getByLabelText('Java Solution, read-only')).toBeTruthy();
-    expect(screen.getByLabelText('C++ Solution, read-only')).toBeTruthy();
+    expect(screen.queryByLabelText('Java Solution, read-only')).toBeNull();
+    expect(screen.queryByLabelText('C++ Solution, read-only')).toBeNull();
     expect(load).toHaveBeenCalledExactlyOnceWith('first');
 
     fireEvent.click(themeToggle);
@@ -549,8 +554,8 @@ describe('public member UI scaffold', () => {
     expect(
       await screen.findByLabelText('Python Solution, read-only'),
     ).toBeTruthy();
-    expect(screen.getByLabelText('Java Solution, read-only')).toBeTruthy();
-    expect(screen.getByLabelText('C++ Solution, read-only')).toBeTruthy();
+    expect(screen.queryByLabelText('Java Solution, read-only')).toBeNull();
+    expect(screen.queryByLabelText('C++ Solution, read-only')).toBeNull();
     expect(screen.queryByText('Answers hidden')).toBeNull();
     expect(screen.queryByText(/Waiting for the officer/)).toBeNull();
     expect(load).toHaveBeenCalledExactlyOnceWith('first');

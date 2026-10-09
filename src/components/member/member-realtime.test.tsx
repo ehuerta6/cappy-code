@@ -182,8 +182,8 @@ describe('Member answer visibility realtime', () => {
       'session',
       'first',
     );
-    expect(screen.getByLabelText('Java Solution, read-only')).toBeTruthy();
-    expect(screen.getByLabelText('C++ Solution, read-only')).toBeTruthy();
+    expect(screen.queryByLabelText('Java Solution, read-only')).toBeNull();
+    expect(screen.queryByLabelText('C++ Solution, read-only')).toBeNull();
 
     act(() => listeners.answers[0].onValue(false));
     expect(await screen.findByText('Answers hidden')).toBeTruthy();
@@ -235,8 +235,8 @@ describe('Member answer visibility realtime', () => {
     expect(
       await screen.findByLabelText('Python Solution, read-only'),
     ).toBeTruthy();
-    expect(screen.getByLabelText('Java Solution, read-only')).toBeTruthy();
-    expect(screen.getByLabelText('C++ Solution, read-only')).toBeTruthy();
+    expect(screen.queryByLabelText('Java Solution, read-only')).toBeNull();
+    expect(screen.queryByLabelText('C++ Solution, read-only')).toBeNull();
     expect(screen.queryByText('Answers hidden')).toBeNull();
   });
 
@@ -256,8 +256,8 @@ describe('Member answer visibility realtime', () => {
     expect(
       await screen.findByLabelText('Python Solution, read-only'),
     ).toBeTruthy();
-    expect(screen.getByLabelText('Java Solution, read-only')).toBeTruthy();
-    expect(screen.getByLabelText('C++ Solution, read-only')).toBeTruthy();
+    expect(screen.queryByLabelText('Java Solution, read-only')).toBeNull();
+    expect(screen.queryByLabelText('C++ Solution, read-only')).toBeNull();
     expect(screen.queryByText('Answers hidden')).toBeNull();
     expect(
       screen.queryByText('Waiting for the officer to reveal the solution…'),

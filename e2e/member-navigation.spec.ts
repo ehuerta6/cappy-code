@@ -145,9 +145,11 @@ test('Members can browse live, ended, and bank content without selection fallbac
   await expect(
     page.getByRole('region', { name: 'Python' }).locator('.view-lines'),
   ).toContainText('def longest_unique');
+  await page.getByLabel('Language').selectOption('java');
   await expect(
     page.getByRole('region', { name: 'Java' }).locator('.view-lines'),
   ).toContainText('int longestUnique');
+  await page.getByLabel('Language').selectOption('cpp');
   await expect(
     page.getByRole('region', { name: 'C++' }).locator('.view-lines'),
   ).toContainText('int longestUnique');
