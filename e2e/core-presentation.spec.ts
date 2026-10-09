@@ -153,13 +153,12 @@ test('Officer prepares and presents a Session through its public lifecycle', asy
       officer.getByRole('button', { name: 'New Approach' }),
     ).toBeVisible();
 
-    // Session-created reusable Bank copies stay unpublished until an Officer
-    // explicitly publishes them.
+    // Session-created reusable Bank copies are available without a publication step.
     await officer.goto('/officer/problem-bank');
     await officer.getByRole('button', { name: problemTitle }).click();
-    await expect(officer.getByText('Publication: Unpublished')).toBeVisible();
-    await officer.getByRole('button', { name: 'Publish' }).click();
-    await expect(officer.getByText('Publication: Published')).toBeVisible();
+    await expect(officer.getByRole('button', { name: /publish/i })).toHaveCount(
+      0,
+    );
     await officer.goto('/officer');
     await officer
       .getByRole('button', { name: new RegExp(sessionTitle) })

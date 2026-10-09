@@ -15,7 +15,6 @@ const api = vi.hoisted(() => ({
   listBankProblemApproachTags: vi.fn(),
   listOfficerBankProblems: vi.fn(),
   updateBankProblem: vi.fn(),
-  updateBankPublication: vi.fn(),
   updateBankSolution: vi.fn(),
   updateBankApproach: vi.fn(),
 }));
@@ -61,7 +60,6 @@ const record = {
   exampleInput: '1 2',
   exampleOutput: '3',
   category: 'interview-style' as const,
-  isPublished: false,
   isTemporarilyHidden: false,
 };
 
@@ -103,7 +101,6 @@ beforeEach(() => {
     },
   });
   api.updateBankProblem.mockResolvedValue(undefined);
-  api.updateBankPublication.mockResolvedValue(undefined);
   api.updateBankSolution.mockResolvedValue(undefined);
   api.updateBankApproach.mockResolvedValue(undefined);
   api.deleteBankProblem.mockResolvedValue(undefined);
@@ -111,7 +108,7 @@ beforeEach(() => {
 
 afterEach(() => cleanup());
 
-describe('Officer Problem Bank publication', () => {
+describe('Officer Problem Bank', () => {
   it('confirms deletion, then removes the row only after persistence succeeds', async () => {
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
     const deletion = deferred<void>();
@@ -294,42 +291,27 @@ describe('Officer Problem Bank publication', () => {
     ).toBe('def two_sum(): pass');
   });
 
-  it('shows the saved publication intent and preserves unsaved content edits', async () => {
+  it('has no publication controls and saves only edited content', async () => {
     render(<OfficerProblemBank />);
     await screen.findByRole('button', { name: 'Two Sum' });
     await screen.findByLabelText('Problem title');
 
-    expect(screen.getByText('Publication: Unpublished')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /publish/i })).toBeNull();
+    expect(screen.queryByText(/Published|Unpublished/)).toBeNull();
     fireEvent.change(screen.getByLabelText('Problem title'), {
       target: { value: 'Two Sum, revised' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Publish' }));
-
-    await screen.findByText('Publication: Published');
-    expect(api.updateBankPublication).toHaveBeenCalledWith('two-sum', true);
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    await waitFor(() =>
+      expect(api.updateBankProblem).toHaveBeenCalledWith(
+        'two-sum',
+        expect.objectContaining({ title: 'Two Sum, revised' }),
+      ),
+    );
     expect(screen.getByLabelText('Problem title')).toHaveProperty(
       'value',
       'Two Sum, revised',
     );
-    expect(screen.getByText('Unsaved changes')).toBeTruthy();
-  });
-
-  it('shows a retry after publication failure and retries the same intent', async () => {
-    api.updateBankPublication
-      .mockRejectedValueOnce(new Error('offline'))
-      .mockResolvedValueOnce(undefined);
-    render(<OfficerProblemBank />);
-    await screen.findByRole('button', { name: 'Two Sum' });
-    await screen.findByLabelText('Problem title');
-    fireEvent.click(screen.getByRole('button', { name: 'Publish' }));
-
-    const retry = await screen.findByRole('button', { name: 'Retry Publish' });
-    expect(screen.getByRole('alert').textContent).toContain(
-      'Publication update failed',
-    );
-    fireEvent.click(retry);
-
-    await screen.findByText('Publication: Published');
-    expect(api.updateBankPublication).toHaveBeenCalledTimes(2);
+    expect(api).not.toHaveProperty('updateBankPublication');
   });
 });

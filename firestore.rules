@@ -114,32 +114,25 @@ service cloud.firestore {
         : false;
     }
 
-    function bankProblemDataIsPublished(data) {
-      return data.get('isPublished', data.get('isPublic', false)) == true;
-    }
-
     function bankProblemDataIsNotHidden(data) {
       return !data.keys().hasAny(['hiddenByLiveSessionId'])
         || data.hiddenByLiveSessionId == null;
     }
 
     function bankProblemIsEffectivelyVisible(problemId) {
-      return bankProblemDataIsPublished(resource.data)
-        && bankProblemDataIsNotHidden(resource.data)
+      return bankProblemDataIsNotHidden(resource.data)
         && !bankProblemUsedByActiveSession(problemId);
     }
 
     function bankProblemIsListVisible() {
-      return bankProblemDataIsPublished(resource.data)
-        && bankProblemDataIsNotHidden(resource.data);
+      return bankProblemDataIsNotHidden(resource.data);
     }
 
     function bankSolutionParentIsEffectivelyVisible(problemId) {
       let bankProblem = get(
         /databases/$(database)/documents/problemBank/$(problemId)
       ).data;
-      return bankProblemDataIsPublished(bankProblem)
-        && bankProblemDataIsNotHidden(bankProblem)
+      return bankProblemDataIsNotHidden(bankProblem)
         && !bankProblemUsedByActiveSession(problemId);
     }
 
@@ -242,14 +235,9 @@ service cloud.firestore {
       allow list: if isOfficer() || bankProblemIsListVisible();
       allow create: if isOfficer()
         && hasSupportedProblemCategory(request.resource.data)
-        && request.resource.data.isPublished == false
         && request.resource.data.hiddenByLiveSessionId == null;
       allow update: if isOfficer()
-        && hasSupportedProblemCategory(request.resource.data)
-        && (request.resource.data.isPublished is bool
-          || (!request.resource.data.keys().hasAny(['isPublished'])
-            && request.resource.data.keys().hasAny(['isPublic'])
-            && request.resource.data.isPublic is bool));
+        && hasSupportedProblemCategory(request.resource.data);
       allow delete: if isOfficer();
 
       match /solutions/{language} {

@@ -24,12 +24,11 @@ Keep problem metadata separate from solution documents. Metadata includes the pr
 
 Firestore Security Rules are the actual hidden-answer permission boundary. A hidden answer must not be readable by an anonymous member client. Live Solution-document reads require the parent Problem's `answersVisible` to be true. Ended-session Solution reads do not depend on `answersVisible`; draft Solutions remain officer-only. Rules also restrict session and problem management to authenticated officers. UI state such as **Hide Answers** is not a substitute for these rules.
 
-Problem Bank publication intent is stored separately from temporary live-session
-hiding. New Bank entries start unpublished. Member visibility requires an
-Officer-published entry that is not temporarily hidden because the active live
-Session uses it. Not Live, End, and supported live Session deletion release only
-the temporary hide and retain publication intent. Firestore Rules enforce this
-for Bank metadata and Bank Solutions.
+Problem Bank content is public by default and is hidden only while referenced by
+the active live Session. Not Live, End, and supported live Session deletion
+release the temporary hide. Firestore Rules enforce this for Bank metadata and
+nested content, including direct reads protected by the live Session's
+`bankProblemIds` relationship.
 
 ## Session model and presentation behavior
 

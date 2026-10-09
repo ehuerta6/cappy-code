@@ -23,7 +23,6 @@ import {
   getBankProblem,
   listBankProblemApproachTags,
   listOfficerBankProblems,
-  updateBankPublication,
   updateBankProblem,
   updateBankSolution,
   updateBankApproach,
@@ -74,13 +73,9 @@ export default function OfficerProblemBank() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [publicationSaving, setPublicationSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState(false);
   const [structuralBusy, setStructuralBusy] = useState(false);
-  const [publicationError, setPublicationError] = useState<boolean | null>(
-    null,
-  );
   const [revision, setRevision] = useState(0);
   const selected = records.find(({ id }) => id === selectedId);
   const filteredRecords = filterProblemBank(
@@ -223,10 +218,7 @@ export default function OfficerProblemBank() {
         }
         const fields = Object.fromEntries(
           Object.entries(result.problem).filter(
-            ([key]) =>
-              key !== 'id' &&
-              key !== 'isPublished' &&
-              key !== 'isTemporarilyHidden',
+            ([key]) => key !== 'id' && key !== 'isTemporarilyHidden',
           ),
         ) as BankProblemContent;
         setContent(fields);
@@ -326,34 +318,8 @@ export default function OfficerProblemBank() {
     }
   }
 
-  async function changePublication(isPublished: boolean) {
-    if (!selectedId || publicationSaving) return;
-    setPublicationSaving(true);
-    setPublicationError(null);
-    try {
-      await updateBankPublication(selectedId, isPublished);
-      setRecords((items) =>
-        items.map((item) =>
-          item.id === selectedId ? { ...item, isPublished } : item,
-        ),
-      );
-    } catch {
-      setPublicationError(isPublished);
-    } finally {
-      setPublicationSaving(false);
-    }
-  }
-
   async function removeSelected(retry = false) {
-    if (
-      !selectedId ||
-      dirty ||
-      saving ||
-      deleting ||
-      structuralBusy ||
-      publicationSaving
-    )
-      return;
+    if (!selectedId || dirty || saving || deleting || structuralBusy) return;
     if (
       !retry &&
       !window.confirm(
@@ -506,24 +472,6 @@ export default function OfficerProblemBank() {
           {filteredRecords.length > 0 && selected && content && solutions ? (
             <section className="min-w-0" aria-label={`Edit ${selected.title}`}>
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                <p className="m-0 text-sm text-muted" role="status">
-                  Publication:{' '}
-                  {selected.isPublished ? 'Published' : 'Unpublished'}
-                  {selected.isPublished && selected.isTemporarilyHidden
-                    ? ' · temporarily hidden during the live Session'
-                    : ''}
-                </p>
-                <button
-                  className={buttonClass}
-                  disabled={publicationSaving}
-                  onClick={() => void changePublication(!selected.isPublished)}
-                >
-                  {publicationSaving
-                    ? 'Saving publication…'
-                    : selected.isPublished
-                      ? 'Unpublish'
-                      : 'Publish'}
-                </button>
                 <button
                   className={buttonClass}
                   disabled={!dirty || saving}
@@ -533,7 +481,7 @@ export default function OfficerProblemBank() {
                 </button>
                 <button
                   className={buttonClass}
-                  disabled={dirty || saving || deleting || publicationSaving}
+                  disabled={dirty || saving || deleting}
                   onClick={() => void removeSelected()}
                 >
                   {deleting ? 'Deleting…' : 'Delete Problem'}
@@ -549,19 +497,6 @@ export default function OfficerProblemBank() {
                     onClick={() => void removeSelected(true)}
                   >
                     Retry delete
-                  </button>
-                </p>
-              )}
-              {publicationError !== null && (
-                <p role="alert">
-                  Publication update failed. Retry to confirm the selected
-                  state.{' '}
-                  <button
-                    className={buttonClass}
-                    disabled={publicationSaving}
-                    onClick={() => void changePublication(publicationError)}
-                  >
-                    Retry {publicationError ? 'Publish' : 'Unpublish'}
                   </button>
                 </p>
               )}
