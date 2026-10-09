@@ -148,6 +148,7 @@ test('Officer prepares and presents a Session through its public lifecycle', asy
       const editor = officer
         .getByRole('region', { name: language })
         .locator('.monaco-editor');
+      await expect(editor).toBeVisible();
       await editor.click();
       await officer.keyboard.press('ControlOrMeta+A');
       await officer.keyboard.insertText(
@@ -155,9 +156,12 @@ test('Officer prepares and presents a Session through its public lifecycle', asy
           index
         ],
       );
-      await officer
-        .getByRole('button', { name: 'Save Changes', exact: true })
-        .click();
+      const saveChangesButton = officer.getByRole('button', {
+        name: 'Save Changes',
+        exact: true,
+      });
+      await expect(saveChangesButton).toBeEnabled();
+      await saveChangesButton.click();
       await expect(officer.getByText('Saved ✓')).toBeVisible();
     }
     await expect(
