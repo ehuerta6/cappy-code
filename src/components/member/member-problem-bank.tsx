@@ -6,9 +6,9 @@ import AppHeader from '@/components/app-header';
 import ProblemMarkdown from '@/components/member/problem-markdown';
 import SolutionWorkspace from '@/components/solutions/solution-workspace';
 import {
-  ProblemUsageHistory,
-  ProblemUsageMetadata,
-} from '@/components/problems/problem-usage';
+  ProblemApproachTags,
+  ProblemDifficultyBadge,
+} from '@/components/problems/problem-bank-metadata';
 import { problemCategories } from '@/lib/domain';
 import type { SolutionApproach } from '@/lib/domain';
 import {
@@ -20,6 +20,7 @@ import {
 } from '@/lib/firebase/problem-bank';
 import { listProblemUsageSummaries } from '@/lib/firebase/problem-usage';
 import type { ProblemUsageSummary } from '@/lib/problem-usage';
+import { problemApproachTags } from '@/lib/problem-bank-filters';
 import ProblemBankFilters from '@/components/problems/problem-bank-filters';
 import {
   emptyProblemBankFilters,
@@ -41,7 +42,6 @@ export function MemberProblemBank() {
   >({ status: 'loading' });
   const [retry, setRetry] = useState(0);
   const [usage, setUsage] = useState<Record<string, ProblemUsageSummary>>({});
-  const [usageFailed, setUsageFailed] = useState(false);
   const [tagsByProblem, setTagsByProblem] = useState<Record<string, string[]>>(
     {},
   );
@@ -55,13 +55,11 @@ export function MemberProblemBank() {
     setState({ status: 'loading' });
     setUsage({});
     setTagsByProblem({});
-    setUsageFailed(false);
     setFilters(emptyProblemBankFilters);
     listMemberBankProblems().then(
       (records) => {
         if (!active) return;
         setState({ status: 'ready', records });
-        setUsageFailed(false);
         if (records.length === 0) {
           setUsage({});
           setTagsByProblem({});
@@ -80,10 +78,7 @@ export function MemberProblemBank() {
             if (active) setUsage(summaries);
           },
           () => {
-            if (active) {
-              setUsage({});
-              setUsageFailed(true);
-            }
+            if (active) setUsage({});
           },
         );
       },
@@ -173,21 +168,18 @@ export function MemberProblemBank() {
                           >
                             {record.title}
                           </Link>
-                          <ProblemUsageMetadata
-                            summary={usage[record.id]}
-                            failed={usageFailed}
-                          />
-                          <p className="mb-2 px-3 text-xs text-muted">
-                            {record.difficulty
-                              ? `${record.difficulty[0].toUpperCase()}${record.difficulty.slice(1)}`
-                              : ''}
-                            {tagsByProblem[record.id]?.length
-                              ? ` · ${tagsByProblem[record.id].join(' · ')}`
-                              : ''}
-                            {usage[record.id]?.branches.length
-                              ? ` · ${usage[record.id].branches.map((branch) => (branch === 'intro' ? 'Intro' : branch === 'general' ? 'General' : 'ICPC')).join(', ')}`
-                              : ''}
-                          </p>
+                          <div
+                            className="flex flex-wrap items-center gap-1.5 px-3 pb-3"
+                            role="group"
+                            aria-label={`${record.title} classification`}
+                          >
+                            <ProblemDifficultyBadge
+                              difficulty={record.difficulty}
+                            />
+                            <ProblemApproachTags
+                              tags={tagsByProblem[record.id] ?? []}
+                            />
+                          </div>
                         </li>
                       ))}
                     </ul>
@@ -219,22 +211,10 @@ export function MemberBankProblemPage({ problemId }: { problemId: string }) {
   >({ status: 'loading' });
   const [retry, setRetry] = useState(0);
   const [approachId, setApproachId] = useState('primary');
-  const [usage, setUsage] = useState<ProblemUsageSummary | undefined>();
-  const [usageFailed, setUsageFailed] = useState(false);
   useEffect(() => {
     let active = true;
     setState({ status: 'loading' });
     setApproachId('primary');
-    setUsage(undefined);
-    setUsageFailed(false);
-    listProblemUsageSummaries([problemId]).then(
-      (summaries) => {
-        if (active) setUsage(summaries[problemId]);
-      },
-      () => {
-        if (active) setUsageFailed(true);
-      },
-    );
     getBankProblem(problemId).then(
       (result) => {
         if (active)
@@ -303,11 +283,7 @@ export function MemberBankProblemPage({ problemId }: { problemId: string }) {
                 </h1>
               </div>
               <div className="flex flex-wrap items-center gap-3">
-                {state.problem.difficulty && (
-                  <span className="rounded border border-border-soft px-2 py-1 text-sm capitalize">
-                    {state.problem.difficulty}
-                  </span>
-                )}
+                <ProblemDifficultyBadge difficulty={state.problem.difficulty} />
                 {state.problem.leetcodeUrl && (
                   <a
                     className="text-accent underline-offset-4 hover:underline"
@@ -320,8 +296,12 @@ export function MemberBankProblemPage({ problemId }: { problemId: string }) {
                 )}
               </div>
             </div>
+            <div className="mt-3">
+              <ProblemApproachTags
+                tags={problemApproachTags(state.approaches)}
+              />
+            </div>
             <ProblemMarkdown>{state.problem.description}</ProblemMarkdown>
-            <ProblemUsageHistory summary={usage} failed={usageFailed} />
             {state.problem.constraints && (
               <section
                 className="mt-5 max-w-[80ch]"
@@ -388,14 +368,6 @@ export function MemberBankProblemPage({ problemId }: { problemId: string }) {
                       ))}
                     </div>
                   )}
-                  {state.approaches.find(({ id }) => id === approachId)?.tags
-                    .length ? (
-                    <p className="mb-3 text-sm text-muted">
-                      {state.approaches
-                        .find(({ id }) => id === approachId)
-                        ?.tags.join(' · ')}
-                    </p>
-                  ) : null}
                   <SolutionWorkspace
                     solutions={
                       state.approaches.find(({ id }) => id === approachId)
