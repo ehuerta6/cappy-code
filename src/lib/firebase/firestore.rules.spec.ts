@@ -670,6 +670,98 @@ describe('Firestore security rules', () => {
     await assertSucceeds(getDoc(doc(member, 'problemBank/used-live')));
   });
 
+  it('retries live Session deletion when another branch claims the same Bank Problem during deletion', async () => {
+    const db = officerDb();
+    await environment.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'sessions/general-arrives'), {
+        title: 'General arrives during deletion',
+        date: '2026-10-09',
+        branch: 'general',
+        status: 'draft',
+        bankProblemIds: ['used-live'],
+      });
+    });
+
+    let signalDeletionReads!: () => void;
+    let releaseDeletion!: () => void;
+    const deletionReadsReady = new Promise<void>((resolve) => {
+      signalDeletionReads = resolve;
+    });
+    const deletionMayCommit = new Promise<void>((resolve) => {
+      releaseDeletion = resolve;
+    });
+    let deletionAttempts = 0;
+    const deletion = runTransaction(db, async (transaction) => {
+      deletionAttempts += 1;
+      const [session, ...controls] = await Promise.all([
+        transaction.get(doc(db, 'sessions/live')),
+        transaction.get(doc(db, 'sessionControl/liveSession')),
+        transaction.get(doc(db, 'sessionControl/intro')),
+        transaction.get(doc(db, 'sessionControl/general')),
+        transaction.get(doc(db, 'sessionControl/icpc')),
+        transaction.get(doc(db, 'problemBank/used-live')),
+      ]);
+      const intro = controls[1]!;
+      const general = controls[2]!;
+      const icpc = controls[3]!;
+      const bank = controls[4]!;
+      if (deletionAttempts === 1) {
+        signalDeletionReads();
+        await deletionMayCommit;
+      }
+      const remainingClaim = [intro, general, icpc].find(
+        (claim) =>
+          claim.exists() &&
+          claim.data().sessionId !== 'live' &&
+          claim.data().bankProblemIds?.includes('used-live'),
+      );
+      const remainingOwner = remainingClaim?.exists()
+        ? remainingClaim.data().sessionId
+        : null;
+      transaction.update(doc(db, 'sessionControl/intro'), {
+        sessionId: null,
+        bankProblemIds: [],
+      });
+      if (bank.data()?.hiddenByLiveSessionId !== (remainingOwner ?? null))
+        transaction.update(doc(db, 'problemBank/used-live'), {
+          hiddenByLiveSessionId: remainingOwner ?? null,
+        });
+      transaction.delete(doc(db, 'sessions/live'));
+      expect(session.data()?.status).toBe('live');
+    });
+
+    await deletionReadsReady;
+    await runTransaction(db, async (transaction) => {
+      await Promise.all([
+        transaction.get(doc(db, 'sessions/general-arrives')),
+        transaction.get(doc(db, 'sessionControl/general')),
+        transaction.get(doc(db, 'problemBank/used-live')),
+      ]);
+      transaction.update(doc(db, 'sessions/general-arrives'), {
+        status: 'live',
+      });
+      transaction.set(doc(db, 'sessionControl/general'), {
+        sessionId: 'general-arrives',
+        bankProblemIds: ['used-live'],
+      });
+      transaction.update(doc(db, 'problemBank/used-live'), {
+        hiddenByLiveSessionId: 'general-arrives',
+      });
+    });
+    releaseDeletion();
+    await deletion;
+
+    expect(deletionAttempts).toBeGreaterThan(1);
+    expect(
+      (await getDoc(doc(db, 'sessions/general-arrives'))).data()?.status,
+    ).toBe('live');
+    expect(
+      (await getDoc(doc(db, 'problemBank/used-live'))).data()
+        ?.hiddenByLiveSessionId,
+    ).toBe('general-arrives');
+    await assertFails(getDoc(doc(anonymousDb(), 'problemBank/used-live')));
+  });
+
   it('allows Not Live only with the pointer cleared and preserves prepared Problem data', async () => {
     const db = officerDb();
     await assertFails(updateDoc(doc(db, 'sessions/live'), { status: 'draft' }));

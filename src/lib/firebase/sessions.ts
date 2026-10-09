@@ -28,13 +28,14 @@ import { todayCalendarDate } from '../calendar-date';
 import { getOfficerAuth } from './auth';
 import { getFirestoreDb } from './client';
 import {
+  approachPath,
   approachCollectionPath,
   approachSolutionPath,
   bankProblemPath,
   problemPath,
   sessionPath,
+  solutionPath,
 } from './paths';
-import { appendProblemDeletion } from './problems';
 import { getApproaches } from './solutions';
 
 export interface SessionRecord {
@@ -410,7 +411,9 @@ export async function transitionSession(
       claims[targetBranch].exists() &&
       claims[targetBranch].data().sessionId === id;
     const transitionBankIds = new Set<string>();
-    if (nextStatus === 'live' || releaseTargetClaim) {
+    const releasesLegacyTarget =
+      nextStatus !== 'live' && legacyId === id && legacyIsLive;
+    if (nextStatus === 'live' || releaseTargetClaim || releasesLegacyTarget) {
       for (const bankId of bankIdsFromData(snapshot.data()))
         transitionBankIds.add(bankId);
     }
@@ -517,55 +520,6 @@ export async function deleteSession(id: string): Promise<void> {
     collection(db, `${sessionPath(id)}/problems`),
   );
   const sessionReference = doc(db, sessionPath(id));
-  const [session, legacyControl] = await Promise.all([
-    getDocFromServer(sessionReference),
-    getDocFromServer(doc(db, 'sessionControl/liveSession')),
-  ]);
-  const branch = session.exists() ? branchFromData(session.data()) : null;
-  const liveBranchReference = branch
-    ? doc(db, `sessionControl/${branch}`)
-    : null;
-  const branchClaims = await Promise.all(
-    sessionBranches.map((item) =>
-      getDocFromServer(doc(db, `sessionControl/${item}`)),
-    ),
-  );
-  const branchOwners = new Map<string, Record<string, unknown>>();
-  for (const claim of branchClaims) {
-    const ownerId = claim.exists() ? claim.data().sessionId : null;
-    if (typeof ownerId !== 'string' || ownerId === id) continue;
-    branchOwners.set(ownerId, claim.data() ?? {});
-  }
-  const branchClaimIndex = branch ? sessionBranches.indexOf(branch) : -1;
-  const branchClaim =
-    branchClaimIndex >= 0 ? branchClaims[branchClaimIndex] : undefined;
-  const releasesLiveClaim =
-    session.exists() &&
-    session.data().status === 'live' &&
-    ((liveBranchReference !== null &&
-      branchClaim?.exists() &&
-      branchClaim.data().sessionId === id) ||
-      (legacyControl.exists() && legacyControl.data().sessionId === id));
-  const bankProblemIds: string[] =
-    session.exists() && Array.isArray(session.data().bankProblemIds)
-      ? [
-          ...new Set<string>(
-            session
-              .data()
-              .bankProblemIds.filter(
-                (bankId: unknown): bankId is string =>
-                  typeof bankId === 'string',
-              ),
-          ),
-        ]
-      : [];
-  const bankSnapshots = releasesLiveClaim
-    ? await Promise.all(
-        bankProblemIds.map((bankId) =>
-          getDocFromServer(doc(db, bankProblemPath(bankId))),
-        ),
-      )
-    : [];
   const approachSnapshots = await Promise.all(
     problems.docs.map((problem) =>
       getDocsFromServer(
@@ -578,51 +532,117 @@ export async function deleteSession(id: string): Promise<void> {
       count + 4 + approachSnapshots[index].docs.length * 4,
     0,
   );
-  const bankVisibilityWrites = bankSnapshots.filter((item) =>
-    item.exists(),
-  ).length;
-  // Keep the entire cascade atomic within Firestore's 500-write batch limit.
-  const writeCount =
-    problemWrites +
-    1 +
-    Number(releasesLiveClaim) *
-      (Number(branchClaim?.exists() === true) +
-        Number(
-          legacyControl.exists() && legacyControl.data().sessionId === id,
-        )) +
-    bankVisibilityWrites;
-  if (writeCount > 500)
+  if (problemWrites + 1 > 500)
     throw new Error('Too many problems to delete this session in one batch.');
-  const batch = writeBatch(db);
-  problems.docs.forEach((problem, index) =>
-    appendProblemDeletion(
-      batch,
-      db,
-      id,
-      problem.id,
-      approachSnapshots[index].docs.map(({ id: approachId }) => approachId),
-    ),
-  );
-  if (releasesLiveClaim) {
-    if (branchClaim?.exists() && branchClaim.data().sessionId === id)
-      batch.update(liveBranchReference!, {
+
+  await runTransaction(db, async (transaction) => {
+    const session = await transaction.get(sessionReference);
+    const legacyReference = doc(db, 'sessionControl/liveSession');
+    const branchReferences = Object.fromEntries(
+      sessionBranches.map((item) => [item, doc(db, `sessionControl/${item}`)]),
+    ) as Record<SessionBranch, ReturnType<typeof doc>>;
+    const [legacyControl, ...branchClaims] = await Promise.all([
+      transaction.get(legacyReference),
+      ...sessionBranches.map((item) => transaction.get(branchReferences[item])),
+    ]);
+    const claims = Object.fromEntries(
+      sessionBranches.map((branch, index) => [branch, branchClaims[index]]),
+    ) as Record<SessionBranch, (typeof branchClaims)[number]>;
+    const branch = session.exists() ? branchFromData(session.data()) : null;
+    const branchClaim = branch ? claims[branch] : undefined;
+    const legacyId = legacyControl.exists()
+      ? legacyControl.data().sessionId
+      : null;
+    let legacyOwner: Awaited<ReturnType<typeof transaction.get>> | null = null;
+    if (typeof legacyId === 'string' && legacyId !== id)
+      legacyOwner = await transaction.get(doc(db, sessionPath(legacyId)));
+
+    const releasesLiveClaim =
+      session.exists() &&
+      session.data().status === 'live' &&
+      ((branchClaim?.exists() && branchClaim.data().sessionId === id) ||
+        legacyId === id);
+    const bankProblemIds = releasesLiveClaim
+      ? bankIdsFromData(session.data())
+      : [];
+    const bankSnapshots = await Promise.all(
+      bankProblemIds.map((bankId) =>
+        transaction.get(doc(db, bankProblemPath(bankId))),
+      ),
+    );
+
+    const branchOwners = new Map<string, Record<string, unknown>>();
+    for (const claim of branchClaims) {
+      const ownerId = claim.exists() ? claim.data().sessionId : null;
+      if (typeof ownerId !== 'string' || ownerId === id) continue;
+      branchOwners.set(ownerId, claim.data() ?? {});
+    }
+    const legacyOwnerData = legacyOwner?.exists()
+      ? (legacyOwner.data() as Record<string, unknown>)
+      : null;
+    if (
+      typeof legacyId === 'string' &&
+      legacyId !== id &&
+      legacyOwnerData?.status === 'live'
+    )
+      branchOwners.set(legacyId, legacyOwnerData);
+
+    const branchClaimReleased =
+      releasesLiveClaim &&
+      branchClaim?.exists() &&
+      branchClaim.data().sessionId === id;
+    const legacyClaimReleased = releasesLiveClaim && legacyId === id;
+    const bankMarkerUpdates = bankSnapshots.flatMap((bank) => {
+      if (!bank.exists()) return [];
+      const remainingUser = [...branchOwners.entries()].find(([, data]) =>
+        bankIdsFromData(data).includes(bank.id),
+      )?.[0];
+      const marker = remainingUser ?? null;
+      return bank.data().hiddenByLiveSessionId === marker
+        ? []
+        : [{ reference: bank.ref, marker }];
+    });
+    const writeCount =
+      problemWrites +
+      1 +
+      Number(branchClaimReleased) +
+      Number(legacyClaimReleased) +
+      bankMarkerUpdates.length;
+    if (writeCount > 500)
+      throw new Error('Too many problems to delete this session in one batch.');
+
+    for (const [problemIndex, problem] of problems.docs.entries()) {
+      for (const { id: approachId } of approachSnapshots[problemIndex].docs) {
+        for (const language of languages)
+          transaction.delete(
+            doc(
+              db,
+              approachSolutionPath(
+                problemPath(id, problem.id),
+                approachId,
+                language,
+              ),
+            ),
+          );
+        transaction.delete(
+          doc(db, approachPath(problemPath(id, problem.id), approachId)),
+        );
+      }
+      for (const language of languages)
+        transaction.delete(doc(db, solutionPath(id, problem.id, language)));
+      transaction.delete(doc(db, problemPath(id, problem.id)));
+    }
+    if (branchClaimReleased)
+      transaction.update(branchReferences[branch!], {
         sessionId: null,
         bankProblemIds: [],
       });
-    if (legacyControl.exists() && legacyControl.data().sessionId === id)
-      batch.update(doc(db, 'sessionControl/liveSession'), { sessionId: null });
-    for (const bank of bankSnapshots) {
-      if (bank.exists()) {
-        const remainingUser = [...branchOwners.entries()].find(([, data]) =>
-          bankIdsFromData(data).includes(bank.id),
-        )?.[0];
-        if (bank.data().hiddenByLiveSessionId !== (remainingUser ?? null))
-          batch.update(bank.ref, {
-            hiddenByLiveSessionId: remainingUser ?? null,
-          });
-      }
-    }
-  }
-  batch.delete(sessionReference);
-  await batch.commit();
+    if (legacyClaimReleased)
+      transaction.update(legacyReference, { sessionId: null });
+    for (const update of bankMarkerUpdates)
+      transaction.update(update.reference, {
+        hiddenByLiveSessionId: update.marker,
+      });
+    transaction.delete(sessionReference);
+  });
 }

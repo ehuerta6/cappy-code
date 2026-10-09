@@ -17,6 +17,7 @@ const sdk = vi.hoisted(() => ({
   transactionGet: vi.fn(),
   transactionUpdate: vi.fn(),
   transactionSet: vi.fn(),
+  transactionDelete: vi.fn(),
   transactionStatus: 'draft' as string,
   transactionLiveSessionId: null as string | null,
   transactionLiveSessionExists: false,
@@ -99,12 +100,25 @@ beforeEach(() => {
         : { status: sdk.transactionStatus },
   }));
   sdk.transactionGet.mockImplementation(async (reference) => {
+    if (reference.path === 'sessionControl/liveSession')
+      return { exists: () => false, data: () => undefined };
     if (reference.path === 'sessionControl/intro')
       return {
         exists: () => sdk.transactionLiveSessionExists,
         data: () => ({ sessionId: sdk.transactionLiveSessionId }),
       };
+    if (reference.path.startsWith('sessionControl/'))
+      return { exists: () => false, data: () => undefined };
     if (reference.path === 'problemBank/deleted-source')
+      return { exists: () => false, data: () => undefined };
+    if (reference.path.startsWith('problemBank/'))
+      return { exists: () => false, data: () => undefined };
+    if (reference.path === 'sessions/session-id')
+      return {
+        exists: () => true,
+        data: () => ({ ...session, status: sdk.transactionStatus }),
+      };
+    if (reference.path.startsWith('sessions/'))
       return { exists: () => false, data: () => undefined };
     return {
       exists: () => true,
@@ -116,6 +130,7 @@ beforeEach(() => {
       get: sdk.transactionGet,
       update: sdk.transactionUpdate,
       set: sdk.transactionSet,
+      delete: sdk.transactionDelete,
     }),
   );
   sdk.getCountFromServer.mockResolvedValue({ data: () => ({ count: 1 }) });
@@ -637,6 +652,19 @@ describe('officer session persistence', () => {
     sdk.transactionStatus = 'live';
     sdk.transactionLiveSessionExists = true;
     sdk.transactionLiveSessionId = 'current-live';
+    sdk.transactionGet.mockImplementation(async (reference) => {
+      if (reference.path === 'sessions/legacy-live')
+        return {
+          exists: () => true,
+          data: () => ({ ...session, status: 'live' }),
+        };
+      if (reference.path === 'sessionControl/intro')
+        return {
+          exists: () => true,
+          data: () => ({ sessionId: 'current-live' }),
+        };
+      return { exists: () => false, data: () => undefined };
+    });
     await transitionSession('legacy-live', 'draft');
     expect(sdk.transactionUpdate).toHaveBeenCalledWith(
       { path: 'sessions/legacy-live' },
@@ -644,6 +672,55 @@ describe('officer session persistence', () => {
     );
     expect(sdk.transactionSet).not.toHaveBeenCalled();
   });
+
+  it.each(['draft', 'ended'] as const)(
+    'releases Bank visibility for a legacy-only live Session becoming %s while preserving another branch use',
+    async (nextStatus) => {
+      sdk.transactionGet.mockImplementation(async (reference) => {
+        if (reference.path === 'sessions/session-id')
+          return {
+            exists: () => true,
+            data: () => ({
+              ...session,
+              status: 'live',
+              bankProblemIds: ['shared-bank'],
+            }),
+          };
+        if (reference.path === 'sessionControl/liveSession')
+          return {
+            exists: () => true,
+            data: () => ({ sessionId: 'session-id' }),
+          };
+        if (reference.path === 'sessionControl/general')
+          return {
+            exists: () => true,
+            data: () => ({
+              sessionId: 'general-live',
+              bankProblemIds: ['shared-bank'],
+            }),
+          };
+        if (reference.path === 'problemBank/shared-bank')
+          return {
+            exists: () => true,
+            id: 'shared-bank',
+            ref: reference,
+            data: () => ({ hiddenByLiveSessionId: 'session-id' }),
+          };
+        return { exists: () => false, data: () => undefined };
+      });
+
+      await transitionSession('session-id', nextStatus);
+
+      expect(sdk.transactionUpdate).toHaveBeenCalledWith(
+        { path: 'sessionControl/liveSession' },
+        { sessionId: null },
+      );
+      expect(sdk.transactionUpdate).toHaveBeenCalledWith(
+        { path: 'problemBank/shared-bank' },
+        { hiddenByLiveSessionId: 'general-live' },
+      );
+    },
+  );
 
   it('rejects empty Go Live attempts and invalid state transitions before commit', async () => {
     sdk.getDocsFromServer.mockResolvedValueOnce({ docs: [], empty: true });
@@ -685,7 +762,7 @@ describe('officer session persistence', () => {
     );
     await deleteSession('session-id');
     expect(
-      sdk.batchDelete.mock.calls.map(([reference]) => reference.path),
+      sdk.transactionDelete.mock.calls.map(([reference]) => reference.path),
     ).toEqual([
       'sessions/session-id/problems/first/approaches/primary/solutions/python',
       'sessions/session-id/problems/first/approaches/primary/solutions/java',
@@ -705,7 +782,7 @@ describe('officer session persistence', () => {
       'sessions/session-id/problems/second',
       'sessions/session-id',
     ]);
-    expect(sdk.batchCommit).toHaveBeenCalledTimes(1);
+    expect(sdk.runTransaction).toHaveBeenCalledTimes(1);
     expect(sdk.updateDoc).not.toHaveBeenCalled();
   });
 
@@ -715,19 +792,19 @@ describe('officer session persistence', () => {
     sdk.transactionLiveSessionId = 'session-id';
     sdk.getDocsFromServer.mockResolvedValue({ docs: [] });
     await deleteSession('session-id');
-    expect(sdk.batchUpdate).toHaveBeenCalledWith(
+    expect(sdk.transactionUpdate).toHaveBeenCalledWith(
       { path: 'sessionControl/intro' },
       { sessionId: null, bankProblemIds: [] },
     );
-    expect(sdk.batchDelete).toHaveBeenCalledWith({
+    expect(sdk.transactionDelete).toHaveBeenCalledWith({
       path: 'sessions/session-id',
     });
-    expect(sdk.batchCommit).toHaveBeenCalledOnce();
+    expect(sdk.runTransaction).toHaveBeenCalledOnce();
   });
 
   it('deleting one live branch keeps another branch claim and shared Bank hide', async () => {
     sdk.getDocsFromServer.mockResolvedValue({ docs: [] });
-    sdk.getDocFromServer.mockImplementation(async (reference) => {
+    sdk.transactionGet.mockImplementation(async (reference) => {
       if (reference.path === 'sessions/session-id')
         return {
           exists: () => true,
@@ -750,16 +827,6 @@ describe('officer session persistence', () => {
             bankProblemIds: ['bank-one'],
           }),
         };
-      if (reference.path === 'sessions/general-live')
-        return {
-          exists: () => true,
-          data: () => ({
-            ...session,
-            branch: 'general',
-            status: 'live',
-            bankProblemIds: ['bank-one'],
-          }),
-        };
       if (reference.path === 'problemBank/bank-one')
         return {
           exists: () => true,
@@ -767,28 +834,113 @@ describe('officer session persistence', () => {
           ref: reference,
           data: () => ({ hiddenByLiveSessionId: 'session-id' }),
         };
+      if (reference.path === 'sessionControl/liveSession')
+        return { exists: () => false, data: () => undefined };
+      if (reference.path === 'sessionControl/icpc')
+        return { exists: () => false, data: () => undefined };
       return { exists: () => false, data: () => undefined };
     });
 
     await deleteSession('session-id');
 
-    expect(sdk.batchUpdate).toHaveBeenCalledWith(
+    expect(sdk.transactionUpdate).toHaveBeenCalledWith(
       { path: 'sessionControl/intro' },
       { sessionId: null, bankProblemIds: [] },
     );
-    expect(sdk.batchUpdate).toHaveBeenCalledWith(
+    expect(sdk.transactionUpdate).toHaveBeenCalledWith(
       { path: 'problemBank/bank-one' },
       { hiddenByLiveSessionId: 'general-live' },
     );
-    expect(sdk.batchUpdate.mock.calls).not.toContainEqual([
+    expect(sdk.transactionUpdate.mock.calls).not.toContainEqual([
       { path: 'sessionControl/general' },
       expect.anything(),
     ]);
   });
 
+  it('re-reads branch owners when deletion retries after another branch goes live', async () => {
+    sdk.getDocsFromServer.mockResolvedValue({ docs: [] });
+    let generalClaim: { sessionId: string | null; bankProblemIds: string[] } = {
+      sessionId: null,
+      bankProblemIds: [],
+    };
+    let bankMarker: string | null = 'session-id';
+    sdk.transactionGet.mockImplementation(async (reference) => {
+      if (reference.path === 'sessions/session-id')
+        return {
+          exists: () => true,
+          data: () => ({
+            ...session,
+            status: 'live',
+            bankProblemIds: ['bank-one'],
+          }),
+        };
+      if (reference.path === 'sessionControl/intro')
+        return {
+          exists: () => true,
+          data: () => ({
+            sessionId: 'session-id',
+            bankProblemIds: ['bank-one'],
+          }),
+        };
+      if (reference.path === 'sessionControl/general')
+        return {
+          exists: () => generalClaim.sessionId !== null,
+          data: () => generalClaim,
+        };
+      if (reference.path === 'problemBank/bank-one')
+        return {
+          exists: () => true,
+          id: 'bank-one',
+          ref: reference,
+          data: () => ({ hiddenByLiveSessionId: bankMarker }),
+        };
+      return { exists: () => false, data: () => undefined };
+    });
+    let attempts = 0;
+    sdk.runTransaction.mockImplementation(async (_db, callback) => {
+      const executeAttempt = async () => {
+        attempts += 1;
+        await callback({
+          get: sdk.transactionGet,
+          update: sdk.transactionUpdate,
+          set: sdk.transactionSet,
+          delete: sdk.transactionDelete,
+        });
+      };
+      await executeAttempt();
+      // Simulate a competing Go Live commit invalidating the first attempt.
+      generalClaim = {
+        sessionId: 'general-live',
+        bankProblemIds: ['bank-one'],
+      };
+      bankMarker = 'general-live';
+      sdk.transactionUpdate.mockClear();
+      sdk.transactionDelete.mockClear();
+      await executeAttempt();
+    });
+
+    await deleteSession('session-id');
+
+    expect(attempts).toBe(2);
+    expect(sdk.transactionUpdate).toHaveBeenCalledWith(
+      { path: 'sessionControl/intro' },
+      { sessionId: null, bankProblemIds: [] },
+    );
+    expect(
+      sdk.transactionUpdate.mock.calls.some(
+        ([reference, update]) =>
+          reference.path === 'problemBank/bank-one' &&
+          update.hiddenByLiveSessionId === null,
+      ),
+    ).toBe(false);
+    expect(sdk.transactionDelete).toHaveBeenCalledWith({
+      path: 'sessions/session-id',
+    });
+  });
+
   it('deletes a Session while releasing a live claim with a missing Bank source', async () => {
     sdk.getDocsFromServer.mockResolvedValue({ docs: [] });
-    sdk.getDocFromServer.mockImplementation(async (reference) => {
+    sdk.transactionGet.mockImplementation(async (reference) => {
       if (reference.path === 'sessions/session-id')
         return {
           exists: () => true,
@@ -803,35 +955,39 @@ describe('officer session persistence', () => {
           exists: () => true,
           data: () => ({ sessionId: 'session-id' }),
         };
+      if (reference.path === 'sessionControl/liveSession')
+        return { exists: () => false, data: () => undefined };
       return { exists: () => false, data: () => undefined };
     });
 
     await expect(deleteSession('session-id')).resolves.toBeUndefined();
 
-    expect(sdk.batchUpdate).toHaveBeenCalledWith(
+    expect(sdk.transactionUpdate).toHaveBeenCalledWith(
       { path: 'sessionControl/intro' },
       { sessionId: null, bankProblemIds: [] },
     );
-    expect(sdk.batchDelete).toHaveBeenCalledWith({
+    expect(sdk.transactionDelete).toHaveBeenCalledWith({
       path: 'sessions/session-id',
     });
     expect(
-      sdk.batchUpdate.mock.calls.some(
+      sdk.transactionUpdate.mock.calls.some(
         ([reference]) => reference.path === 'problemBank/deleted-source',
       ),
     ).toBe(false);
-    expect(sdk.batchCommit).toHaveBeenCalledOnce();
+    expect(sdk.runTransaction).toHaveBeenCalledOnce();
   });
 
-  it('deletes an empty session in one batch and rejects oversized cascades before writing', async () => {
+  it('deletes an empty session atomically and rejects oversized cascades before writing', async () => {
     sdk.getDocsFromServer.mockImplementation(async (reference) =>
       reference.path === 'sessions/empty/problems'
         ? { docs: [] }
         : { docs: [] },
     );
     await deleteSession('empty');
-    expect(sdk.batchDelete).toHaveBeenCalledWith({ path: 'sessions/empty' });
-    sdk.batchDelete.mockClear();
+    expect(sdk.transactionDelete).toHaveBeenCalledWith({
+      path: 'sessions/empty',
+    });
+    sdk.transactionDelete.mockClear();
     sdk.getDocsFromServer.mockImplementation(async (reference) =>
       reference.path === 'sessions/large/problems'
         ? {
@@ -842,7 +998,7 @@ describe('officer session persistence', () => {
         : { docs: [] },
     );
     await expect(deleteSession('large')).rejects.toThrow('Too many problems');
-    expect(sdk.batchDelete).not.toHaveBeenCalled();
+    expect(sdk.transactionDelete).not.toHaveBeenCalled();
   });
 
   it('counts each Approach and its three Solutions toward the Session batch limit', async () => {
@@ -858,12 +1014,12 @@ describe('officer session persistence', () => {
           : { docs: [] },
     );
     await expect(deleteSession('large')).rejects.toThrow('Too many problems');
-    expect(sdk.batchDelete).not.toHaveBeenCalled();
+    expect(sdk.transactionDelete).not.toHaveBeenCalled();
   });
 
-  it('propagates failed cascade commits without presenting deletion success', async () => {
+  it('propagates failed cascade transactions without presenting deletion success', async () => {
     const error = new Error('offline');
-    sdk.batchCommit.mockRejectedValue(error);
+    sdk.runTransaction.mockRejectedValue(error);
     await expect(deleteSession('session-id')).rejects.toBe(error);
   });
 
