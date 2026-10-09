@@ -341,6 +341,12 @@ describe('Problem Bank import planning safety', () => {
     expect(reviewed.reviewedHistoricalSkips).toBe(1);
     expect(reviewed.unresolvedHistoricalSnapshots).toBe(0);
     expect(isImportPlanBlocked(reviewed)).toBe(false);
+    const ambiguityPlan = buildImportPlan(manifest, {
+      problems: {},
+      sessions: {},
+    });
+    expect(ambiguityPlan.irreducibleAmbiguities).toHaveLength(6);
+    expect(isImportPlanBlocked(ambiguityPlan)).toBe(false);
     expect(
       reviewed.problems
         .flatMap((problem) => problem.backfills)
@@ -371,6 +377,35 @@ describe('Problem Bank import planning safety', () => {
     expect(isImportPlanBlocked(pending)).toBe(true);
   });
 
+  it('blocks pending difficulty approvals and allows all human-reviewed proposals', () => {
+    const pendingManifest = structuredClone(manifest);
+    pendingManifest.problems[0].difficultyProvenance.requiresHumanApproval = true;
+    const pending = buildImportPlan(pendingManifest, {
+      problems: {},
+      sessions: {},
+    });
+    expect(pending.pendingDifficultyApprovals).toHaveLength(1);
+    expect(isImportPlanBlocked(pending)).toBe(true);
+
+    const reviewed = buildImportPlan(manifest, { problems: {}, sessions: {} });
+    expect(reviewed.pendingDifficultyApprovals).toHaveLength(0);
+    expect(
+      manifest.problems.filter(
+        (problem) => problem.difficultyProvenance.proposed,
+      ),
+    ).toHaveLength(27);
+    expect(
+      manifest.problems
+        .filter((problem) => problem.difficultyProvenance.proposed)
+        .every(
+          (problem) =>
+            problem.difficultyProvenance.humanReviewed === true &&
+            !problem.difficultyProvenance.requiresHumanApproval,
+        ),
+    ).toBe(true);
+    expect(isImportPlanBlocked(reviewed)).toBe(false);
+  });
+
   it('surfaces the current production Two Sum record as a conflict', () => {
     const problem = manifest.problems.find(
       (entry) => entry.title === 'Two Sum',
@@ -384,5 +419,6 @@ describe('Problem Bank import planning safety', () => {
     });
     expect(plan.counts.CONFLICT).toBe(1);
     expect(plan.conflicts).toContain('Two Sum');
+    expect(isImportPlanBlocked(plan)).toBe(true);
   });
 });

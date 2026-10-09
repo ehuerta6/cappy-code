@@ -59,6 +59,7 @@ export interface ImportProblem {
     source: string;
     reason: string;
     reviewed: boolean;
+    humanReviewed?: boolean;
     proposed?: boolean;
     requiresHumanApproval?: boolean;
   };
@@ -552,7 +553,11 @@ export async function runImportPlan<T>(
 }
 
 export function isImportPlanBlocked(plan: ImportPlan) {
-  return plan.conflicts.length > 0 || plan.unresolvedHistoricalSnapshots > 0;
+  return (
+    plan.conflicts.length > 0 ||
+    plan.unresolvedHistoricalSnapshots > 0 ||
+    plan.pendingDifficultyApprovals.length > 0
+  );
 }
 
 export interface LiveState {
