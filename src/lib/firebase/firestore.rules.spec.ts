@@ -618,6 +618,13 @@ describe('Firestore security rules', () => {
         hiddenByLiveSessionId: null,
       }),
     );
+    await assertFails(
+      setDoc(doc(officer, 'problemBank/created-hidden'), {
+        title: 'Cannot create already hidden',
+        category: 'custom',
+        hiddenByLiveSessionId: 'live',
+      }),
+    );
   });
 
   it('denies Member Bank deletion and preserves Session snapshots when an Officer deletes the Bank hierarchy', async () => {

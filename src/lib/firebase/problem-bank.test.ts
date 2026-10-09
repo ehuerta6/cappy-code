@@ -291,6 +291,11 @@ describe('Problem Bank snapshots', () => {
         approachesEnabled: true,
       },
     );
+    const bankParent = sdk.transactionSet.mock.calls.find(
+      ([reference]) => reference.path === 'problemBank/reserved-bank',
+    )?.[1];
+    expect(bankParent).not.toHaveProperty('isPublished');
+    expect(bankParent).not.toHaveProperty('isPublic');
     for (const language of ['python', 'java', 'cpp'] as const) {
       expect(sdk.transactionSet).toHaveBeenCalledWith(
         { path: `problemBank/reserved-bank/solutions/${language}` },
@@ -377,17 +382,23 @@ describe('Problem Bank snapshots', () => {
     expect(sdk.runTransaction).not.toHaveBeenCalled();
   });
 
-  it('materializes a Session Problem with live hiding when its Session is live', async () => {
-    sdk.transactionGet.mockResolvedValueOnce({
-      exists: () => true,
-      data: () => ({ status: 'live' }),
-    });
-    await materializeSessionProblemInBank('session', 'problem');
-    expect(sdk.transactionSet).toHaveBeenCalledWith(
-      { path: 'problemBank/reserved-bank' },
-      expect.objectContaining({ hiddenByLiveSessionId: 'session' }),
-    );
-  });
+  it.each(['live', 'ended'] as const)(
+    'rejects Session-to-Bank materialization while the Session is %s',
+    async (status) => {
+      sdk.transactionGet.mockResolvedValueOnce({
+        exists: () => true,
+        data: () => ({ status }),
+      });
+
+      await expect(
+        materializeSessionProblemInBank('session', 'problem'),
+      ).rejects.toThrow(
+        'Only draft Sessions can be materialized into the Problem Bank.',
+      );
+      expect(sdk.transactionSet).not.toHaveBeenCalled();
+      expect(sdk.transactionUpdate).not.toHaveBeenCalled();
+    },
+  );
 
   it('retries failed materialization against the same Bank ID without creating duplicates', async () => {
     sdk.runTransaction.mockRejectedValueOnce(new Error('offline'));

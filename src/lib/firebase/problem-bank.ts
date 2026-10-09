@@ -459,11 +459,14 @@ export async function materializeSessionProblemInBank(
     const sessionSnapshot = await transaction.get(sessionReference);
     if (!sessionSnapshot.exists())
       throw new Error('This Session no longer exists.');
-    const isLive = sessionSnapshot.data().status === 'live';
+    if (sessionSnapshot.data().status !== 'draft')
+      throw new Error(
+        'Only draft Sessions can be materialized into the Problem Bank.',
+      );
 
     transaction.set(bankReference, {
       ...bankContent,
-      hiddenByLiveSessionId: isLive ? sessionId : null,
+      hiddenByLiveSessionId: null,
       approachesEnabled: true,
     });
     for (const [language, solution] of solutionEntries)

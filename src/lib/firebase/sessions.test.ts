@@ -300,6 +300,43 @@ describe('officer session persistence', () => {
     );
   });
 
+  it.each(['draft', 'ended'] as const)(
+    'clears an already-linked Bank Problem when a live Session becomes %s',
+    async (nextStatus) => {
+      sdk.transactionStatus = 'live';
+      sdk.transactionLiveSessionExists = true;
+      sdk.transactionLiveSessionId = 'session-id';
+      sdk.transactionGet.mockImplementation(async (reference) => {
+        if (reference.path === 'sessionControl/liveSession')
+          return {
+            exists: () => true,
+            data: () => ({ sessionId: 'session-id' }),
+          };
+        if (reference.path === 'sessions/session-id')
+          return {
+            exists: () => true,
+            data: () => ({
+              ...session,
+              status: 'live',
+              bankProblemIds: ['bank-one'],
+            }),
+          };
+        return {
+          exists: () => true,
+          ref: { path: reference.path },
+          data: () => ({ hiddenByLiveSessionId: 'session-id' }),
+        };
+      });
+
+      await transitionSession('session-id', nextStatus);
+
+      expect(sdk.transactionUpdate).toHaveBeenCalledWith(
+        { path: 'problemBank/bank-one' },
+        { hiddenByLiveSessionId: null },
+      );
+    },
+  );
+
   it('blocks Go Live when legacy-lock initialization finds another live Session', async () => {
     sdk.getDocsFromServer.mockResolvedValueOnce({
       docs: [document('problem')],
