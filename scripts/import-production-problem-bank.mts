@@ -11,6 +11,8 @@ import {
   buildImportPlan,
   classifyExisting,
   importTarget,
+  isLeetCodeUrl,
+  isImportPlanBlocked,
   missingBankFields,
   missingSolutionFields,
   newBankDocument,
@@ -99,6 +101,8 @@ async function readState(
   selected: ImportProblem[],
 ): Promise<LiveState> {
   const problems: LiveState['problems'] = {};
+  const identityMatches: NonNullable<LiveState['identityMatches']> = {};
+  const identityConflicts: NonNullable<LiveState['identityConflicts']> = {};
   const bankSnapshots = await database.collection('problemBank').get();
   for (const snapshot of bankSnapshots.docs) {
     const existing = await readExistingProblem(database, snapshot.ref);
@@ -109,20 +113,49 @@ async function readState(
     return `${url.hostname.toLowerCase()}${url.pathname.replace(/\/$/, '').toLowerCase()}`;
   };
   for (const problem of selected) {
-    const match = bankSnapshots.docs.find((snapshot) => {
-      const savedUrl = snapshot.get('leetcodeUrl');
-      if (problem.sourceUrl && typeof savedUrl === 'string')
-        return normalizeUrl(savedUrl) === normalizeUrl(problem.sourceUrl);
-      return (
-        (savedUrl === undefined || savedUrl === null || savedUrl === '') &&
-        typeof snapshot.get('title') === 'string' &&
-        (snapshot.get('title') as string).trim().toLowerCase() ===
-          problem.title.trim().toLowerCase()
+    const canonicalUrl = isLeetCodeUrl(problem.canonicalSourceUrl)
+      ? problem.canonicalSourceUrl
+      : undefined;
+    const urlMatches = canonicalUrl
+      ? bankSnapshots.docs.filter((snapshot) => {
+          const savedUrl = snapshot.get('leetcodeUrl');
+          return (
+            typeof savedUrl === 'string' &&
+            isLeetCodeUrl(savedUrl) &&
+            normalizeUrl(savedUrl) === normalizeUrl(canonicalUrl)
+          );
+        })
+      : [];
+    const exactContentMatches = canonicalUrl
+      ? []
+      : bankSnapshots.docs.filter((snapshot) => {
+          const data = snapshot.data();
+          return (
+            data.title === problem.title &&
+            data.description === problem.description &&
+            data.constraints === problem.constraints &&
+            data.exampleInput === problem.exampleInput &&
+            data.exampleOutput === problem.exampleOutput &&
+            data.category === problem.category &&
+            data.difficulty === problem.difficulty
+          );
+        });
+    const matches = urlMatches.length > 0 ? urlMatches : exactContentMatches;
+    if (matches.length > 1) {
+      identityConflicts[problem.id] =
+        `Multiple strong identity matches for ${problem.title}.`;
+      continue;
+    }
+    const match = matches[0];
+    if (match) identityMatches[problem.id] = match.id;
+    else if (problems[problem.id]) identityMatches[problem.id] = problem.id;
+    else {
+      const sameTitle = bankSnapshots.docs.find(
+        (snapshot) => snapshot.get('title') === problem.title,
       );
-    });
-    if (match && match.id !== problem.id) {
-      const existing = problems[match.id];
-      if (existing) problems[`identity-conflict:${problem.id}`] = existing;
+      if (sameTitle)
+        identityConflicts[problem.id] =
+          `Exact title exists under ${sameTitle.id} without a verifiable canonical identity.`;
     }
   }
   const sessions: LiveState['sessions'] = {};
@@ -132,7 +165,8 @@ async function readState(
     ...selected.flatMap((problem) =>
       problem.provenanceBackfills.map((entry) => entry.sessionId),
     ),
-    ...manifest.unresolvedHistoricalSnapshots.map((entry) => entry.sessionId),
+    ...manifest.pendingHistoricalReviews.map((entry) => entry.sessionId),
+    ...manifest.reviewedHistoricalSkips.map((entry) => entry.sessionId),
   ]);
   for (const sessionId of sessionIds) {
     const sessionRef = database.doc(`sessions/${sessionId}`);
@@ -149,11 +183,15 @@ async function readState(
       ),
     };
   }
-  return { problems, sessions };
+  return { problems, identityMatches, identityConflicts, sessions };
 }
 
-async function writeProblem(database: Firestore, problem: ImportProblem) {
-  const parent = database.doc(`problemBank/${problem.id}`);
+async function writeProblem(
+  database: Firestore,
+  problem: ImportProblem,
+  targetProblemId: string,
+) {
+  const parent = database.doc(`problemBank/${targetProblemId}`);
   await database.runTransaction(async (transaction) => {
     const parentSnapshot = await transaction.get(parent);
     const current: ExistingProblemState | undefined = parentSnapshot.exists
@@ -241,7 +279,11 @@ async function writeProblem(database: Firestore, problem: ImportProblem) {
 async function backfillSession(
   database: Firestore,
   sessionId: string,
-  entries: Array<{ problem: ImportProblem; sessionProblemId: string }>,
+  entries: Array<{
+    problem: ImportProblem;
+    targetProblemId: string;
+    sessionProblemId: string;
+  }>,
 ) {
   const sessionRef = database.doc(`sessions/${sessionId}`);
   await database.runTransaction(async (transaction) => {
@@ -256,11 +298,11 @@ async function backfillSession(
       ),
     );
     const oldIds = sessionSnapshot.data()?.bankProblemIds;
-    const additions = entries.map(({ problem }) => problem.id);
+    const additions = entries.map(({ targetProblemId }) => targetProblemId);
     const newIds = mergeBankProblemIds(oldIds, additions);
     const updates: Array<{ ref: DocumentReference; bankId: string }> = [];
     snapshots.forEach((snapshot, index) => {
-      const { problem } = entries[index];
+      const { problem, targetProblemId } = entries[index];
       const backfill = problem.provenanceBackfills.find(
         (entry) =>
           entry.sessionId === sessionId && entry.problemId === snapshot.id,
@@ -278,14 +320,17 @@ async function backfillSession(
         throw new Error(
           `Historical snapshot ${sessionId}/${snapshot.id} no longer exactly matches.`,
         );
-      if (data.bankProblemId !== undefined && data.bankProblemId !== problem.id)
+      if (
+        data.bankProblemId !== undefined &&
+        data.bankProblemId !== targetProblemId
+      )
         throw new Error(
           `Historical snapshot ${sessionId}/${snapshot.id} has a conflicting Bank reference.`,
         );
-      if (data.bankProblemId !== problem.id)
+      if (data.bankProblemId !== targetProblemId)
         updates.push({
           ref: sessionRef.collection('problems').doc(snapshot.id),
-          bankId: problem.id,
+          bankId: targetProblemId,
         });
     });
     if (
@@ -306,11 +351,7 @@ for (const problem of plan.problems) {
   if (problem.status === 'CONFLICT')
     console.log(`CONFLICT: ${problem.title} (${problem.problemId})`);
 }
-if (
-  plan.conflicts.length > 0 ||
-  plan.unresolvedOccurrences > 0 ||
-  plan.unresolvedHistoricalSnapshots > 0
-) {
+if (isImportPlanBlocked(plan)) {
   console.log(
     'Import is blocked until all conflicts and unresolved manifest items are reviewed.',
   );
@@ -321,16 +362,26 @@ if (
       (entry) => entry.problemId === problem.id,
     );
     if (planned && planned.status !== 'UNCHANGED')
-      await writeProblem(db, problem);
+      await writeProblem(db, problem, planned.targetProblemId);
   }
   const backfillsBySession = new Map<
     string,
-    Array<{ problem: ImportProblem; sessionProblemId: string }>
+    Array<{
+      problem: ImportProblem;
+      targetProblemId: string;
+      sessionProblemId: string;
+    }>
   >();
   for (const problem of manifest.problems) {
     for (const backfill of problem.provenanceBackfills) {
       const entries = backfillsBySession.get(backfill.sessionId) ?? [];
-      entries.push({ problem, sessionProblemId: backfill.problemId });
+      entries.push({
+        problem,
+        targetProblemId:
+          plan.problems.find((entry) => entry.problemId === problem.id)
+            ?.targetProblemId ?? problem.id,
+        sessionProblemId: backfill.problemId,
+      });
       backfillsBySession.set(backfill.sessionId, entries);
     }
   }

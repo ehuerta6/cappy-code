@@ -32,12 +32,15 @@ export interface ImportOccurrence {
   session: string;
   week: string;
   sourceRef: string;
+  sourceDeckUrl?: string;
   decision: 'canonical-match' | 'new-canonical';
+  classification?: 'canonical' | 'duplicate';
 }
 
 export interface PlannedBackfill {
   sessionId: string;
   problemId: string;
+  targetProblemId: string;
   snapshotChanged: boolean;
   sessionChanged: boolean;
 }
@@ -52,8 +55,14 @@ export interface ImportProblem {
   exampleOutput: string;
   category: ImportCategory;
   difficulty: ImportDifficulty;
-  difficultyProvenance: { source: string; reason: string; reviewed: boolean };
-  sourceUrl?: string;
+  difficultyProvenance: {
+    source: string;
+    reason: string;
+    reviewed: boolean;
+    proposed?: boolean;
+    requiresHumanApproval?: boolean;
+  };
+  canonicalSourceUrl?: string;
   occurrences: ImportOccurrence[];
   approaches: ImportApproach[];
   review: { approved: boolean; warnings: string[] };
@@ -83,12 +92,21 @@ export interface ImportManifest {
     sourceRef: string;
     title: string;
     reason: string;
+    kind?: 'instructional-example' | 'future-unpresented' | 'not-presented';
+    inventory?: boolean;
   }>;
-  unresolvedHistoricalSnapshots: Array<{
+  pendingHistoricalReviews: Array<{
     sessionId: string;
     problemId: string;
     title: string;
     reason: string;
+  }>;
+  reviewedHistoricalSkips: Array<{
+    sessionId: string;
+    problemId: string;
+    title: string;
+    reason: string;
+    status: 'reviewed-skip';
   }>;
   unresolvedOccurrences: Array<{
     branch: string;
@@ -96,6 +114,7 @@ export interface ImportManifest {
     sourceRef: string;
     title: string;
     reason: string;
+    classification: 'irreducibly-ambiguous';
   }>;
 }
 
@@ -135,8 +154,31 @@ export function validateManifest(
     throw new Error('Manifest excludedOccurrences must be an array.');
   if (!Array.isArray(value.unresolvedOccurrences))
     throw new Error('Manifest unresolvedOccurrences must be an array.');
-  if (!Array.isArray(value.unresolvedHistoricalSnapshots))
-    throw new Error('Manifest unresolvedHistoricalSnapshots must be an array.');
+  if (!Array.isArray(value.pendingHistoricalReviews))
+    throw new Error('Manifest pendingHistoricalReviews must be an array.');
+  if (!Array.isArray(value.reviewedHistoricalSkips))
+    throw new Error('Manifest reviewedHistoricalSkips must be an array.');
+  for (const [index, entry] of value.reviewedHistoricalSkips.entries()) {
+    if (
+      !isObject(entry) ||
+      entry.status !== 'reviewed-skip' ||
+      !nonempty(entry.reason) ||
+      !nonempty(entry.sessionId) ||
+      !nonempty(entry.problemId) ||
+      !nonempty(entry.title)
+    )
+      throw new Error(`reviewedHistoricalSkips[${index}] is incomplete.`);
+  }
+  for (const [index, entry] of value.pendingHistoricalReviews.entries()) {
+    if (
+      !isObject(entry) ||
+      !nonempty(entry.reason) ||
+      !nonempty(entry.sessionId) ||
+      !nonempty(entry.problemId) ||
+      !nonempty(entry.title)
+    )
+      throw new Error(`pendingHistoricalReviews[${index}] is incomplete.`);
+  }
 
   const ids = new Set<string>();
   const occurrenceKeys = new Set<string>();
@@ -201,21 +243,34 @@ export function validateManifest(
         `${path}.difficultyProvenance must be reviewed and explained.`,
       );
     if (
-      problem.sourceUrl !== undefined &&
-      (!nonempty(problem.sourceUrl) ||
-        !/^https:\/\//i.test(problem.sourceUrl) ||
-        !URL.canParse(problem.sourceUrl))
+      problem.canonicalSourceUrl !== undefined &&
+      (!nonempty(problem.canonicalSourceUrl) ||
+        !/^https:\/\//i.test(problem.canonicalSourceUrl) ||
+        !URL.canParse(problem.canonicalSourceUrl))
     )
-      throw new Error(`${path}.sourceUrl must be a valid HTTPS URL.`);
+      throw new Error(`${path}.canonicalSourceUrl must be a valid HTTPS URL.`);
     if (!Array.isArray(problem.occurrences) || problem.occurrences.length === 0)
       throw new Error(
         `${path}.occurrences must contain at least one CIC occurrence.`,
       );
-    for (const [occurrenceIndex, occurrence] of problem.occurrences.entries())
+    for (const [occurrenceIndex, occurrence] of problem.occurrences.entries()) {
+      if (!['canonical', 'duplicate'].includes(occurrence.classification ?? ''))
+        throw new Error(
+          `${path}.occurrences[${occurrenceIndex}] needs a canonical or duplicate classification.`,
+        );
+      if (
+        occurrence.sourceDeckUrl !== undefined &&
+        (!URL.canParse(occurrence.sourceDeckUrl) ||
+          !/^https:\/\//i.test(occurrence.sourceDeckUrl))
+      )
+        throw new Error(
+          `${path}.occurrences[${occurrenceIndex}].sourceDeckUrl must be HTTPS.`,
+        );
       addOccurrenceKey(
         { ...occurrence, title: problem.title },
         `${path}.occurrences[${occurrenceIndex}]`,
       );
+    }
     if (!Array.isArray(problem.approaches) || problem.approaches.length === 0)
       throw new Error(`${path}.approaches must contain at least one Approach.`);
     if (problem.approaches.length > 100)
@@ -272,11 +327,20 @@ export function validateManifest(
       }
     }
   }
-  for (const [index, entry] of value.unresolvedOccurrences.entries())
+  for (const [index, entry] of value.unresolvedOccurrences.entries()) {
+    if (
+      !isObject(entry) ||
+      entry.classification !== 'irreducibly-ambiguous' ||
+      !nonempty(entry.reason)
+    )
+      throw new Error(
+        `unresolvedOccurrences[${index}] must be explicitly irreducibly ambiguous with an evidence-based reason.`,
+      );
     addOccurrenceKey(
       entry as Record<string, unknown>,
       `unresolvedOccurrences[${index}]`,
     );
+  }
   for (const [index, entry] of value.excludedOccurrences.entries())
     addOccurrenceKey(
       entry as Record<string, unknown>,
@@ -320,7 +384,11 @@ export function classifyExisting(
   let changes = false;
   for (const field of fields) {
     const expected =
-      field === 'leetcodeUrl' ? problem.sourceUrl : desired[field];
+      field === 'leetcodeUrl'
+        ? isLeetCodeUrl(problem.canonicalSourceUrl)
+          ? problem.canonicalSourceUrl
+          : undefined
+        : desired[field];
     const actual = existing.data[field];
     if (actual === undefined || actual === '') {
       if (expected !== undefined && expected !== '') changes = true;
@@ -372,7 +440,9 @@ export function newBankDocument(problem: ImportProblem) {
     exampleOutput: problem.exampleOutput,
     category: problem.category,
     difficulty: problem.difficulty,
-    ...(problem.sourceUrl ? { leetcodeUrl: problem.sourceUrl } : {}),
+    ...(isLeetCodeUrl(problem.canonicalSourceUrl)
+      ? { leetcodeUrl: problem.canonicalSourceUrl }
+      : {}),
     isPublished: false,
     hiddenByLiveSessionId: null,
     approachesEnabled: true,
@@ -391,14 +461,15 @@ export function missingBankFields(
     exampleOutput: problem.exampleOutput,
     category: problem.category,
     difficulty: problem.difficulty,
-    ...(problem.sourceUrl ? { leetcodeUrl: problem.sourceUrl } : {}),
+    ...(isLeetCodeUrl(problem.canonicalSourceUrl)
+      ? { leetcodeUrl: problem.canonicalSourceUrl }
+      : {}),
   };
   const missing = Object.fromEntries(
     Object.entries(expected).filter(
       ([key]) => existing[key] === undefined || existing[key] === '',
     ),
   );
-  if (existing.approachesEnabled !== true) missing.approachesEnabled = true;
   return missing;
 }
 
@@ -480,8 +551,14 @@ export async function runImportPlan<T>(
   return { applied: true as const, result: await options.apply(plan) };
 }
 
+export function isImportPlanBlocked(plan: ImportPlan) {
+  return plan.conflicts.length > 0 || plan.unresolvedHistoricalSnapshots > 0;
+}
+
 export interface LiveState {
   problems: Record<string, ExistingProblemState>;
+  identityMatches?: Record<string, string>;
+  identityConflicts?: Record<string, string>;
   sessions: Record<
     string,
     {
@@ -493,6 +570,7 @@ export interface LiveState {
 
 export interface PlannedProblem {
   problemId: string;
+  targetProblemId: string;
   title: string;
   status: PlanStatus;
   occurrences: number;
@@ -507,7 +585,14 @@ export interface ImportPlan {
   provenanceBackfillSessions: number;
   conflicts: string[];
   unresolvedOccurrences: number;
+  irreducibleAmbiguities: Array<{ title: string; reason: string }>;
   unresolvedHistoricalSnapshots: number;
+  reviewedHistoricalSkips: number;
+  pendingDifficultyApprovals: Array<{
+    title: string;
+    difficulty: ImportDifficulty;
+    reason: string;
+  }>;
   problems: PlannedProblem[];
   occurrencesByBranch: Record<'intro' | 'general' | 'icpc', number>;
   inventoryOccurrencesByBranch: Record<'intro' | 'general' | 'icpc', number>;
@@ -520,9 +605,10 @@ export function buildImportPlan(
   validateManifest(manifest);
   const historicalConflicts: string[] = [];
   const problems = manifest.problems.map((problem) => {
-    const status = state.problems[`identity-conflict:${problem.id}`]
+    const targetProblemId = state.identityMatches?.[problem.id] ?? problem.id;
+    const status = state.identityConflicts?.[problem.id]
       ? 'CONFLICT'
-      : classifyExisting(problem, state.problems[problem.id]);
+      : classifyExisting(problem, state.problems[targetProblemId]);
     const backfills: PlannedBackfill[] = [];
     for (const entry of problem.provenanceBackfills) {
       const session = state.sessions[entry.sessionId];
@@ -544,7 +630,7 @@ export function buildImportPlan(
         continue;
       }
       const linked = snapshot.bankProblemId;
-      if (linked !== undefined && linked !== problem.id) {
+      if (linked !== undefined && linked !== targetProblemId) {
         historicalConflicts.push(
           `${problem.title}: conflicting historical reference at ${entry.sessionId}/${entry.problemId}`,
         );
@@ -563,19 +649,22 @@ export function buildImportPlan(
       }
       const sessionIds = Array.isArray(parentIds) ? parentIds : [];
       const targetOccurrences = sessionIds.filter(
-        (id) => id === problem.id,
+        (id) => id === targetProblemId,
       ).length;
-      const sessionChanged = linked !== problem.id || targetOccurrences !== 1;
+      const sessionChanged =
+        linked !== targetProblemId || targetOccurrences !== 1;
       if (sessionChanged)
         backfills.push({
           sessionId: entry.sessionId,
           problemId: entry.problemId,
-          snapshotChanged: linked !== problem.id,
+          targetProblemId,
+          snapshotChanged: linked !== targetProblemId,
           sessionChanged: targetOccurrences !== 1,
         });
     }
     return {
       problemId: problem.id,
+      targetProblemId,
       title: problem.title,
       status,
       occurrences: problem.occurrences.length,
@@ -605,9 +694,20 @@ export function buildImportPlan(
         .map((problem) => problem.title),
       ...historicalConflicts,
     ],
-    unresolvedOccurrences: manifest.unresolvedOccurrences.length,
-    unresolvedHistoricalSnapshots:
-      manifest.unresolvedHistoricalSnapshots.length,
+    unresolvedOccurrences: 0,
+    irreducibleAmbiguities: manifest.unresolvedOccurrences.map((entry) => ({
+      title: entry.title,
+      reason: entry.reason,
+    })),
+    unresolvedHistoricalSnapshots: manifest.pendingHistoricalReviews.length,
+    reviewedHistoricalSkips: manifest.reviewedHistoricalSkips.length,
+    pendingDifficultyApprovals: manifest.problems
+      .filter((problem) => problem.difficultyProvenance.requiresHumanApproval)
+      .map((problem) => ({
+        title: problem.title,
+        difficulty: problem.difficulty,
+        reason: problem.difficultyProvenance.reason,
+      })),
     problems,
     occurrencesByBranch: manifest.problems.reduce(
       (counts, problem) => {
@@ -620,6 +720,9 @@ export function buildImportPlan(
     inventoryOccurrencesByBranch: [
       ...manifest.problems.flatMap((problem) => problem.occurrences),
       ...manifest.unresolvedOccurrences,
+      ...manifest.excludedOccurrences.filter(
+        (item) => item.inventory !== false,
+      ),
     ].reduce(
       (counts, occurrence) => {
         counts[occurrence.branch as 'intro' | 'general' | 'icpc'] += 1;
@@ -640,8 +743,34 @@ export function printPlan(plan: ImportPlan, writeEnabled = false) {
     `RECONCILE: ${plan.counts.RECONCILE}`,
     `UNCHANGED: ${plan.counts.UNCHANGED}`,
     `PROVENANCE BACKFILLS: ${plan.provenanceBackfillSnapshots} snapshots across ${plan.provenanceBackfillSessions} Sessions`,
+    `REVIEWED HISTORICAL SKIPS: ${plan.reviewedHistoricalSkips}`,
     `CONFLICTS: ${plan.conflicts.length}`,
-    `UNRESOLVED MANIFEST ITEMS: ${plan.unresolvedOccurrences + plan.unresolvedHistoricalSnapshots} (${plan.unresolvedOccurrences} source occurrences, ${plan.unresolvedHistoricalSnapshots} historical snapshots)`,
+    `PENDING UNRESOLVED SOURCE ITEMS: ${plan.unresolvedOccurrences}`,
+    `IRREDUCIBLY AMBIGUOUS SOURCE ITEMS: ${plan.irreducibleAmbiguities.length}`,
+    ...plan.irreducibleAmbiguities.map(
+      (entry) => `  ${entry.title}: ${entry.reason}`,
+    ),
+    `PENDING DIFFICULTY APPROVALS: ${plan.pendingDifficultyApprovals.length}`,
+    ...plan.pendingDifficultyApprovals.map(
+      (entry) =>
+        `  ${entry.title}: proposed ${entry.difficulty} — ${entry.reason}`,
+    ),
+    `PENDING HISTORICAL REVIEWS: ${plan.unresolvedHistoricalSnapshots}`,
     `PRODUCTION WRITES: ${writeEnabled ? 'ENABLED' : 'DISABLED'}`,
   ].join('\n');
+}
+
+export function isLeetCodeUrl(value: string | undefined): value is string {
+  if (!value) return false;
+  try {
+    const url = new URL(value);
+    return (
+      url.protocol === 'https:' &&
+      (url.hostname === 'leetcode.com' ||
+        url.hostname === 'www.leetcode.com') &&
+      /^\/problems\/[a-z0-9-]+\/?$/i.test(url.pathname)
+    );
+  } catch {
+    return false;
+  }
 }
