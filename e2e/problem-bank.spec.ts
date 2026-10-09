@@ -49,11 +49,11 @@ test('Officer edits and reuses a bank Problem as an independent Session snapshot
       officer.getByRole('button', { name: 'Save approach details' }),
     ).toBeDisabled();
     await officer
-      .getByLabel('Description (Markdown supported)')
+      .getByLabel('Description (optional, Markdown supported)')
       .fill(originalStatement);
-    await officer.getByLabel('Constraints').fill('1 ≤ n ≤ 200,000');
-    await officer.getByLabel('Example input').fill('4 8 12');
-    await officer.getByLabel('Expected output').fill('12');
+    await officer.getByLabel('Constraints (optional)').fill('1 ≤ n ≤ 200,000');
+    await officer.getByLabel('Example input (optional)').fill('4 8 12');
+    await officer.getByLabel('Expected output (optional)').fill('12');
     const secrets = [
       'BANK_PYTHON_SOLUTION',
       'BANK_JAVA_SOLUTION',
@@ -89,7 +89,7 @@ test('Officer edits and reuses a bank Problem as an independent Session snapshot
     await officer.getByLabel('Session title').fill(sessionTitle);
     await officer.getByLabel('Session date').fill('2026-10-21');
     await officer
-      .getByRole('button', { name: 'Save Changes', exact: true })
+      .getByRole('button', { name: 'Save changes', exact: true })
       .click();
     await officer.getByRole('button', { name: 'Manage problems' }).click();
     await officer
@@ -112,7 +112,7 @@ test('Officer edits and reuses a bank Problem as an independent Session snapshot
     await officer.getByRole('button', { name: bankTitle }).click();
     await expect(officer.getByLabel('Problem title')).toHaveValue(bankTitle);
     await officer
-      .getByLabel('Description (Markdown supported)')
+      .getByLabel('Description (optional, Markdown supported)')
       .fill('Updated in the bank after reuse.');
     await officer.getByRole('button', { name: 'Save changes' }).click();
     await expect(
@@ -136,7 +136,7 @@ test('Officer edits and reuses a bank Problem as an independent Session snapshot
       officer.getByRole('region', { name: 'Session metadata' }),
     ).toBeVisible();
     await officer.getByRole('button', { name: 'Manage problems' }).click();
-    await expect(officer.getByLabel('Description')).toHaveValue(
+    await expect(officer.getByLabel('Description (optional)')).toHaveValue(
       originalStatement,
     );
     await expect(

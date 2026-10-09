@@ -48,8 +48,7 @@ const labels = {
   'interview-style': 'Interview-style',
   'competitive-programming': 'Competitive Programming',
 } as const;
-const buttonClass =
-  'min-h-11 rounded border border-border-strong bg-surface px-3 py-2 text-ink hover:bg-hover disabled:cursor-default disabled:bg-raised disabled:text-muted';
+const buttonClass = 'ui-button ui-button--secondary';
 
 export default function OfficerProblemBank() {
   const [records, setRecords] = useState<BankProblemRecord[]>([]);
@@ -523,7 +522,7 @@ export default function OfficerProblemBank() {
                     <label className="grid gap-1 font-medium">
                       Problem title
                       <input
-                        className="min-h-11 rounded border border-border-strong bg-surface px-3 py-2 font-normal"
+                        className="ui-field font-normal"
                         value={content.title}
                         disabled={saving || deleting}
                         onChange={(event) =>
@@ -534,7 +533,7 @@ export default function OfficerProblemBank() {
                     <label className="grid gap-1 font-medium">
                       Problem type
                       <select
-                        className="min-h-11 rounded border border-border-strong bg-surface px-3 py-2 font-normal"
+                        className="ui-field font-normal"
                         value={content.category}
                         disabled={saving || deleting}
                         onChange={(event) =>
@@ -555,7 +554,7 @@ export default function OfficerProblemBank() {
                     <label className="grid gap-1 font-medium">
                       Difficulty
                       <select
-                        className="min-h-11 rounded border border-border-strong bg-surface px-3 py-2 font-normal"
+                        className="ui-field font-normal"
                         value={content.difficulty ?? ''}
                         disabled={saving || deleting}
                         onChange={(event) =>
@@ -575,9 +574,9 @@ export default function OfficerProblemBank() {
                       </select>
                     </label>
                     <label className="grid gap-1 font-medium">
-                      LeetCode link (optional)
+                      Problem link (optional)
                       <input
-                        className="min-h-11 rounded border border-border-strong bg-surface px-3 py-2 font-normal"
+                        className="ui-field font-normal"
                         type="url"
                         disabled={saving || deleting}
                         value={content.leetcodeUrl ?? ''}
@@ -592,9 +591,9 @@ export default function OfficerProblemBank() {
                     </label>
                   </div>
                   <label className="my-4 grid max-w-3xl gap-1 font-medium">
-                    Description (Markdown supported)
+                    Description (optional, Markdown supported)
                     <textarea
-                      className="min-h-32 rounded border border-border-strong bg-surface px-3 py-2 font-normal"
+                      className="ui-field min-h-32 font-normal"
                       value={content.description}
                       disabled={saving || deleting}
                       onChange={(event) =>
@@ -606,9 +605,9 @@ export default function OfficerProblemBank() {
                     />
                   </label>
                   <label className="my-4 grid max-w-3xl gap-1 font-medium">
-                    Constraints
+                    Constraints (optional)
                     <textarea
-                      className="min-h-20 rounded border border-border-strong bg-surface px-3 py-2 font-normal"
+                      className="ui-field min-h-20 font-normal"
                       value={content.constraints}
                       disabled={saving || deleting}
                       onChange={(event) =>
@@ -621,9 +620,9 @@ export default function OfficerProblemBank() {
                   </label>
                   <div className="grid gap-4 sm:grid-cols-2">
                     <label className="grid gap-1 font-medium">
-                      Example input
+                      Example input (optional)
                       <textarea
-                        className="min-h-20 rounded border border-border-strong bg-surface px-3 py-2 font-mono font-normal"
+                        className="ui-field min-h-20 font-mono font-normal"
                         value={content.exampleInput}
                         disabled={saving}
                         onChange={(event) =>
@@ -635,9 +634,9 @@ export default function OfficerProblemBank() {
                       />
                     </label>
                     <label className="grid gap-1 font-medium">
-                      Expected output
+                      Expected output (optional)
                       <textarea
-                        className="min-h-20 rounded border border-border-strong bg-surface px-3 py-2 font-mono font-normal"
+                        className="ui-field min-h-20 font-mono font-normal"
                         value={content.exampleOutput}
                         disabled={saving}
                         onChange={(event) =>

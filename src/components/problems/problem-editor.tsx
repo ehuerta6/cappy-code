@@ -115,7 +115,7 @@ export default function ProblemEditor({
       <label className="my-5 flex max-w-3xl flex-col gap-2">
         Problem title
         <input
-          className="min-h-11 w-full rounded border border-border-strong bg-surface px-3 py-2 text-2xl font-semibold leading-8 text-ink disabled:cursor-default disabled:bg-raised disabled:text-muted"
+          className="ui-field text-2xl font-semibold leading-8"
           id="problem-title"
           value={content.title}
           onChange={(event) => edit('title', event.target.value)}
@@ -135,7 +135,7 @@ export default function ProblemEditor({
       <label className="my-5 flex max-w-xs flex-col gap-2">
         Problem category
         <select
-          className="min-h-11 w-full rounded border border-border-strong bg-surface px-3 py-2 text-ink disabled:cursor-default disabled:bg-raised disabled:text-muted"
+          className="ui-field"
           value={content.category}
           onChange={(event) =>
             edit('category', event.target.value as ProblemCategory)
@@ -152,7 +152,7 @@ export default function ProblemEditor({
       <label className="my-5 flex max-w-xs flex-col gap-2">
         Difficulty
         <select
-          className="min-h-11 w-full rounded border border-border-strong bg-surface px-3 py-2 text-ink disabled:cursor-default disabled:bg-raised disabled:text-muted"
+          className="ui-field"
           value={content.difficulty}
           onChange={(event) => edit('difficulty', event.target.value)}
           disabled={saving || disabled}
@@ -165,14 +165,13 @@ export default function ProblemEditor({
       </label>
       <label className="my-5 flex max-w-3xl flex-col gap-2">
         <span>
-          Description{' '}
+          Description (optional){' '}
           <span aria-hidden="true" className="text-sm font-normal text-muted">
             (Markdown supported)
           </span>
         </span>
         <textarea
-          aria-label="Description"
-          className="min-h-[100px] w-full resize-y rounded border border-border-strong bg-surface px-3 py-2 leading-6 text-ink disabled:cursor-default disabled:bg-raised disabled:text-muted"
+          className="ui-field min-h-[100px] resize-y leading-6"
           rows={5}
           value={content.description}
           onChange={(event) => edit('description', event.target.value)}
@@ -180,9 +179,9 @@ export default function ProblemEditor({
         />
       </label>
       <label className="my-5 flex max-w-3xl flex-col gap-2">
-        Constraints
+        Constraints (optional)
         <textarea
-          className="min-h-[76px] w-full resize-y rounded border border-border-strong bg-surface px-3 py-2 leading-6 text-ink disabled:cursor-default disabled:bg-raised disabled:text-muted"
+          className="ui-field min-h-[76px] resize-y leading-6"
           rows={3}
           value={content.constraints}
           onChange={(event) => edit('constraints', event.target.value)}
@@ -190,9 +189,9 @@ export default function ProblemEditor({
         />
       </label>
       <label className="my-5 flex max-w-3xl flex-col gap-2">
-        LeetCode link (optional)
+        Problem link (optional)
         <input
-          className="min-h-11 w-full min-w-0 rounded border border-border-strong bg-surface px-3 py-2 text-ink disabled:cursor-default disabled:bg-raised disabled:text-muted"
+          className="ui-field min-w-0"
           type="url"
           inputMode="url"
           placeholder="https://leetcode.com/problems/two-sum/"
@@ -218,7 +217,7 @@ export default function ProblemEditor({
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="my-3 flex flex-col gap-2">
             <span>
-              Example input{' '}
+              Example input (optional){' '}
               <span
                 aria-hidden="true"
                 className="text-sm font-normal text-muted"
@@ -227,8 +226,7 @@ export default function ProblemEditor({
               </span>
             </span>
             <textarea
-              aria-label="Example input"
-              className="min-h-[76px] w-full resize-y rounded border border-border-strong bg-surface px-3 py-2 font-mono text-[15px] leading-6 text-ink disabled:cursor-default disabled:bg-raised disabled:text-muted"
+              className="ui-field min-h-[76px] resize-y font-mono text-[15px] leading-6"
               rows={3}
               value={content.exampleInput}
               onChange={(event) => edit('exampleInput', event.target.value)}
@@ -237,7 +235,7 @@ export default function ProblemEditor({
           </label>
           <label className="my-3 flex flex-col gap-2">
             <span>
-              Expected output{' '}
+              Expected output (optional){' '}
               <span
                 aria-hidden="true"
                 className="text-sm font-normal text-muted"
@@ -246,8 +244,7 @@ export default function ProblemEditor({
               </span>
             </span>
             <textarea
-              aria-label="Expected output"
-              className="min-h-[76px] w-full resize-y rounded border border-border-strong bg-surface px-3 py-2 font-mono text-[15px] leading-6 text-ink disabled:cursor-default disabled:bg-raised disabled:text-muted"
+              className="ui-field min-h-[76px] resize-y font-mono text-[15px] leading-6"
               rows={3}
               value={content.exampleOutput}
               onChange={(event) => edit('exampleOutput', event.target.value)}

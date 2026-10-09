@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { approachTags } from '@/lib/domain';
+import { Button } from '@/components/ui/primitives';
 import {
   emptyProblemBankFilters,
   problemBankFilterOptions,
@@ -17,8 +18,6 @@ const labels = {
     'competitive-programming': 'Competitive Programming',
   },
 } as const;
-const triggerClass =
-  'inline-flex min-h-11 items-center justify-between gap-2 rounded border border-border-strong bg-surface px-3 py-2 text-sm text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent';
 const optionClass =
   'flex min-h-11 cursor-pointer items-center gap-3 px-2 text-sm';
 
@@ -122,13 +121,14 @@ export default function ProblemBankFilters({
     const id = `${panelId}-${key}`;
     return (
       <div className="relative">
-        <button
+        <Button
+          variant="secondary"
           aria-controls={id}
           aria-expanded={isOpen}
           onFocus={() => {
             if (openFilter && openFilter !== key) setOpenFilter(null);
           }}
-          className={`${triggerClass} ${selected.length ? 'border-accent bg-raised' : ''}`}
+          className={`justify-between gap-2 text-sm ${selected.length ? 'border-accent bg-raised' : ''}`}
           onClick={(event) => {
             triggerRef.current = event.currentTarget;
             setOpenFilter(isOpen ? null : key);
@@ -138,7 +138,7 @@ export default function ProblemBankFilters({
           {label}
           {selected.length ? ` (${selected.length})` : ''}
           <span aria-hidden="true">▾</span>
-        </button>
+        </Button>
         {isOpen ? (
           <div
             className="fixed z-30 max-h-[min(24rem,70dvh)] w-[min(20rem,calc(100vw-2rem))] overflow-y-auto rounded border border-border-strong bg-surface p-2 text-ink shadow-lg"
@@ -182,7 +182,7 @@ export default function ProblemBankFilters({
       <label className="relative min-w-44 flex-1 basis-52 sm:max-w-sm">
         <span className="sr-only">Search Problems</span>
         <input
-          className="min-h-11 w-full rounded border border-border-strong bg-surface px-3 pr-9 text-sm text-ink placeholder:text-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          className="ui-field pr-9 text-sm placeholder:text-muted"
           onChange={(event) => onChange({ ...value, name: event.target.value })}
           placeholder="Search Problems"
           type="search"
@@ -217,8 +217,9 @@ export default function ProblemBankFilters({
         value.tag,
         (tag) => tag,
       )}
-      <button
-        className={`${triggerClass} ${activeValues ? 'border-accent bg-raised font-semibold' : ''}`}
+      <Button
+        variant="secondary"
+        className={`text-sm ${activeValues ? 'border-accent bg-raised font-semibold' : ''}`}
         disabled={!activeValues}
         onClick={() => {
           setOpenFilter(null);
@@ -227,7 +228,7 @@ export default function ProblemBankFilters({
         type="button"
       >
         Clear all{activeValues ? ` (${activeValues})` : ''}
-      </button>
+      </Button>
       {activeValues > 0 ? (
         <span className="sr-only" aria-live="polite">
           Search and filters active.

@@ -1,4 +1,5 @@
 import type { ProblemDifficulty } from '@/lib/domain';
+import { Badge } from '@/components/ui/primitives';
 
 const difficultyLabels: Record<ProblemDifficulty, string> = {
   easy: 'Easy',
@@ -7,13 +8,10 @@ const difficultyLabels: Record<ProblemDifficulty, string> = {
 };
 
 const difficultyStyles: Record<ProblemDifficulty, string> = {
-  easy: 'border-success/50 bg-success-surface',
-  medium: 'border-warning/50 bg-warning/10',
-  hard: 'border-danger/50 bg-danger-surface',
+  easy: 'border-success/50 bg-success-surface text-ink',
+  medium: 'border-warning/50 bg-warning/10 text-ink',
+  hard: 'border-danger/50 bg-danger-surface text-ink',
 };
-
-const badgeClass =
-  'inline-flex min-h-7 items-center rounded border px-2 py-0.5 text-sm font-medium leading-5 text-ink';
 
 export function ProblemDifficultyBadge({
   difficulty,
@@ -23,9 +21,18 @@ export function ProblemDifficultyBadge({
   if (!difficulty) return null;
 
   return (
-    <span className={`${badgeClass} ${difficultyStyles[difficulty]}`}>
+    <Badge
+      tone={
+        difficulty === 'easy'
+          ? 'success'
+          : difficulty === 'medium'
+            ? 'warning'
+            : 'danger'
+      }
+      className={difficultyStyles[difficulty]}
+    >
       {difficultyLabels[difficulty]}
-    </span>
+    </Badge>
   );
 }
 
@@ -39,13 +46,13 @@ export function ProblemApproachTags({ tags }: { tags: string[] }) {
       aria-label="DSA / algorithm tags"
     >
       {tags.map((tag) => (
-        <span
-          className={`${badgeClass} ${tagFamilies[approachTagFamily(tag)]}`}
+        <Badge
+          className={`text-ink ${tagFamilies[approachTagFamily(tag)]}`}
           data-tag-family={approachTagFamily(tag)}
           key={tag}
         >
           {tag}
-        </span>
+        </Badge>
       ))}
     </div>
   );
@@ -55,7 +62,7 @@ export function ProblemLink({ href }: { href?: string }) {
   if (!href) return null;
   return (
     <a
-      className="inline-flex min-h-10 items-center text-sm text-muted underline decoration-border-strong underline-offset-4 hover:text-ink focus-visible:rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+      className="inline-flex min-h-11 items-center px-1 text-sm text-muted underline decoration-border-strong underline-offset-4 hover:text-ink focus-visible:rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
       href={href}
       target="_blank"
       rel="noopener noreferrer"

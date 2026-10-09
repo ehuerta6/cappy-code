@@ -16,6 +16,7 @@ import {
 } from '@/lib/domain';
 import { todayCalendarDate } from '@/lib/calendar-date';
 import SessionEditor from './session-editor';
+import { Button } from '@/components/ui/primitives';
 
 export default function OfficerSessions({ sessionId }: { sessionId?: string }) {
   const router = useRouter();
@@ -126,11 +127,10 @@ export default function OfficerSessions({ sessionId }: { sessionId?: string }) {
       : undefined;
   if (sessionId && !currentSessionRequest) {
     return (
-      <section
-        className="min-h-56 border-t border-border-soft pt-5"
-        aria-busy="true"
-      >
-        <p role="status">Loading Session…</p>
+      <section className="ui-loading-block min-h-56" aria-busy="true">
+        <p className="ui-state-message m-0" role="status">
+          Loading Session…
+        </p>
       </section>
     );
   }
@@ -163,12 +163,9 @@ export default function OfficerSessions({ sessionId }: { sessionId?: string }) {
         <p>
           This Session may have been deleted or you may not have access to it.
         </p>
-        <button
-          className="min-h-11 rounded border border-border-strong bg-surface px-3 py-2"
-          onClick={() => router.push('/officer')}
-        >
+        <Button onClick={() => router.push('/officer')}>
           Back to Sessions
-        </button>
+        </Button>
       </section>
     );
   }
@@ -178,30 +175,24 @@ export default function OfficerSessions({ sessionId }: { sessionId?: string }) {
       <section role="alert" aria-label="Session load failed">
         <h1 className="text-2xl font-semibold">Session could not be loaded</h1>
         <p>Check your connection and retry loading this Session.</p>
-        <button
-          className="min-h-11 rounded border border-border-strong bg-surface px-3 py-2"
-          onClick={reload}
-        >
-          Retry loading Session
-        </button>
+        <Button onClick={reload}>Retry loading Session</Button>
       </section>
     );
   }
 
   if (sessionId && currentSessionRequest?.status === 'loading') {
     return (
-      <section
-        className="min-h-56 border-t border-border-soft pt-5"
-        aria-busy="true"
-      >
-        <p role="status">Loading Session…</p>
+      <section className="ui-loading-block min-h-56" aria-busy="true">
+        <p className="ui-state-message m-0" role="status">
+          Loading Session…
+        </p>
       </section>
     );
   }
 
   return (
     <section
-      className="mx-auto flex w-full max-w-[1440px] flex-col text-base leading-relaxed"
+      className="flex w-full flex-col text-base leading-relaxed"
       aria-label="Officer sessions"
     >
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3 sm:gap-6">
@@ -212,7 +203,7 @@ export default function OfficerSessions({ sessionId }: { sessionId?: string }) {
           <label className="flex flex-col gap-1 text-sm">
             <span>Branch for new session</span>
             <select
-              className="min-h-11 rounded border border-border-strong bg-surface px-3 py-2 text-ink"
+              className="ui-field"
               aria-label="Branch for new session"
               value={createBranch}
               onChange={(event) =>
@@ -227,13 +218,13 @@ export default function OfficerSessions({ sessionId }: { sessionId?: string }) {
               ))}
             </select>
           </label>
-          <button
-            className="min-h-11 rounded border border-accent bg-accent px-3 py-2 font-semibold text-accent-contrast hover:border-accent-hover hover:bg-accent-hover disabled:cursor-default disabled:bg-raised disabled:text-muted"
+          <Button
+            variant="primary"
             onClick={() => void create()}
             disabled={creating || loading || loadError}
           >
             {creating ? 'Creating…' : '+ New session'}
-          </button>
+          </Button>
         </div>
       </div>
       {createError && (
@@ -243,16 +234,13 @@ export default function OfficerSessions({ sessionId }: { sessionId?: string }) {
         </p>
       )}
       {loading || !dashboardLoaded ? (
-        <p role="status">Loading sessions…</p>
+        <p className="ui-state-message m-0" role="status">
+          Loading sessions…
+        </p>
       ) : loadError ? (
         <div role="alert">
           <p>Sessions could not be loaded. Check your connection and retry.</p>
-          <button
-            className="min-h-11 rounded border border-border-strong bg-surface px-3 py-2 hover:bg-hover"
-            onClick={reload}
-          >
-            Retry loading sessions
-          </button>
+          <Button onClick={reload}>Retry loading sessions</Button>
         </div>
       ) : records.length === 0 ? (
         <p>No Sessions yet</p>
@@ -292,8 +280,9 @@ export default function OfficerSessions({ sessionId }: { sessionId?: string }) {
                               className="border-b border-border-soft"
                               key={record.id}
                             >
-                              <button
-                                className="flex min-h-14 w-full flex-wrap items-center justify-start gap-x-3 gap-y-1 rounded px-2 py-3 text-left text-ink hover:bg-hover focus-visible:relative focus-visible:z-10 disabled:cursor-default disabled:bg-raised disabled:text-muted max-sm:items-start max-sm:flex-col"
+                              <Button
+                                variant="quiet"
+                                className="min-h-14 w-full flex-wrap justify-start gap-x-3 gap-y-1 px-2 py-3 text-left focus-visible:relative focus-visible:z-10 max-sm:flex-col max-sm:items-start"
                                 onClick={() => {
                                   router.push(
                                     `/officer/sessions/${encodeURIComponent(record.id)}`,
@@ -301,6 +290,9 @@ export default function OfficerSessions({ sessionId }: { sessionId?: string }) {
                                 }}
                                 disabled={creating}
                               >
+                                <span className="min-w-0 break-words font-semibold">
+                                  {record.session.title}
+                                </span>
                                 <time
                                   className="shrink-0 text-sm text-muted"
                                   dateTime={record.session.date}
@@ -315,24 +307,17 @@ export default function OfficerSessions({ sessionId }: { sessionId?: string }) {
                                     ),
                                   )}
                                 </time>
-                                <span className="min-w-0 break-words font-semibold">
-                                  {record.session.title}
-                                </span>
                                 <span className="text-sm text-muted">
                                   {record.problemCount === null
                                     ? 'Problem count unavailable'
                                     : `${record.problemCount} ${record.problemCount === 1 ? 'Problem' : 'Problems'}`}
                                 </span>
-                                <span
-                                  className={`inline-flex min-h-7 shrink-0 items-center rounded border border-border-soft px-2.5 py-0.5 text-sm font-semibold capitalize leading-5 ${record.session.status === 'live' ? 'border-success/50 bg-success-surface text-success' : record.session.status === 'draft' ? 'border-warning/50 text-warning' : 'text-muted'}`}
-                                >
-                                  {record.session.status}
-                                </span>
-                              </button>
+                              </Button>
                               {record.session.status === 'ended' ? (
                                 <PastSessionProblemHistory
                                   sessionId={record.id}
                                   sessionTitle={record.session.title}
+                                  problemCount={record.problemCount}
                                 />
                               ) : null}
                             </li>
@@ -378,10 +363,13 @@ function statusGroups(branch: SessionBranch, records: SessionRecord[]) {
 function PastSessionProblemHistory({
   sessionId,
   sessionTitle,
+  problemCount,
 }: {
   sessionId: string;
   sessionTitle: string;
+  problemCount: number | null;
 }) {
+  const [expanded, setExpanded] = useState(false);
   const [state, setState] = useState<
     | { status: 'loading' }
     | { status: 'loaded'; problems: ProblemRecord[] }
@@ -391,6 +379,7 @@ function PastSessionProblemHistory({
   const [revision, setRevision] = useState(0);
 
   useEffect(() => {
+    if (!expanded) return;
     let cancelled = false;
     setState({ status: 'loading' });
     listProblems(sessionId).then(
@@ -409,64 +398,81 @@ function PastSessionProblemHistory({
     return () => {
       cancelled = true;
     };
-  }, [revision, sessionId]);
+  }, [expanded, revision, sessionId]);
 
   return (
-    <section
-      className="mb-4 ml-3 max-w-4xl border-l border-border-soft py-1 pl-4 sm:ml-[4.5rem] sm:pl-5"
-      aria-label={`Problem history for ${sessionTitle}`}
-    >
-      {state.status === 'loading' ? (
-        <p className="m-0 text-sm text-muted" role="status">
-          Loading Problems…
-        </p>
-      ) : state.status === 'unavailable' ? (
-        <div className="text-sm text-muted">
-          <p className="m-0">Problem history could not be loaded.</p>
-          <button
-            className="mt-1 min-h-9 rounded px-2 text-accent underline underline-offset-2 hover:text-accent-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-            onClick={() => setRevision((value) => value + 1)}
-          >
-            Retry Problem history
-          </button>
-        </div>
-      ) : state.status === 'empty' ? (
-        <p className="m-0 text-sm text-muted">No Problems recorded.</p>
-      ) : (
-        <ol className="m-0 grid gap-3 pl-5">
-          {state.problems.map(({ id, problem }) => (
-            <li className="min-w-0 pl-1" key={id}>
-              <h3 className="m-0 break-words text-sm font-semibold leading-5 text-ink">
-                {problem.title}
-              </h3>
-              <p className="m-0 mt-1 whitespace-pre-wrap break-words text-sm leading-5 text-muted">
-                {problem.description || 'No description provided'}
-              </p>
-              {problem.constraints ? (
-                <p className="m-0 mt-1 whitespace-pre-wrap break-words text-sm leading-5 text-muted">
-                  <span className="font-medium text-ink">Constraints: </span>
-                  {problem.constraints}
-                </p>
-              ) : null}
-              <p className="m-0 mt-1 min-w-0 break-all text-sm leading-5 text-muted">
-                <span className="font-medium text-ink">LeetCode: </span>
-                {problem.leetcodeUrl ? (
-                  <a
-                    className="text-accent underline underline-offset-2 hover:text-accent-hover focus-visible:rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                    href={problem.leetcodeUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    {problem.leetcodeUrl}
-                  </a>
-                ) : (
-                  'No LeetCode link provided'
-                )}
-              </p>
-            </li>
-          ))}
-        </ol>
+    <div className="mb-3 ml-3 sm:ml-[4.5rem]">
+      <Button
+        variant="quiet"
+        className="min-h-11 px-2 text-sm"
+        aria-expanded={expanded}
+        aria-label={`${expanded ? 'Hide' : 'Show'} Problem details for ${sessionTitle}`}
+        onClick={() => setExpanded((value) => !value)}
+      >
+        {expanded ? 'Hide Problems' : 'Show Problems'}
+        {problemCount === null ? '' : ` (${problemCount})`}
+      </Button>
+      {expanded && (
+        <section
+          className="mt-2 max-w-4xl border-l border-border-soft py-1 pl-4 sm:pl-5"
+          aria-label={`Problem history for ${sessionTitle}`}
+        >
+          {state.status === 'loading' ? (
+            <p className="m-0 text-sm text-muted" role="status">
+              Loading Problems…
+            </p>
+          ) : state.status === 'unavailable' ? (
+            <div className="text-sm text-muted">
+              <p className="m-0">Problem history could not be loaded.</p>
+              <Button
+                variant="quiet"
+                className="mt-1 min-h-11 px-2 text-accent underline underline-offset-2 hover:text-accent-hover"
+                onClick={() => setRevision((value) => value + 1)}
+              >
+                Retry Problem history
+              </Button>
+            </div>
+          ) : state.status === 'empty' ? (
+            <p className="m-0 text-sm text-muted">No Problems recorded.</p>
+          ) : (
+            <ol className="m-0 grid gap-3 pl-5">
+              {state.problems.map(({ id, problem }) => (
+                <li className="min-w-0 pl-1" key={id}>
+                  <h3 className="m-0 break-words text-sm font-semibold leading-5 text-ink">
+                    {problem.title}
+                  </h3>
+                  <p className="m-0 mt-1 whitespace-pre-wrap break-words text-sm leading-5 text-muted">
+                    {problem.description || 'No description provided'}
+                  </p>
+                  {problem.constraints ? (
+                    <p className="m-0 mt-1 whitespace-pre-wrap break-words text-sm leading-5 text-muted">
+                      <span className="font-medium text-ink">
+                        Constraints:{' '}
+                      </span>
+                      {problem.constraints}
+                    </p>
+                  ) : null}
+                  <p className="m-0 mt-1 min-w-0 break-all text-sm leading-5 text-muted">
+                    <span className="font-medium text-ink">Problem link: </span>
+                    {problem.leetcodeUrl ? (
+                      <a
+                        className="text-accent underline underline-offset-2 hover:text-accent-hover focus-visible:rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                        href={problem.leetcodeUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        {problem.leetcodeUrl}
+                      </a>
+                    ) : (
+                      'No Problem link provided'
+                    )}
+                  </p>
+                </li>
+              ))}
+            </ol>
+          )}
+        </section>
       )}
-    </section>
+    </div>
   );
 }

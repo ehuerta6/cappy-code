@@ -150,9 +150,11 @@ describe('public member UI scaffold', () => {
         }}
       />,
     );
-    expect(
-      screen.getByRole('link', { name: /Intro practice/ }).getAttribute('href'),
-    ).toBe('/sessions/live-session');
+    const liveSessionLink = screen.getByRole('link', {
+      name: /Intro practice/,
+    });
+    expect(liveSessionLink.getAttribute('href')).toBe('/sessions/live-session');
+    expect(liveSessionLink.textContent).not.toContain('Live');
     expect(
       screen.getByRole('link', { name: /Past practice/ }).getAttribute('href'),
     ).toBe('/sessions/past');
@@ -171,6 +173,16 @@ describe('public member UI scaffold', () => {
     ).toBeTruthy();
     expect(screen.queryByText('Private draft')).toBeNull();
     expect(screen.getByRole('link', { name: 'Officer login' })).toBeTruthy();
+    expect(
+      screen
+        .getByRole('link', { name: 'Sessions' })
+        .getAttribute('aria-current'),
+    ).toBe('page');
+    expect(
+      screen
+        .getByRole('link', { name: 'Problem Bank' })
+        .getAttribute('aria-current'),
+    ).toBeNull();
     expect(
       screen.getByRole('button', { name: 'Toggle color theme' }),
     ).toBeTruthy();

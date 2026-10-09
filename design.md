@@ -96,9 +96,17 @@ documents contain code and complexity information; there is no prepared
 Solution Output or execution surface.
 
 Problem Bank details use the same Member Approach and Language selection model.
-The public header links to Problem Bank and Officer login; Session and Problem
-Bank views provide return navigation where applicable. Keep discovery and return
-paths clear without adding heavy or persistent navigation.
+The public header provides persistent Sessions and Problem Bank destinations,
+marks the current destination with `aria-current="page"`, and includes Officer
+login. Officer Mode uses the same destinations within its own mode. Keep the
+header compact on desktop and place navigation on a second row on narrow
+screens; the Officer Mode context and theme control remain available there.
+Problem Bank details link back to discovery where applicable.
+
+Session discovery rows put the Session title before supporting date metadata.
+The Live and Past section heading supplies the status, so rows do not repeat it.
+Use a visible skeleton during initial discovery loading and an explicit
+retryable message for errors.
 
 ### Officer
 
@@ -111,6 +119,12 @@ Officers can manage Approaches (create, edit, delete, and reorder where the
 Session lifecycle permits), select a Language, and manage Session lifecycle,
 answer visibility, and preparation readiness. Put high-value presentation
 controls within reach without obscuring code or crowding the workspace.
+
+Use one shared **Save changes** action for Session metadata. In the Problem
+workspace, name the combined action **Save Problem and Solution changes** so
+its scope is clear. Keep lifecycle and destructive actions visually distinct.
+Past Session Problem history is disclosed on demand and loaded only when opened,
+so the dashboard remains scannable and initial queries stay focused.
 
 ## Problem Bank — Current and Direction
 
@@ -171,6 +185,12 @@ meaningful icon. Provide a visible 2px focus outline with offset; selected
 Problems also need a semantic selected state and a visible accent treatment.
 
 ## Typography, spacing, and shell — Direction
+
+Use the shared UI primitives for buttons, fields, badges, and status messages.
+Buttons and fields have a consistent minimum 44px touch height, visible focus,
+and restrained radius. Primary, secondary, quiet, and destructive actions use
+the same color and interaction vocabulary across Member and Officer views.
+Member and Officer discovery pages use a shared shell capped at 1440px.
 
 Use system sans-serif for interface text and a system monospace stack for code.
 Keep the established hierarchy:

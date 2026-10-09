@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useColorTheme, type ColorTheme } from './theme-provider';
+import { Button } from './ui/primitives';
 
 function systemTheme(): ColorTheme {
   return window.matchMedia('(prefers-color-scheme: dark)').matches
@@ -32,9 +33,9 @@ export default function ThemeToggle() {
   }
 
   return (
-    <button
-      className="theme-toggle inline-flex min-h-11 w-11 items-center justify-center gap-2 rounded border border-border-strong bg-surface px-0 text-ink hover:bg-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:w-auto sm:px-2.5"
-      type="button"
+    <Button
+      variant="secondary"
+      className="theme-toggle h-11 w-11 gap-2 px-0 sm:w-auto sm:px-2.5"
       aria-label="Toggle color theme"
       aria-pressed={theme === null ? undefined : theme === 'dark'}
       onClick={toggle}
@@ -45,6 +46,6 @@ export default function ThemeToggle() {
       <span className="hidden text-sm sm:inline">
         {theme ? `${theme === 'dark' ? 'Dark' : 'Light'} mode` : 'Theme'}
       </span>
-    </button>
+    </Button>
   );
 }

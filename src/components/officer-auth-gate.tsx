@@ -2,14 +2,17 @@
 
 import { signOut } from 'firebase/auth';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useState, type ReactNode } from 'react';
 import { useOfficerAuth } from '@/hooks/use-officer-auth';
 import { getOfficerAuth } from '@/lib/firebase/auth';
 import AppHeader from './app-header';
 import OfficerLogin from './officer-login';
+import { Button } from './ui/primitives';
 
 export default function OfficerAuthGate({ children }: { children: ReactNode }) {
   const auth = useOfficerAuth();
+  const pathname = usePathname();
   const [signingOut, setSigningOut] = useState(false);
   const [error, setError] = useState('');
 
@@ -29,33 +32,33 @@ export default function OfficerAuthGate({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen bg-canvas text-ink">
       <AppHeader
+        mode={auth.status === 'authenticated' ? 'officer' : 'login'}
+        current={
+          pathname.startsWith('/officer/problem-bank')
+            ? 'problem-bank'
+            : 'sessions'
+        }
         context={auth.status === 'authenticated' ? 'Officer Mode' : undefined}
       >
-        <nav aria-label="Officer navigation">
-          <Link href="/" aria-label="View member site">
-            View member site
-          </Link>
-          {auth.status === 'authenticated' && (
-            <>
-              <Link href="/officer">Sessions</Link>
-              <Link href="/officer/problem-bank">Problem Bank</Link>
-              <button
-                className="min-h-11 rounded px-2 text-sm text-muted hover:bg-hover hover:text-ink"
-                disabled={signingOut}
-                onClick={handleLogout}
-                type="button"
-              >
-                {signingOut ? 'Signing out…' : 'Sign out'}
-              </button>
-            </>
-          )}
-        </nav>
+        <Link href="/" className="ui-header-link" aria-label="View member site">
+          View member site
+        </Link>
+        {auth.status === 'authenticated' && (
+          <Button
+            variant="quiet"
+            className="min-h-11 px-1.5 text-sm"
+            disabled={signingOut}
+            onClick={handleLogout}
+          >
+            {signingOut ? 'Signing out…' : 'Sign out'}
+          </Button>
+        )}
       </AppHeader>
       <main
         className={
           auth.status === 'anonymous'
             ? 'mx-auto flex min-h-[calc(100vh-56px)] w-[calc(100%-32px)] max-w-[1440px] items-center justify-center pb-[6vh] sm:w-[calc(100%-48px)]'
-            : 'mx-auto w-[calc(100%-32px)] max-w-[1440px] py-5 pb-12 sm:w-[calc(100%-48px)] sm:pt-6'
+            : 'ui-page-shell'
         }
       >
         {error && (

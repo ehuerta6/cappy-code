@@ -245,7 +245,7 @@ describe('Officer Sessions surface', () => {
     resolve([record]);
     expect(
       await screen.findByRole('button', {
-        name: /Oct 8.*Arrays.*1 Problem.*draft/,
+        name: /Arrays.*Oct 8.*1 Problem/,
       }),
     ).toBeTruthy();
   });
@@ -388,13 +388,11 @@ describe('Officer Sessions surface', () => {
     expect(live.querySelector('time')?.getAttribute('datetime')).toBe(
       '2026-01-01',
     );
-    const pastRows = past.querySelectorAll('button');
+    const pastRows = past.querySelectorAll('ul > li > button');
     expect(pastRows[0].textContent).toContain('Oct 1');
     expect(pastRows[1].textContent).toContain('Sep 1');
     expect(pastRows[0].textContent).toContain('1 Problem');
-    expect(
-      await within(past).findAllByText('No Problems recorded.'),
-    ).toHaveLength(2);
+    expect(api.listProblems).not.toHaveBeenCalled();
   });
 
   it('groups Officer Sessions into three independent branch history regions', async () => {
@@ -429,7 +427,9 @@ describe('Officer Sessions surface', () => {
     });
     const icpc = screen.getByRole('region', { name: 'ICPC session history' });
     expect(
-      within(intro).getByRole('button', { name: /Intro past/ }),
+      within(intro).getByRole('button', {
+        name: 'Show Problem details for Intro past',
+      }),
     ).toBeTruthy();
     expect(
       within(general).getByRole('button', { name: /General live/ }),
@@ -449,7 +449,7 @@ describe('Officer Sessions surface', () => {
     ).not.toContain('overflow-y-auto');
   });
 
-  it('shows ended-session Problem summaries directly under Past in order and keeps row navigation', async () => {
+  it('loads ended-session Problem summaries on demand and keeps row navigation', async () => {
     const draft = {
       ...record,
       id: 'draft-session',
@@ -535,6 +535,12 @@ describe('Officer Sessions surface', () => {
     const past = within(intro).getByRole('region', {
       name: 'Past Intro sessions',
     });
+    expect(api.listProblems).not.toHaveBeenCalled();
+    fireEvent.click(
+      within(past).getByRole('button', {
+        name: 'Show Problem details for Arrays & Hashing',
+      }),
+    );
     const newerHistory = await within(past).findByRole('region', {
       name: 'Problem history for Arrays & Hashing',
     });
@@ -558,9 +564,14 @@ describe('Officer Sessions surface', () => {
         .getAttribute('href'),
     ).toBe('https://leetcode.com/problems/two-sum/');
     expect(
-      within(newerHistory).getByText('No LeetCode link provided'),
+      within(newerHistory).getByText('No Problem link provided'),
     ).toBeTruthy();
-    const olderHistory = within(past).getByRole('region', {
+    fireEvent.click(
+      within(past).getByRole('button', {
+        name: 'Show Problem details for Strings',
+      }),
+    );
+    const olderHistory = await within(past).findByRole('region', {
       name: 'Problem history for Strings',
     });
     expect(within(olderHistory).getByText('Valid Anagram')).toBeTruthy();
@@ -569,18 +580,14 @@ describe('Officer Sessions surface', () => {
         name: 'https://leetcode.com/problems/valid-anagram/',
       }),
     ).toBeTruthy();
-    expect(
-      within(past)
-        .getAllByRole('button')
-        .map((button) => button.textContent?.match(/Oct \d/)?.[0]),
-    ).toEqual(['Oct 4', 'Oct 1']);
-    expect(
-      api.listProblems.mock.calls.map(([sessionId]) => sessionId).sort(),
-    ).toEqual(['newer-session', 'older-session']);
+    expect(api.listProblems.mock.calls.map(([id]) => id).sort()).toEqual([
+      'newer-session',
+      'older-session',
+    ]);
     expect(screen.queryByLabelText('Session title')).toBeNull();
 
     fireEvent.click(
-      within(past).getByRole('button', { name: /Oct 4.*Arrays & Hashing/ }),
+      within(past).getByRole('button', { name: /Arrays & Hashing.*Oct 4/ }),
     );
     expect(await screen.findByLabelText('Session title')).toBeTruthy();
   });
@@ -624,6 +631,12 @@ describe('Officer Sessions surface', () => {
     const past = within(intro).getByRole('region', {
       name: 'Past Intro sessions',
     });
+    expect(api.listProblems).not.toHaveBeenCalled();
+    fireEvent.click(
+      within(past).getByRole('button', {
+        name: 'Show Problem details for Unavailable history',
+      }),
+    );
     const failedHistory = within(past).getByRole('region', {
       name: 'Problem history for Unavailable history',
     });
@@ -632,13 +645,12 @@ describe('Officer Sessions surface', () => {
         'Problem history could not be loaded.',
       ),
     ).toBeTruthy();
-    expect(within(past).getByText('No Problems recorded.')).toBeTruthy();
-    expect(
-      within(past).getByRole('button', { name: /Unavailable history/ }),
-    ).toBeTruthy();
-    expect(
-      within(past).getByRole('button', { name: /Empty history/ }),
-    ).toBeTruthy();
+    fireEvent.click(
+      within(past).getByRole('button', {
+        name: 'Show Problem details for Empty history',
+      }),
+    );
+    expect(await within(past).findByText('No Problems recorded.')).toBeTruthy();
 
     fireEvent.click(
       within(failedHistory).getByRole('button', {
@@ -895,7 +907,7 @@ describe('Officer Sessions surface', () => {
     expect(api.updateSession).not.toHaveBeenCalled();
     fireEvent.blur(screen.getByLabelText('Session title'));
     expect(api.updateSession).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
     await waitFor(() =>
       expect(api.updateSession).toHaveBeenCalledWith('session-id', {
         branch: 'intro',
@@ -911,7 +923,7 @@ describe('Officer Sessions surface', () => {
       await screen.findByRole('region', { name: 'Intro session history' }),
     ).toBeTruthy();
     expect(
-      screen.getByRole('button', { name: /Oct 8.*Arrays.*1 Problem.*ended/ }),
+      screen.getByRole('button', { name: /Arrays.*Oct 8.*1 Problem/ }),
     ).toBeTruthy();
   });
 
@@ -945,7 +957,7 @@ describe('Officer Sessions surface', () => {
     fireEvent.blur(title);
     expect(api.updateSession).not.toHaveBeenCalled();
     expect(screen.getByRole('status').textContent).toBe('Unsaved changes');
-    fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
     expect(screen.getByRole('status').textContent).toBe('Saving…');
     expect(api.updateSession).toHaveBeenCalledWith('session-id', {
       branch: 'intro',
@@ -959,7 +971,7 @@ describe('Officer Sessions surface', () => {
     expect(
       (
         screen.getByRole('button', {
-          name: 'Save Changes',
+          name: 'Save changes',
         }) as HTMLButtonElement
       ).disabled,
     ).toBe(true);
@@ -972,7 +984,7 @@ describe('Officer Sessions surface', () => {
     await openEditor();
     const title = screen.getByLabelText('Session title') as HTMLInputElement;
     fireEvent.change(title, { target: { value: 'Unsaved Hashing' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
     await screen.findByRole('alert');
     expect(title.value).toBe('Unsaved Hashing');
     expect(
@@ -982,7 +994,7 @@ describe('Officer Sessions surface', () => {
         }) as HTMLButtonElement
       ).disabled,
     ).toBe(true);
-    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Retry save' }));
     await waitFor(() =>
       expect(screen.getByRole('status').textContent).toBe('Saved ✓'),
     );
@@ -994,7 +1006,7 @@ describe('Officer Sessions surface', () => {
     await openEditor();
     const title = screen.getByLabelText('Session title') as HTMLInputElement;
     fireEvent.change(title, { target: { value: 'Unsaved Hashing' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
     await screen.findByRole('alert');
     expect(api.updateSession).toHaveBeenCalledTimes(1);
 
@@ -1005,7 +1017,7 @@ describe('Officer Sessions surface', () => {
     expect(
       (
         screen.getByRole('button', {
-          name: 'Save Changes',
+          name: 'Save changes',
         }) as HTMLButtonElement
       ).disabled,
     ).toBe(true);
@@ -1017,7 +1029,7 @@ describe('Officer Sessions surface', () => {
     fireEvent.change(screen.getByLabelText('Session title'), {
       target: { value: ' ' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
     expect(await screen.findByText('Enter a session title.')).toBeTruthy();
     expect(api.updateSession).not.toHaveBeenCalled();
   });
@@ -1060,7 +1072,7 @@ describe('Officer Sessions surface', () => {
     fireEvent.blur(title);
     expect(api.updateProblem).not.toHaveBeenCalled();
     expect(screen.queryByRole('alert')).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
     await screen.findByRole('alert');
     expect(
       (
@@ -1110,7 +1122,7 @@ describe('Officer Sessions surface', () => {
     });
     expect((backButton as HTMLButtonElement).disabled).toBe(true);
     expect(api.updateSolution).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
     fireEvent.click(backButton);
     expect(screen.getByLabelText('Session problems')).toBeTruthy();
     await waitFor(() =>
@@ -1173,7 +1185,7 @@ describe('Officer Sessions surface', () => {
     ).toBeNull();
     expect(api.duplicateSession).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
     await waitFor(() =>
       expect(api.updateSolution).toHaveBeenCalledWith(
         'session-id',
@@ -1241,7 +1253,7 @@ describe('Officer Sessions surface', () => {
     expect(api.updateProblem).not.toHaveBeenCalled();
     expect(api.updateSolution).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
     await screen.findByText(/Java Solution could not be saved/);
     expect(api.updateProblem).toHaveBeenCalledOnce();
     expect(api.updateProblem).toHaveBeenCalledWith('session-id', 'problem', {
@@ -1323,7 +1335,7 @@ describe('Officer Sessions surface', () => {
       target: { value: 'changed source' },
     });
     expect(api.updateSolution).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
     await waitFor(() =>
       expect(api.updateSolution).toHaveBeenCalledWith(
         'session-id',
@@ -1490,7 +1502,7 @@ describe('Officer Sessions surface', () => {
     fireEvent.change(screen.getByLabelText('Python Solution, editable'), {
       target: { value: 'print(1)' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
     await waitFor(() =>
       expect(api.updateSession).toHaveBeenCalledWith('session-id', {
         branch: 'intro',
@@ -1507,7 +1519,7 @@ describe('Officer Sessions surface', () => {
         ) as HTMLTextAreaElement
       ).value,
     ).not.toBe('');
-    fireEvent.click(screen.getByRole('button', { name: 'Retry Save' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Retry save' }));
     await screen.findByText('Saved ✓');
     expect(api.updateSession).toHaveBeenCalledTimes(1);
     expect(api.updateProblem).toHaveBeenCalledTimes(1);

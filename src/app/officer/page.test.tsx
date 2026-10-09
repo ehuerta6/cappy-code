@@ -36,7 +36,10 @@ vi.mock('@/lib/firebase/member', () => ({
   listMemberSessions: firebase.listMemberSessions,
   subscribeToMemberSessions: firebase.subscribeToMemberSessions,
 }));
-vi.mock('next/navigation', () => ({ useRouter: () => navigation }));
+vi.mock('next/navigation', () => ({
+  useRouter: () => navigation,
+  usePathname: () => '/officer',
+}));
 vi.mock('@monaco-editor/react', () => ({
   default: ({ options }: { options: { readOnly: boolean } }) => (
     <div

@@ -150,6 +150,191 @@
   }
 }
 
+@layer components {
+  .ui-page-shell {
+    width: calc(100% - 2rem);
+    max-width: 90rem;
+    margin-inline: auto;
+    padding-block: 1.5rem 3rem;
+  }
+
+  .ui-skeleton {
+    border-radius: 0.25rem;
+    background: var(--surface-raised);
+  }
+
+  .ui-header-link {
+    display: inline-flex;
+    min-height: 2.75rem;
+    align-items: center;
+    border-radius: 0.25rem;
+    padding-inline: 0.375rem;
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    text-decoration: none;
+    text-underline-offset: 0.25rem;
+  }
+
+  .ui-header-link:hover {
+    color: var(--accent-hover);
+    text-decoration: underline;
+  }
+
+  .ui-header-link--current {
+    color: var(--text-primary);
+    font-weight: 600;
+    text-decoration: underline;
+    text-decoration-color: var(--accent);
+    text-decoration-thickness: 2px;
+  }
+
+  .ui-header-link:focus-visible {
+    position: relative;
+    z-index: 1;
+  }
+
+  .ui-button {
+    display: inline-flex;
+    min-height: 2.75rem;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border: 1px solid var(--border-strong);
+    border-radius: 0.25rem;
+    padding: 0.625rem 0.75rem;
+    color: var(--text-primary);
+    background: var(--surface-primary);
+    font-size: 0.9375rem;
+    line-height: 1.375rem;
+    text-align: center;
+    text-decoration: none;
+    cursor: pointer;
+  }
+
+  .ui-button:hover:not(:disabled) {
+    background: var(--surface-hover);
+  }
+
+  .ui-button:disabled {
+    border-color: var(--border-subtle);
+    color: var(--text-secondary);
+    background: var(--surface-raised);
+    cursor: not-allowed;
+  }
+
+  .ui-button--primary {
+    border-color: var(--accent);
+    color: var(--accent-contrast);
+    background: var(--accent);
+    font-weight: 600;
+  }
+
+  .ui-button--primary:hover:not(:disabled) {
+    border-color: var(--accent-hover);
+    background: var(--accent-hover);
+  }
+
+  .ui-button--secondary {
+    font-weight: 500;
+  }
+
+  .ui-button--quiet {
+    border-color: transparent;
+    color: var(--text-secondary);
+    background: transparent;
+  }
+
+  .ui-button--quiet:hover:not(:disabled) {
+    color: var(--text-primary);
+  }
+
+  .ui-button--danger {
+    border-color: color-mix(in srgb, var(--danger) 55%, var(--border-strong));
+    color: var(--danger);
+    background: var(--surface-primary);
+  }
+
+  .ui-button--danger:hover:not(:disabled) {
+    background: var(--danger-surface);
+  }
+
+  .ui-field {
+    display: block;
+    width: 100%;
+    min-height: 2.75rem;
+    border: 1px solid var(--border-strong);
+    border-radius: 0.25rem;
+    padding: 0.625rem 0.75rem;
+    color: var(--text-primary);
+    background: var(--surface-primary);
+    font-size: 0.9375rem;
+    line-height: 1.375rem;
+  }
+
+  .ui-field:disabled {
+    color: var(--text-secondary);
+    background: var(--surface-raised);
+    cursor: not-allowed;
+  }
+
+  textarea.ui-field {
+    min-height: 5rem;
+    resize: vertical;
+  }
+
+  .ui-badge {
+    display: inline-flex;
+    min-height: 1.75rem;
+    align-items: center;
+    border: 1px solid var(--border-subtle);
+    border-radius: 0.25rem;
+    padding: 0.125rem 0.5rem;
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    font-weight: 600;
+    line-height: 1.25rem;
+    text-transform: capitalize;
+    white-space: nowrap;
+  }
+
+  .ui-badge--success {
+    border-color: color-mix(in srgb, var(--success) 55%, var(--border-strong));
+    color: var(--success);
+    background: var(--success-surface);
+  }
+
+  .ui-badge--warning {
+    border-color: color-mix(in srgb, var(--warning) 55%, var(--border-strong));
+    color: var(--warning);
+    background: var(--surface-primary);
+  }
+
+  .ui-badge--danger {
+    border-color: color-mix(in srgb, var(--danger) 55%, var(--border-strong));
+    color: var(--danger);
+    background: var(--danger-surface);
+  }
+
+  .ui-state-message {
+    margin-block: 1rem;
+    color: var(--text-secondary);
+    font-size: 0.9375rem;
+    line-height: 1.5rem;
+  }
+
+  .ui-loading-block {
+    min-height: 6rem;
+    border-top: 1px solid var(--border-subtle);
+    padding-top: 1rem;
+  }
+}
+
+@media (min-width: 640px) {
+  .ui-page-shell {
+    width: calc(100% - 3rem);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
