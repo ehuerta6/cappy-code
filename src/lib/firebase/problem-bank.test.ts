@@ -63,7 +63,8 @@ import {
 
 const metadata = {
   title: 'Two Sum',
-  description: 'Find two values.',
+  description:
+    'Find two values.\n\n![Tree diagram](<https://storage.example/immutable-tree.webp>)',
   constraints: '2 ≤ n ≤ 100',
   exampleInput: '1 2',
   exampleOutput: '3',

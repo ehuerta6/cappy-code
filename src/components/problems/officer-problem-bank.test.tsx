@@ -19,6 +19,8 @@ const api = vi.hoisted(() => ({
   updateBankSolution: vi.fn(),
   updateBankApproach: vi.fn(),
 }));
+const imageApi = vi.hoisted(() => ({ uploadProblemImage: vi.fn() }));
+vi.mock('@/lib/firebase/storage', () => imageApi);
 
 vi.mock('client-only', () => ({}));
 vi.mock('@/lib/firebase/problem-bank', () => api);
@@ -126,11 +128,45 @@ beforeEach(() => {
   api.updateBankSolution.mockResolvedValue(undefined);
   api.updateBankApproach.mockResolvedValue(undefined);
   api.deleteBankProblem.mockResolvedValue(undefined);
+  imageApi.uploadProblemImage.mockResolvedValue(
+    'https://firebasestorage.googleapis.com/v0/b/test/o/problem-images%2Fofficer%2Fbank-image?alt=media',
+  );
 });
 
 afterEach(() => cleanup());
 
 describe('Officer Problem Bank', () => {
+  it('adds an immutable image reference to Bank description content for explicit save', async () => {
+    render(<OfficerProblemBank />);
+    const description = await screen.findByLabelText(/Description/);
+    fireEvent.click(screen.getByRole('button', { name: 'Add image' }));
+    fireEvent.change(screen.getByLabelText('Choose image file'), {
+      target: {
+        files: [new File(['image bytes'], 'tree.webp', { type: 'image/webp' })],
+      },
+    });
+    fireEvent.change(screen.getByLabelText('Image alt text'), {
+      target: { value: 'Binary tree' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Upload and insert' }));
+
+    await waitFor(() =>
+      expect((description as HTMLTextAreaElement).value).toContain(
+        '![Binary tree](<https://firebasestorage.googleapis.com/v0/b/test/o/problem-images%2Fofficer%2Fbank-image?alt=media>)',
+      ),
+    );
+    expect(api.updateBankProblem).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    await waitFor(() =>
+      expect(api.updateBankProblem).toHaveBeenCalledWith(
+        'two-sum',
+        expect.objectContaining({
+          description: (description as HTMLTextAreaElement).value,
+        }),
+      ),
+    );
+  });
+
   it('uses one selected Language editor and the shared classification badges', async () => {
     render(<OfficerProblemBank />);
     await screen.findByLabelText('Python Solution, editable');

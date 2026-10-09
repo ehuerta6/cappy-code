@@ -6,6 +6,7 @@ const environment = {
   NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: 'unit-test.firebaseapp.com',
   NEXT_PUBLIC_FIREBASE_PROJECT_ID: 'unit-test',
   NEXT_PUBLIC_FIREBASE_APP_ID: 'unit-test-app-id',
+  NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: 'unit-test.appspot.com',
 };
 
 function configureEnvironment() {
@@ -24,6 +25,7 @@ describe('Firebase configuration', () => {
       authDomain: environment.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
       projectId: environment.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
       appId: environment.NEXT_PUBLIC_FIREBASE_APP_ID,
+      storageBucket: environment.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
     });
   });
 
@@ -49,6 +51,7 @@ describe('Firebase configuration', () => {
       authDomain: 'localhost',
       projectId: 'demo-cappycode-local',
       appId: 'demo-cappycode-local',
+      storageBucket: 'demo-cappycode-local.appspot.com',
     });
   });
 
@@ -61,6 +64,7 @@ describe('Firebase configuration', () => {
       authDomain: environment.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
       projectId: environment.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
       appId: environment.NEXT_PUBLIC_FIREBASE_APP_ID,
+      storageBucket: environment.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
     });
   });
 

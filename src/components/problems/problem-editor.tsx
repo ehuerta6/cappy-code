@@ -11,6 +11,7 @@ import type { SaveStateReporter } from '@/components/officer-save-state';
 import type { ProblemCategory } from '@/lib/domain';
 import { isPermissionDenied } from '@/lib/firebase/errors';
 import { ProblemDifficultyBadge } from './problem-bank-metadata';
+import ProblemImageAuthoring from './problem-image-authoring';
 
 export default function ProblemEditor({
   sessionId,
@@ -34,7 +35,9 @@ export default function ProblemEditor({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldError, setFieldError] = useState<string | null>(null);
+  const [imagePending, setImagePending] = useState(false);
   const busy = useRef(false);
+  const descriptionRef = useRef<HTMLTextAreaElement>(null);
   const dirty = Object.keys(content).some(
     (key) =>
       content[key as keyof ProblemContent] !==
@@ -42,12 +45,15 @@ export default function ProblemEditor({
   );
 
   function edit(field: keyof ProblemContent, value: string) {
-    const next = { ...content, [field]: value };
-    setContent(next);
+    setContent((current) => ({ ...current, [field]: value }));
     setError(null);
     setFieldError(null);
   }
   const save = useCallback(async () => {
+    if (imagePending) {
+      setError('Finish or cancel the image upload before saving.');
+      return false;
+    }
     if (!dirty || busy.current) return true;
     let fields;
     try {
@@ -90,11 +96,11 @@ export default function ProblemEditor({
       busy.current = false;
       setSaving(false);
     }
-  }, [dirty, content, onSaved, record.id, sessionId]);
+  }, [dirty, content, imagePending, onSaved, record.id, sessionId, saved]);
 
   useEffect(() => {
     const isDirty = dirty || Boolean(error);
-    onBusyChange(isDirty || saving);
+    onBusyChange(isDirty || saving || imagePending);
     onSaveStateChange(
       isDirty || saving
         ? {
@@ -105,7 +111,15 @@ export default function ProblemEditor({
           }
         : null,
     );
-  }, [dirty, error, onBusyChange, onSaveStateChange, save, saving]);
+  }, [
+    dirty,
+    error,
+    imagePending,
+    onBusyChange,
+    onSaveStateChange,
+    save,
+    saving,
+  ]);
   return (
     <div
       role="tabpanel"
@@ -163,22 +177,42 @@ export default function ProblemEditor({
           <option value="hard">Hard</option>
         </select>
       </label>
-      <label className="my-5 flex max-w-3xl flex-col gap-2">
-        <span>
+      <div className="my-5 flex max-w-3xl flex-col gap-2">
+        <label htmlFor={`problem-description-${record.id}`}>
           Description{' '}
           <span aria-hidden="true" className="text-sm font-normal text-muted">
             (Markdown supported)
           </span>
-        </span>
+        </label>
         <textarea
+          ref={descriptionRef}
           aria-label="Description"
+          id={`problem-description-${record.id}`}
           className="min-h-[100px] w-full resize-y rounded border border-border-strong bg-surface px-3 py-2 leading-6 text-ink disabled:cursor-default disabled:bg-raised disabled:text-muted"
           rows={5}
           value={content.description}
           onChange={(event) => edit('description', event.target.value)}
-          disabled={saving || disabled}
+          disabled={saving || disabled || imagePending}
         />
-      </label>
+        <ProblemImageAuthoring
+          id={record.id}
+          description={content.description}
+          textareaRef={descriptionRef}
+          disabled={saving || disabled}
+          onDescriptionChange={(description) =>
+            edit('description', description)
+          }
+          onPendingChange={(pending) => {
+            setImagePending(pending);
+            if (!pending)
+              setError((current) =>
+                current === 'Finish or cancel the image upload before saving.'
+                  ? null
+                  : current,
+              );
+          }}
+        />
+      </div>
       <label className="my-5 flex max-w-3xl flex-col gap-2">
         Constraints
         <textarea

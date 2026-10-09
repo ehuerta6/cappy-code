@@ -5,6 +5,7 @@ export const FIREBASE_EMULATOR_CONFIG = {
   projectId: 'demo-cappycode-local',
   firestorePort: 8080,
   authPort: 9099,
+  storagePort: 9199,
 } as const;
 
 export function useFirebaseEmulators(): boolean {
@@ -30,6 +31,7 @@ export function getFirebaseConfig(): FirebaseOptions {
       authDomain: 'localhost',
       projectId: FIREBASE_EMULATOR_CONFIG.projectId,
       appId: 'demo-cappycode-local',
+      storageBucket: 'demo-cappycode-local.appspot.com',
     };
   }
 
@@ -38,6 +40,7 @@ export function getFirebaseConfig(): FirebaseOptions {
     authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
     projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
     appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+    storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
   };
 
   const requiredValues = {
@@ -45,6 +48,7 @@ export function getFirebaseConfig(): FirebaseOptions {
     NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: config.authDomain,
     NEXT_PUBLIC_FIREBASE_PROJECT_ID: config.projectId,
     NEXT_PUBLIC_FIREBASE_APP_ID: config.appId,
+    NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: config.storageBucket,
   };
   const missingVariables = Object.entries(requiredValues)
     .filter(([, value]) => !value?.trim())

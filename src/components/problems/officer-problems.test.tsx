@@ -25,6 +25,8 @@ const bankApi = vi.hoisted(() => ({
   listOfficerBankProblems: vi.fn(),
   materializeSessionProblemInBank: vi.fn(),
 }));
+const imageApi = vi.hoisted(() => ({ uploadProblemImage: vi.fn() }));
+vi.mock('@/lib/firebase/storage', () => imageApi);
 vi.mock('@/lib/firebase/problems', async (original) => ({
   ...(await original<typeof import('@/lib/firebase/problems')>()),
   ...api,
@@ -161,6 +163,9 @@ beforeEach(() => {
   bankApi.materializeSessionProblemInBank.mockResolvedValue({
     bankProblemId: 'reserved-bank',
   });
+  imageApi.uploadProblemImage.mockResolvedValue(
+    'https://firebasestorage.googleapis.com/v0/b/test/o/problem-images%2Fofficer%2Fasset?alt=media',
+  );
 });
 afterEach(() => {
   cleanup();
@@ -170,6 +175,70 @@ async function loaded() {
   start();
   await screen.findByRole('tab', { name: 'Two Sum' });
 }
+
+it('uploads an image with required alt text and inserts Markdown for explicit save', async () => {
+  await loaded();
+  const description = screen.getByLabelText(
+    'Description',
+  ) as HTMLTextAreaElement;
+  description.focus();
+  description.setSelectionRange(4, 4);
+  fireEvent.select(description);
+  fireEvent.click(screen.getByRole('button', { name: 'Add image' }));
+  const image = new File(['image bytes'], 'tree.png', { type: 'image/png' });
+  fireEvent.change(screen.getByLabelText('Choose image file'), {
+    target: { files: [image] },
+  });
+  fireEvent.change(screen.getByLabelText('Image alt text'), {
+    target: { value: 'Binary tree with root 5' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Upload and insert' }));
+
+  await waitFor(() =>
+    expect(description.value).toContain(
+      '![Binary tree with root 5](<https://firebasestorage.googleapis.com/v0/b/test/o/problem-images%2Fofficer%2Fasset?alt=media>)',
+    ),
+  );
+  expect(description.value.indexOf('![Binary tree with root 5]')).toBe(4);
+  expect(api.updateProblem).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+  await waitFor(() =>
+    expect(api.updateProblem).toHaveBeenCalledWith(
+      'session',
+      'first',
+      expect.objectContaining({ description: description.value }),
+    ),
+  );
+});
+
+it('shows upload failures and keeps the selected image available for retry', async () => {
+  await loaded();
+  imageApi.uploadProblemImage.mockRejectedValueOnce(new Error('network issue'));
+  fireEvent.click(screen.getByRole('button', { name: 'Add image' }));
+  fireEvent.change(screen.getByLabelText('Choose image file'), {
+    target: {
+      files: [new File(['image bytes'], 'tree.png', { type: 'image/png' })],
+    },
+  });
+  fireEvent.change(screen.getByLabelText('Image alt text'), {
+    target: { value: 'Binary tree' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Upload and insert' }));
+
+  expect((await screen.findByRole('alert')).textContent).toContain(
+    'network issue',
+  );
+  expect(screen.getByText('tree.png')).toBeTruthy();
+  imageApi.uploadProblemImage.mockResolvedValueOnce(
+    'https://firebasestorage.googleapis.com/v0/b/test/o/problem-images%2Fofficer%2Fnext?alt=media',
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Upload and insert' }));
+  await waitFor(() =>
+    expect(
+      (screen.getByLabelText('Description') as HTMLTextAreaElement).value,
+    ).toContain('![Binary tree]('),
+  );
+});
 function actions() {
   fireEvent.click(screen.getByRole('button', { name: 'Manage Two Sum' }));
 }

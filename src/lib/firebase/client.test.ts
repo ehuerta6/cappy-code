@@ -33,6 +33,7 @@ function configureBrowser() {
   vi.stubEnv('NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN', 'unit-test.firebaseapp.com');
   vi.stubEnv('NEXT_PUBLIC_FIREBASE_PROJECT_ID', 'unit-test');
   vi.stubEnv('NEXT_PUBLIC_FIREBASE_APP_ID', 'unit-test-app-id');
+  vi.stubEnv('NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET', 'unit-test.appspot.com');
 }
 
 describe('Firebase client initialization', () => {

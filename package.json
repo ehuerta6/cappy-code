@@ -13,7 +13,7 @@
     "e2e": "firebase emulators:exec --only auth,firestore --project demo-cappycode-local \"npm run e2e:playwright\"",
     "e2e:playwright": "playwright test",
     "start": "next start",
-    "emulators": "firebase emulators:start --only auth,firestore --project demo-cappycode-local",
+    "emulators": "firebase emulators:start --only auth,firestore,storage --project demo-cappycode-local",
     "seed": "node scripts/seed-emulator.mjs",
     "reset": "node scripts/reset-emulator.mjs",
     "problem-bank:import": "node --import=tsx scripts/import-production-problem-bank.mts",
@@ -22,6 +22,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:rules": "firebase emulators:exec --only firestore --project demo-cappycode-rules \"vitest run --config vitest.rules.config.mts\"",
+    "test:storage-rules": "firebase emulators:exec --only storage --project demo-cappycode-storage \"vitest run --config vitest.storage-rules.config.mts\"",
     "test:watch": "vitest",
     "format": "prettier --write .",
     "format:check": "prettier --check ."

@@ -100,6 +100,7 @@ environment, using the Web app config from the existing Firebase project
 - `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`
 - `NEXT_PUBLIC_FIREBASE_PROJECT_ID`
 - `NEXT_PUBLIC_FIREBASE_APP_ID`
+- `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`
 - `NEXT_PUBLIC_USE_FIREBASE_EMULATORS=false`
 
 These public client config values are compiled into browser assets. Never put
@@ -109,6 +110,19 @@ new deployment before the production build uses it. Confirm the deployed app's
 Firestore requests target `cappycode-f133c`; production requests must not use
 localhost or emulator endpoints. Deploy Firestore Security Rules separately
 with the Firebase CLI when Rules changes are in scope.
+
+Problem description images also require a Firebase Storage bucket. Set
+`NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` to the bucket name provisioned for
+`cappycode-f133c`, then deploy `storage.rules` separately with
+`firebase deploy --only storage --project cappycode-f133c`. Uploaded image
+objects are publicly readable and officer-created; updates and deletes are
+denied so saved Markdown references remain stable. Configure the bucket and
+Rules before enabling Officer image uploads in a production release.
+
+Cloud Storage for Firebase currently requires the Blaze pay-as-you-go plan.
+The existing deployment guidance above says not to upgrade this project to
+Blaze. Resolve that project-level billing decision before production rollout;
+this feature change does not alter the plan or touch production Firebase.
 
 For a production release, verify anonymous Member access and authenticated
 Officer workflows with the production account, including explicit Save,
@@ -149,6 +163,11 @@ recorded here. No production data was written during verification.
 
 5. Fill in these values from the Web app configuration:
 
+   Also set `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` to the bucket name shown in
+   Firebase Console → Storage. New default buckets use
+   `PROJECT_ID.firebasestorage.app`; older buckets may use
+   `PROJECT_ID.appspot.com`.
+
    | Environment variable               | Firebase config field |
    | ---------------------------------- | --------------------- |
    | `NEXT_PUBLIC_FIREBASE_API_KEY`     | `apiKey`              |
@@ -158,7 +177,7 @@ recorded here. No production data was written during verification.
 
 6. Install dependencies with `npm install`, then start the existing application with `npm run dev`. Restart the server after changing `.env.local`.
 
-These are public Firebase client configuration values, bundled into browser code by Next.js. They are not authorization credentials. Never put officer passwords, service account keys, or server secrets in `NEXT_PUBLIC_` variables. `.env.local` is ignored by Git. Storage, Analytics, and Messaging configuration is unnecessary for this foundation.
+These are public Firebase client configuration values, bundled into browser code by Next.js. They are not authorization credentials. Never put officer passwords, service account keys, or server secrets in `NEXT_PUBLIC_` variables. `.env.local` is ignored by Git. Analytics and Messaging configuration is unnecessary.
 
 ## Client access
 
@@ -492,3 +511,12 @@ npm run test:rules
 CI runs this command separately from the normal Vitest suite. The GitHub Actions
 workflow installs Java 21 before running the emulator so permission tests
 exercise the actual `firestore.rules` file.
+
+Storage Rules tests use the Firebase Storage Emulator and need no production
+bucket or credentials:
+
+```bash
+npm run test:storage-rules
+```
+
+The `npm run emulators` workflow starts Storage alongside Auth and Firestore.

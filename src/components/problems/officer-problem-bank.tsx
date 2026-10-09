@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import SolutionPanel from '@/components/solutions/solution-panel';
 import { ProblemUsageHistory, ProblemUsageMetadata } from './problem-usage';
 import { getSharedEditorHeight } from '@/components/solutions/solution-sizing';
@@ -33,6 +33,7 @@ import {
 import { listProblemUsageSummaries } from '@/lib/firebase/problem-usage';
 import type { ProblemUsageSummary } from '@/lib/problem-usage';
 import ProblemBankFilters from './problem-bank-filters';
+import ProblemImageAuthoring from './problem-image-authoring';
 import {
   ProblemApproachTags,
   ProblemDifficultyBadge,
@@ -79,6 +80,8 @@ export default function OfficerProblemBank() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [imagePending, setImagePending] = useState(false);
+  const descriptionRef = useRef<HTMLTextAreaElement>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState(false);
   const [structuralBusy, setStructuralBusy] = useState(false);
@@ -106,10 +109,11 @@ export default function OfficerProblemBank() {
       ),
     ) ||
     JSON.stringify(approaches) !== JSON.stringify(savedApproaches);
-  const approachActionsDisabled = dirty || saving || structuralBusy;
+  const hasUnsavedChanges = dirty || imagePending;
+  const approachActionsDisabled = hasUnsavedChanges || saving || structuralBusy;
 
   useEffect(() => {
-    if (!dirty && !saving) return;
+    if (!hasUnsavedChanges && !saving) return;
     const beforeUnload = (event: BeforeUnloadEvent) => {
       event.preventDefault();
       event.returnValue = '';
@@ -135,7 +139,7 @@ export default function OfficerProblemBank() {
       window.removeEventListener('beforeunload', beforeUnload);
       document.removeEventListener('click', guardLink, true);
     };
-  }, [dirty, saving]);
+  }, [hasUnsavedChanges, saving]);
 
   useEffect(() => {
     let active = true;
@@ -254,6 +258,10 @@ export default function OfficerProblemBank() {
 
   const save = useCallback(async () => {
     if (!selectedId || !content || !solutions || saving) return;
+    if (imagePending) {
+      setError('Finish or cancel the image upload before saving.');
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
@@ -308,6 +316,7 @@ export default function OfficerProblemBank() {
   }, [
     activeApproach,
     approaches,
+    imagePending,
     approachId,
     content,
     savedContent,
@@ -332,7 +341,14 @@ export default function OfficerProblemBank() {
   }
 
   async function removeSelected(retry = false) {
-    if (!selectedId || dirty || saving || deleting || structuralBusy) return;
+    if (
+      !selectedId ||
+      hasUnsavedChanges ||
+      saving ||
+      deleting ||
+      structuralBusy
+    )
+      return;
     if (
       !retry &&
       !window.confirm(
@@ -385,7 +401,7 @@ export default function OfficerProblemBank() {
         </div>
         <button
           className={buttonClass}
-          disabled={saving || dirty || deleting}
+          disabled={saving || hasUnsavedChanges || deleting}
           onClick={() => void add()}
         >
           + New Problem
@@ -444,7 +460,7 @@ export default function OfficerProblemBank() {
                             aria-current={
                               selectedId === item.id ? 'true' : undefined
                             }
-                            disabled={saving || dirty || deleting}
+                            disabled={saving || hasUnsavedChanges || deleting}
                             onClick={() => setSelectedId(item.id)}
                           >
                             {item.title}
@@ -484,14 +500,14 @@ export default function OfficerProblemBank() {
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <button
                   className={buttonClass}
-                  disabled={!dirty || saving}
+                  disabled={!hasUnsavedChanges || saving || imagePending}
                   onClick={() => void save()}
                 >
                   {saving ? 'Saving…' : 'Save changes'}
                 </button>
                 <button
                   className={buttonClass}
-                  disabled={dirty || saving || deleting}
+                  disabled={hasUnsavedChanges || saving || deleting}
                   onClick={() => void removeSelected()}
                 >
                   {deleting ? 'Deleting…' : 'Delete Problem'}
@@ -515,7 +531,11 @@ export default function OfficerProblemBank() {
                 role="status"
                 aria-live="polite"
               >
-                {saving ? 'Saving…' : dirty ? 'Unsaved changes' : 'Saved ✓'}
+                {saving
+                  ? 'Saving…'
+                  : hasUnsavedChanges
+                    ? 'Unsaved changes'
+                    : 'Saved ✓'}
               </p>
               <div className="grid min-w-0 gap-6 min-[1350px]:h-[calc(100dvh-14rem)] min-[1350px]:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)] min-[1350px]:gap-0 min-[1350px]:overflow-hidden min-[1350px]:divide-x min-[1350px]:divide-border-soft">
                 <div className="min-w-0 min-[1350px]:h-full min-[1350px]:overflow-y-auto min-[1350px]:overscroll-contain min-[1350px]:pr-5">
@@ -591,12 +611,19 @@ export default function OfficerProblemBank() {
                       />
                     </label>
                   </div>
-                  <label className="my-4 grid max-w-3xl gap-1 font-medium">
-                    Description (Markdown supported)
+                  <div className="my-4 grid max-w-3xl gap-2">
+                    <label
+                      className="font-medium"
+                      htmlFor={`bank-problem-description-${selected.id}`}
+                    >
+                      Description (Markdown supported)
+                    </label>
                     <textarea
+                      ref={descriptionRef}
                       className="min-h-32 rounded border border-border-strong bg-surface px-3 py-2 font-normal"
+                      id={`bank-problem-description-${selected.id}`}
                       value={content.description}
-                      disabled={saving || deleting}
+                      disabled={saving || deleting || imagePending}
                       onChange={(event) =>
                         setContent({
                           ...content,
@@ -604,7 +631,19 @@ export default function OfficerProblemBank() {
                         })
                       }
                     />
-                  </label>
+                    <ProblemImageAuthoring
+                      id={`bank-${selected.id}`}
+                      description={content.description}
+                      textareaRef={descriptionRef}
+                      disabled={saving || deleting}
+                      onDescriptionChange={(description) =>
+                        setContent((current) =>
+                          current ? { ...current, description } : current,
+                        )
+                      }
+                      onPendingChange={setImagePending}
+                    />
+                  </div>
                   <label className="my-4 grid max-w-3xl gap-1 font-medium">
                     Constraints
                     <textarea

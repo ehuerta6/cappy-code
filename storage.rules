@@ -1,0 +1,21 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /problem-images/{officerId}/{assetId} {
+      function isOfficer() {
+        return request.auth != null
+          && request.auth.uid == officerId
+          && request.auth.token.firebase.sign_in_provider != 'anonymous';
+      }
+
+      allow read: if true;
+      allow create: if resource == null
+        && isOfficer()
+        && assetId.matches('^[0-9a-fA-F-]{36}$')
+        && request.resource.size > 0
+        && request.resource.size <= 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/(png|jpeg|webp)');
+      allow update, delete: if false;
+    }
+  }
+}

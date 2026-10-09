@@ -1,5 +1,32 @@
+'use client';
+
+import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+
+function ProblemImage({ src, alt }: { src: string; alt: string }) {
+  const [failed, setFailed] = useState(false);
+  if (failed)
+    return (
+      <span
+        className="my-4 block text-sm text-muted"
+        role="img"
+        aria-label={alt}
+      >
+        Image unavailable: {alt}
+      </span>
+    );
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      className="my-4 h-auto max-w-full rounded border border-border-soft object-contain"
+      src={src}
+      alt={alt}
+      loading="lazy"
+      onError={() => setFailed(true)}
+    />
+  );
+}
 
 export default function ProblemMarkdown({ children }: { children: string }) {
   return (
@@ -70,7 +97,22 @@ export default function ProblemMarkdown({ children }: { children: string }) {
             ) : (
               <>{children}</>
             ),
-          img: ({ alt }) => (alt ? <span>{alt}</span> : null),
+          img: ({ src, alt }) => {
+            if (typeof src !== 'string' || !src || !alt?.trim()) return null;
+            let imageUrl: URL;
+            try {
+              imageUrl = new URL(src);
+            } catch {
+              return null;
+            }
+            if (
+              imageUrl.protocol !== 'https:' ||
+              imageUrl.username ||
+              imageUrl.password
+            )
+              return null;
+            return <ProblemImage src={imageUrl.href} alt={alt} />;
+          },
           table: ({ children }) => (
             <div className="my-3 max-w-full overflow-x-auto">
               <table className="border-collapse text-left text-sm">
