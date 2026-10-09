@@ -1,9 +1,10 @@
 # CappyCode presentation design
 
-This is the shared visual and interaction reference for CappyCode. Product scope
-and current decisions live in [Project Scope](docs/PROJECT_SCOPE.md); this
-document describes the presentation model and gives future UI work a consistent
-direction. It is not an implementation plan or a changelog.
+This is CappyCode's presentation and design reference. For broader context, see
+[Project Scope](docs/PROJECT_SCOPE.md). Newer explicit project decisions and
+accepted Issues or specifications take precedence over older documentation.
+This document describes the presentation model and gives future UI work a
+consistent direction; it is not an implementation plan or a changelog.
 
 ## How to read this document
 
