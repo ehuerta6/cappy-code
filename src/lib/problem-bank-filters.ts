@@ -16,6 +16,7 @@ export interface FilterableBankProblem {
 }
 
 export interface ProblemBankFilters {
+  name: string;
   branch: SessionBranch[];
   difficulty: ProblemDifficulty[];
   category: ProblemCategory[];
@@ -23,6 +24,7 @@ export interface ProblemBankFilters {
 }
 
 export const emptyProblemBankFilters: ProblemBankFilters = {
+  name: '',
   branch: [],
   difficulty: [],
   category: [],
@@ -46,6 +48,8 @@ export function filterProblemBank<T extends FilterableBankProblem>(
   >,
 ): T[] {
   return problems.filter((problem) => {
+    const search = filters.name.trim().toLowerCase();
+    if (search && !problem.title.toLowerCase().includes(search)) return false;
     const branchData = branchesByProblem[problem.id];
     const problemBranches = Array.isArray(branchData)
       ? branchData

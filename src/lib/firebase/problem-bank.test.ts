@@ -306,6 +306,7 @@ describe('Problem Bank snapshots', () => {
         ...metadata,
         hiddenByLiveSessionId: null,
         approachesEnabled: true,
+        approachTagSummary: [],
       },
     );
     const bankParent = sdk.transactionSet.mock.calls.find(
@@ -341,6 +342,7 @@ describe('Problem Bank snapshots', () => {
         data: () => ({
           ...metadata,
           hiddenByLiveSessionId: null,
+          approachTagSummary: ['Graph', 'Unsupported tag', 'Arrays'],
           ...(isPublished === undefined ? {} : { isPublished }),
           ...(isPublic === undefined ? {} : { isPublic }),
         }),
@@ -348,7 +350,9 @@ describe('Problem Bank snapshots', () => {
       })),
     );
     sdk.getDocsFromServer.mockResolvedValueOnce({ docs: records });
-    await expect(listMemberBankProblems()).resolves.toHaveLength(9);
+    const result = await listMemberBankProblems();
+    expect(result).toHaveLength(9);
+    expect(result[0].approachTagSummary).toEqual(['Arrays', 'Graph']);
     expect(sdk.query).toHaveBeenCalledWith({ path: 'problemBank' }, [
       'hiddenByLiveSessionId',
       '==',

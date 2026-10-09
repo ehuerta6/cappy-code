@@ -8,7 +8,10 @@ import type { ProblemSolutions } from '@/lib/firebase/solutions';
 import type { ProblemDifficulty } from '@/lib/domain';
 import AppHeader from '@/components/app-header';
 import ProblemMarkdown from '@/components/member/problem-markdown';
-import { ProblemDifficultyBadge } from '@/components/problems/problem-bank-metadata';
+import {
+  ProblemDifficultyBadge,
+  ProblemLink,
+} from '@/components/problems/problem-bank-metadata';
 import { sessionProblemWorkspaceClass } from '@/components/problems/session-problem-workspace';
 import { formatCalendarDate } from '@/lib/calendar-date';
 import MemberSolutionViewer from '@/components/solutions/member-solution-viewer';
@@ -529,16 +532,7 @@ function ProblemContent({
             </h2>
             <ProblemDifficultyBadge difficulty={problem.difficulty} />
           </div>
-          {problem.leetcodeUrl ? (
-            <a
-              className="inline-flex min-h-10 items-center text-sm text-muted underline decoration-border-strong underline-offset-4 hover:text-ink focus-visible:rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-              href={problem.leetcodeUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              View on LeetCode ↗
-            </a>
-          ) : null}
+          <ProblemLink href={problem.leetcodeUrl} />
           <section className="mt-4 mb-8 min-w-0" aria-label="Problem content">
             <div className="space-y-5">
               {problem.description ? (

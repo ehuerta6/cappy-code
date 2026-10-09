@@ -54,6 +54,31 @@ allBranches['two-sum'] = {
 allBranches.shortest = { ...allBranches.shortest, branches: ['icpc'] };
 
 describe('Problem Bank filters', () => {
+  it('trims and case-folds partial Problem name searches while composing with other filters', () => {
+    expect(
+      filterProblemBank(
+        problems,
+        { ...emptyProblemBankFilters, name: '  TWO su ' },
+        tags,
+        allBranches,
+      ).map(({ id }) => id),
+    ).toEqual(['two-sum']);
+    expect(
+      filterProblemBank(
+        problems,
+        {
+          ...emptyProblemBankFilters,
+          name: 'sum',
+          difficulty: ['hard'],
+          category: ['interview-style'],
+          branch: ['general'],
+          tag: ['Arrays'],
+        },
+        tags,
+        allBranches,
+      ),
+    ).toEqual([]);
+  });
   it('matches each difficulty and each category value', () => {
     expect(
       filterProblemBank(

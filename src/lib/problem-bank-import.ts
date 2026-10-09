@@ -380,6 +380,7 @@ export function classifyExisting(
     'category',
     'difficulty',
     'leetcodeUrl',
+    'approachTagSummary',
   ] as const;
   const desired: Record<string, unknown> = { ...problem };
   let changes = false;
@@ -389,7 +390,11 @@ export function classifyExisting(
         ? isLeetCodeUrl(problem.canonicalSourceUrl)
           ? problem.canonicalSourceUrl
           : undefined
-        : desired[field];
+        : field === 'approachTagSummary'
+          ? [...new Set(problem.approaches.flatMap(({ tags }) => tags))].sort(
+              (a, b) => a.localeCompare(b),
+            )
+          : desired[field];
     const actual = existing.data[field];
     if (actual === undefined || actual === '') {
       if (expected !== undefined && expected !== '') changes = true;
@@ -446,6 +451,9 @@ export function newBankDocument(problem: ImportProblem) {
       : {}),
     hiddenByLiveSessionId: null,
     approachesEnabled: true,
+    approachTagSummary: [
+      ...new Set(problem.approaches.flatMap(({ tags }) => tags)),
+    ].sort((a, b) => a.localeCompare(b)),
   };
 }
 
@@ -461,6 +469,9 @@ export function missingBankFields(
     exampleOutput: problem.exampleOutput,
     category: problem.category,
     difficulty: problem.difficulty,
+    approachTagSummary: [
+      ...new Set(problem.approaches.flatMap(({ tags }) => tags)),
+    ].sort((a, b) => a.localeCompare(b)),
     ...(isLeetCodeUrl(problem.canonicalSourceUrl)
       ? { leetcodeUrl: problem.canonicalSourceUrl }
       : {}),

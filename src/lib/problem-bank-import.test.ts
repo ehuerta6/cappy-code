@@ -41,6 +41,9 @@ function existingState(problem: ImportProblem): ExistingProblemState {
         : {}),
       hiddenByLiveSessionId: null,
       approachesEnabled: true,
+      approachTagSummary: [
+        ...new Set(problem.approaches.flatMap(({ tags }) => tags)),
+      ].sort((a, b) => a.localeCompare(b)),
     },
     approaches: Object.fromEntries(
       problem.approaches.map((approach) => [

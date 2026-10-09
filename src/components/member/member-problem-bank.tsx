@@ -8,12 +8,12 @@ import MemberSolutionViewer from '@/components/solutions/member-solution-viewer'
 import {
   ProblemApproachTags,
   ProblemDifficultyBadge,
+  ProblemLink,
 } from '@/components/problems/problem-bank-metadata';
 import { problemCategories } from '@/lib/domain';
 import type { SolutionApproach } from '@/lib/domain';
 import {
   getBankProblem,
-  listBankProblemApproachTags,
   listMemberBankProblems,
   type BankProblemRecord,
 } from '@/lib/firebase/problem-bank';
@@ -48,26 +48,26 @@ export function MemberProblemBank() {
   const [branchMetadata, setBranchMetadata] = useState<
     MetadataLoad<Record<string, SessionBranch[]>>
   >({ status: 'loading' });
-  const [tagMetadata, setTagMetadata] = useState<
-    MetadataLoad<Record<string, string[]>>
-  >({ status: 'loading' });
   const [filters, setFilters] = useState<Filters>(emptyProblemBankFilters);
   const branchFiltersReady = branchMetadata.status === 'ready';
-  const tagFiltersReady = tagMetadata.status === 'ready';
   const branchFilterPending = filters.branch.length > 0 && !branchFiltersReady;
-  const tagFilterPending = filters.tag.length > 0 && !tagFiltersReady;
-  const hasDeferredMetadataFilters = branchFilterPending || tagFilterPending;
+  const hasDeferredMetadataFilters = branchFilterPending;
   const availableFilters = {
     ...filters,
     branch: branchFiltersReady ? filters.branch : [],
-    tag: tagFiltersReady ? filters.tag : [],
+    tag: filters.tag,
   };
   const filteredRecords =
     state.status === 'ready'
       ? filterProblemBank(
           state.records,
           availableFilters,
-          tagMetadata.status === 'ready' ? tagMetadata.value : {},
+          Object.fromEntries(
+            state.records.map(({ id, approachTagSummary }) => [
+              id,
+              approachTagSummary ?? [],
+            ]),
+          ),
           branchMetadata.status === 'ready' ? branchMetadata.value : {},
         )
       : [];
@@ -75,7 +75,6 @@ export function MemberProblemBank() {
     let active = true;
     setState({ status: 'loading' });
     setBranchMetadata({ status: 'loading' });
-    setTagMetadata({ status: 'loading' });
     setFilters(emptyProblemBankFilters);
     listMemberBankProblems().then(
       (records) => {
@@ -83,7 +82,6 @@ export function MemberProblemBank() {
         setState({ status: 'ready', records });
         if (records.length === 0) {
           setBranchMetadata({ status: 'ready', value: {} });
-          setTagMetadata({ status: 'ready', value: {} });
         }
       },
       () => {
@@ -99,15 +97,6 @@ export function MemberProblemBank() {
     let active = true;
     const problemIds = state.records.map(({ id }) => id);
     setBranchMetadata({ status: 'loading' });
-    setTagMetadata({ status: 'loading' });
-    listBankProblemApproachTags(problemIds).then(
-      (tags) => {
-        if (active) setTagMetadata({ status: 'ready', value: tags });
-      },
-      () => {
-        if (active) setTagMetadata({ status: 'failed' });
-      },
-    );
     listProblemUsageSummaries(problemIds).then(
       (summaries) => {
         if (!active) return;
@@ -174,30 +163,18 @@ export function MemberProblemBank() {
           <div className="grid gap-7 md:grid-cols-3">
             <div className="md:col-span-3">
               <ProblemBankFilters value={filters} onChange={setFilters} />
-              {(branchMetadata.status !== 'ready' ||
-                tagMetadata.status !== 'ready') && (
+              {(branchMetadata.status === 'failed' ||
+                hasDeferredMetadataFilters) && (
                 <p className="-mt-3 mb-4 text-sm text-muted" role="status">
-                  {[
-                    branchMetadata.status !== 'ready' && 'CIC branch',
-                    tagMetadata.status !== 'ready' && 'DSA / algorithm',
-                  ]
-                    .filter(Boolean)
-                    .join(' and ')}{' '}
-                  filter details{' '}
-                  {branchMetadata.status === 'failed' ||
-                  tagMetadata.status === 'failed'
-                    ? 'could not be loaded.'
-                    : 'are loading.'}{' '}
-                  {hasDeferredMetadataFilters
-                    ? 'Selected filters are not applied yet; showing Problems that match the available filters.'
-                    : 'Category and difficulty filters remain available.'}{' '}
-                  {(branchMetadata.status === 'failed' ||
-                    tagMetadata.status === 'failed') && (
+                  {branchMetadata.status === 'failed'
+                    ? 'CIC branch filters could not be loaded.'
+                    : 'CIC branch filters are still loading; the selected branch filter is not applied yet.'}{' '}
+                  {branchMetadata.status === 'failed' && (
                     <button
                       className="underline underline-offset-2"
                       onClick={() => setMetadataRetry((value) => value + 1)}
                     >
-                      Retry filter details
+                      Retry branch filters
                     </button>
                   )}
                 </p>
@@ -253,11 +230,7 @@ export function MemberProblemBank() {
                               difficulty={record.difficulty}
                             />
                             <ProblemApproachTags
-                              tags={
-                                tagMetadata.status === 'ready'
-                                  ? (tagMetadata.value[record.id] ?? [])
-                                  : []
-                              }
+                              tags={record.approachTagSummary ?? []}
                             />
                           </div>
                         </li>
@@ -387,7 +360,7 @@ export function MemberBankProblemPage({ problemId }: { problemId: string }) {
                       {labels[currentState.problem.category]}
                     </p>
                     <h1
-                      className="mb-0 mt-1 text-[28px] font-semibold leading-9 tracking-tight"
+                      className="mb-0 mt-1 text-2xl font-semibold leading-8 tracking-tight"
                       id="bank-problem-heading"
                     >
                       {currentState.problem.title}
@@ -397,21 +370,16 @@ export function MemberBankProblemPage({ problemId }: { problemId: string }) {
                     <ProblemDifficultyBadge
                       difficulty={currentState.problem.difficulty}
                     />
-                    {currentState.problem.leetcodeUrl && (
-                      <a
-                        className="text-accent underline-offset-4 hover:underline"
-                        href={currentState.problem.leetcodeUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        LeetCode source
-                      </a>
-                    )}
+                    <ProblemLink href={currentState.problem.leetcodeUrl} />
                   </div>
                 </div>
                 <div className="mt-3">
                   <ProblemApproachTags
-                    tags={problemApproachTags(currentState.approaches)}
+                    tags={
+                      currentState.problem.approachTagSummary?.length
+                        ? currentState.problem.approachTagSummary
+                        : problemApproachTags(currentState.approaches)
+                    }
                   />
                 </div>
                 <ProblemMarkdown>

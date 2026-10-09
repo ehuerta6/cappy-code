@@ -10,7 +10,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const api = vi.hoisted(() => ({
   getBankProblem: vi.fn(),
-  listBankProblemApproachTags: vi.fn(),
   listMemberBankProblems: vi.fn(),
   listProblemUsageSummaries: vi.fn(),
 }));
@@ -53,6 +52,8 @@ const problems = [
     exampleOutput: '3',
     category: 'interview-style' as const,
     difficulty: 'easy' as const,
+    leetcodeUrl: 'https://leetcode.com/problems/two-sum/',
+    approachTagSummary: ['Arrays', 'Hash Map', 'Two Pointers'],
     isTemporarilyHidden: false,
   },
   {
@@ -64,6 +65,7 @@ const problems = [
     exampleOutput: 'A B',
     category: 'competitive-programming' as const,
     difficulty: 'hard' as const,
+    approachTagSummary: ['Graph', 'DFS'],
     isTemporarilyHidden: false,
   },
   {
@@ -74,6 +76,7 @@ const problems = [
     exampleInput: '',
     exampleOutput: '',
     category: 'custom' as const,
+    approachTagSummary: [],
     isTemporarilyHidden: false,
   },
 ];
@@ -110,11 +113,6 @@ const solutions = {
 beforeEach(() => {
   vi.resetAllMocks();
   api.listMemberBankProblems.mockResolvedValue(problems);
-  api.listBankProblemApproachTags.mockResolvedValue({
-    'two-sum': ['Arrays', 'Hash Map', 'Two Pointers'],
-    'graph-search': ['Graph', 'DFS'],
-    untagged: [],
-  });
   api.listProblemUsageSummaries.mockResolvedValue(usage);
   api.getBankProblem.mockResolvedValue({
     problem: problems[0],
@@ -134,46 +132,22 @@ beforeEach(() => {
 afterEach(() => cleanup());
 
 describe('Member Problem Bank metadata', () => {
-  it('keeps Problem results visible and retries secondary filter metadata independently', async () => {
-    api.listBankProblemApproachTags.mockRejectedValueOnce(
-      new Error('tag metadata unavailable'),
-    );
+  it('renders DSA metadata with the initial Problem results without Approach reads', async () => {
     render(<MemberProblemBank />);
 
     expect(await screen.findByRole('link', { name: 'Two Sum' })).toBeTruthy();
-    expect(
-      await screen.findByText(
-        /DSA \/ algorithm filter details could not be loaded\./,
-      ),
-    ).toBeTruthy();
+    expect(screen.getByText('Arrays')).toBeTruthy();
     expect(api.listProblemUsageSummaries).toHaveBeenCalledOnce();
-    expect(api.listBankProblemApproachTags).toHaveBeenCalledOnce();
+    expect(api.listMemberBankProblems).toHaveBeenCalledOnce();
     fireEvent.click(screen.getByText('DSA / algorithm'));
     fireEvent.click(screen.getByLabelText('Arrays'));
     expect(screen.getByRole('link', { name: 'Two Sum' })).toBeTruthy();
-    expect(screen.getByRole('link', { name: 'Graph Search' })).toBeTruthy();
-    expect(screen.queryByText('No Problems match these filters.')).toBeNull();
-
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Retry filter details' }),
-    );
-
-    await waitFor(() =>
-      expect(screen.queryByRole('link', { name: 'Graph Search' })).toBeNull(),
-    );
-    expect(api.listBankProblemApproachTags).toHaveBeenCalledTimes(2);
-    expect(api.listMemberBankProblems).toHaveBeenCalledOnce();
-    expect(screen.getByRole('link', { name: 'Two Sum' })).toBeTruthy();
+    expect(screen.queryByRole('link', { name: 'Graph Search' })).toBeNull();
+    expect(screen.queryByText('No filters active.')).toBeNull();
   });
 
   it('keeps branch-filter matches honest while tag and branch metadata is loading', async () => {
-    let resolveTags!: (value: Record<string, string[]>) => void;
     let resolveUsage!: (value: typeof usage) => void;
-    api.listBankProblemApproachTags.mockReturnValue(
-      new Promise((resolve) => {
-        resolveTags = resolve;
-      }),
-    );
     api.listProblemUsageSummaries.mockReturnValue(
       new Promise((resolve) => {
         resolveUsage = resolve;
@@ -189,19 +163,13 @@ describe('Member Problem Bank metadata', () => {
 
     expect(
       screen.getByText(
-        /Selected filters are not applied yet; showing Problems that match the available filters\./,
+        /CIC branch filters are still loading; the selected branch filter is not applied yet\./,
       ),
     ).toBeTruthy();
     expect(screen.getByRole('link', { name: 'Two Sum' })).toBeTruthy();
-    expect(screen.getByRole('link', { name: 'Graph Search' })).toBeTruthy();
-    expect(screen.getByRole('link', { name: 'Untagged Problem' })).toBeTruthy();
+    expect(screen.queryByRole('link', { name: 'Graph Search' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Untagged Problem' })).toBeNull();
     expect(screen.queryByText('No Problems match these filters.')).toBeNull();
-
-    resolveTags({
-      'two-sum': ['Arrays'],
-      'graph-search': ['Graph'],
-      untagged: [],
-    });
     resolveUsage(usage);
     await waitFor(() =>
       expect(screen.queryByRole('link', { name: 'Graph Search' })).toBeNull(),
@@ -217,9 +185,7 @@ describe('Member Problem Bank metadata', () => {
     render(<MemberProblemBank />);
 
     expect(
-      await screen.findByText(
-        /CIC branch filter details could not be loaded\./,
-      ),
+      await screen.findByText(/CIC branch filters could not be loaded\./),
     ).toBeTruthy();
     fireEvent.click(screen.getByText('CIC branch'));
     fireEvent.click(screen.getByLabelText('Intro'));
@@ -227,12 +193,12 @@ describe('Member Problem Bank metadata', () => {
     expect(screen.getByRole('link', { name: 'Two Sum' })).toBeTruthy();
     expect(screen.getByRole('link', { name: 'Graph Search' })).toBeTruthy();
     expect(
-      screen.getByText(/Selected filters are not applied yet/),
+      screen.getByText(/CIC branch filters could not be loaded\./),
     ).toBeTruthy();
     expect(screen.queryByText('No Problems match these filters.')).toBeNull();
 
     fireEvent.click(
-      screen.getByRole('button', { name: 'Retry filter details' }),
+      screen.getByRole('button', { name: 'Retry branch filters' }),
     );
     await waitFor(() =>
       expect(screen.queryByRole('link', { name: 'Graph Search' })).toBeNull(),
@@ -278,7 +244,7 @@ describe('Member Problem Bank metadata', () => {
     ).toBeTruthy();
   });
 
-  it('shows compact difficulty and neutral tags without usage analytics, while filters keep working', async () => {
+  it('shows compact difficulty and consistently tinted tags without usage analytics', async () => {
     render(<MemberProblemBank />);
 
     expect(await screen.findByRole('link', { name: 'Two Sum' })).toBeTruthy();
@@ -305,9 +271,8 @@ describe('Member Problem Bank metadata', () => {
       );
       expect(badge).toBeTruthy();
       if (!badge) throw new Error(`Missing ${tag} tag badge`);
-      expect(badge.className).toContain('bg-raised');
-      expect(badge.className).toContain('border-border-soft');
-      expect(badge.className).not.toMatch(/success|warning|danger/);
+      expect(badge.dataset.tagFamily).toMatch(/^tag-/);
+      expect(badge.className).toContain('bg-[var(--tag-');
     }
     expect(screen.queryByText('Used 2 times')).toBeNull();
     expect(screen.queryByText('Past Intro Session')).toBeNull();
@@ -339,6 +304,26 @@ describe('Member Problem Bank metadata', () => {
     expect(row.textContent).toBe('');
   });
 
+  it('combines trimmed Problem name search with other filters and clears both locally', async () => {
+    render(<MemberProblemBank />);
+    await screen.findByRole('link', { name: 'Two Sum' });
+    const search = screen.getByRole('searchbox', { name: 'Search Problems' });
+    fireEvent.change(search, { target: { value: '  sum  ' } });
+    expect(screen.getByRole('link', { name: 'Two Sum' })).toBeTruthy();
+    expect(screen.queryByRole('link', { name: 'Graph Search' })).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Difficulty' }));
+    fireEvent.click(screen.getByLabelText('Hard'));
+    expect(screen.getByText('No Problems match these filters.')).toBeTruthy();
+    expect(api.listMemberBankProblems).toHaveBeenCalledOnce();
+
+    fireEvent.click(screen.getByRole('button', { name: /Clear all/ }));
+    expect((search as HTMLInputElement).value).toBe('');
+    expect(screen.getByRole('link', { name: 'Two Sum' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Graph Search' })).toBeTruthy();
+    expect(api.listMemberBankProblems).toHaveBeenCalledOnce();
+  });
+
   it.each([
     ['easy', 'Easy', 'border-success'],
     ['medium', 'Medium', 'border-warning'],
@@ -364,9 +349,17 @@ describe('Member Problem Bank metadata', () => {
       const badge = await screen.findByText(label);
       expect(badge.className).toContain(treatment);
       expect(badge.className).toContain('text-ink');
-      expect(screen.getByText('Arrays').className).toContain('bg-raised');
+      expect(screen.getByText('Arrays').dataset.tagFamily).toBe('tag-data');
       expect(screen.getByText('Find the pair.')).toBeTruthy();
       expect(screen.getByText('Prepared Solutions')).toBeTruthy();
+      const problemLink = screen.getByRole('link', {
+        name: 'Problem link ↗',
+      });
+      expect(problemLink.getAttribute('href')).toBe(
+        'https://leetcode.com/problems/two-sum/',
+      );
+      expect(problemLink.getAttribute('target')).toBe('_blank');
+      expect(problemLink.getAttribute('rel')).toBe('noopener noreferrer');
       expect(screen.queryByText('Used in Sessions')).toBeNull();
       expect(screen.queryByText('Loading usage history…')).toBeNull();
       expect(api.listProblemUsageSummaries).not.toHaveBeenCalled();

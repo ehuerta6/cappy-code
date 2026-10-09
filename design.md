@@ -57,7 +57,9 @@ navigation, gamification, and decorative SaaS styling.
   Solutions immediately.
 - Once available, a Member selects one Approach and one Language and sees exactly
   one read-only Monaco editor at a time. The selected Solution's complexity
-  information is presented with it. The code is selectable and copyable.
+  information is presented with it. Long lines soft-wrap within the editor,
+  while vertical scrolling remains available. The code is selectable and
+  copyable.
 - Officer Mode keeps the same Problem/selected Solution hierarchy. Its editor is
   editable and the workspace adds explicit saving, Approach management,
   reveal and lifecycle controls, plus readiness and management information.
@@ -126,10 +128,19 @@ and history information. Neither view uses publication-state controls.
 ### Direction
 
 Use compact category organization and filters, readable Problem names, and
-metadata that serves the current user's task. Keep tags neutral, compact, and
-naturally wrapping; do not assign random or rainbow colors. Difficulty is
+metadata that serves the current user's task. A compact name search combines
+with branch, difficulty, category, and DSA filters over the already loaded
+Problem list. Keep only one filter menu open at a time. DSA tags use a shared,
+deterministic set of restrained semantic tints; the text label remains present
+and tags use the same mapping in Member and Officer views. Difficulty is
 supplemental to its visible text label: Easy uses restrained green, Medium
 restrained amber, and Hard restrained red.
+
+Bank list rows receive their DSA summary with the Problem records so tags do not
+appear in a second loading phase. Approach changes update the stored summary.
+Ancillary branch usage data can load separately without resetting the rows.
+Source links use the concise generic label **Problem link ↗** and remain
+secondary to the Problem title.
 
 ## Visual tokens — Direction
 
@@ -188,7 +199,10 @@ do not force wrapping unless a specific content need justifies it. Preserve
 intentional keyboard escape/focus behavior. Show one selected Language editor at
 a time, rather than a permanent three-language grid.
 
-Monaco uses the matching theme background and primary foreground. Keep cursor,
+Read-only Member Monaco soft-wraps long prepared lines, keeps the established
+15px font size, and hides horizontal scrolling while retaining vertical
+scrolling. Officer Monaco remains an editing surface and may preserve horizontal
+scrolling where it helps editing. Monaco uses the matching theme background and primary foreground. Keep cursor,
 selection, syntax, and line numbers legible in both themes. Content sizing and
 scrolling should let people read long code without shrinking the type; avoid
 page-level horizontal overflow.

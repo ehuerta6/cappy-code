@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useId, useRef, useState } from 'react';
 import { approachTags } from '@/lib/domain';
 import {
   emptyProblemBankFilters,
@@ -16,50 +17,12 @@ const labels = {
     'competitive-programming': 'Competitive Programming',
   },
 } as const;
-const summaryClass =
-  'min-h-11 cursor-pointer rounded border border-border-strong bg-surface px-3 py-2 text-sm text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent';
-const optionClass = 'flex min-h-9 items-center gap-2 px-2 text-sm';
+const triggerClass =
+  'inline-flex min-h-11 items-center justify-between gap-2 rounded border border-border-strong bg-surface px-3 py-2 text-sm text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent';
+const optionClass =
+  'flex min-h-11 cursor-pointer items-center gap-3 px-2 text-sm';
 
-function FilterGroup<T extends string>({
-  label,
-  values,
-  selected,
-  valueLabel,
-  onToggle,
-}: {
-  label: string;
-  values: readonly T[];
-  selected: T[];
-  valueLabel: (value: T) => string;
-  onToggle: (value: T) => void;
-}) {
-  return (
-    <details className="relative">
-      <summary
-        className={`${summaryClass} list-none [&::-webkit-details-marker]:hidden`}
-      >
-        <span>
-          {label}
-          {selected.length ? ` (${selected.length})` : ''}
-        </span>{' '}
-        <span aria-hidden="true">▾</span>
-      </summary>
-      <div className="absolute z-20 mt-1 max-h-64 min-w-56 overflow-y-auto rounded border border-border-strong bg-surface p-2 shadow-lg">
-        {values.map((value) => (
-          <label className={optionClass} key={value}>
-            <input
-              checked={selected.includes(value)}
-              onChange={() => onToggle(value)}
-              type="checkbox"
-              value={value}
-            />
-            {valueLabel(value)}
-          </label>
-        ))}
-      </div>
-    </details>
-  );
-}
+type FilterKey = 'branch' | 'difficulty' | 'category' | 'tag';
 
 export default function ProblemBankFilters({
   value,
@@ -68,17 +31,44 @@ export default function ProblemBankFilters({
   value: Filters;
   onChange: (value: Filters) => void;
 }) {
-  const activeGroups = Object.values(value).filter(
-    (values) => values.length > 0,
-  ).length;
-  const activeValues = Object.values(value).reduce(
-    (count, values) => count + values.length,
-    0,
-  );
-  function toggle<K extends keyof Filters>(
-    group: K,
-    selected: Filters[K][number],
-  ) {
+  const [openFilter, setOpenFilter] = useState<FilterKey | null>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelId = useId();
+  const activeGroups = (
+    ['branch', 'difficulty', 'category', 'tag'] as const
+  ).filter((group) => value[group].length > 0).length;
+  const activeValues = activeGroups + (value.name.trim() ? 1 : 0);
+
+  useEffect(() => {
+    if (!openFilter) return;
+    function dismissOutside(event: PointerEvent) {
+      if (!rootRef.current?.contains(event.target as Node)) setOpenFilter(null);
+    }
+    function dismissFocus(event: FocusEvent) {
+      const target = event.target as Node;
+      const panel = document.getElementById(`${panelId}-${openFilter}`);
+      const trigger = rootRef.current?.querySelector('[aria-expanded="true"]');
+      if (!panel?.contains(target) && !trigger?.contains(target))
+        setOpenFilter(null);
+    }
+    function dismissEscape(event: KeyboardEvent) {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      setOpenFilter(null);
+      triggerRef.current?.focus();
+    }
+    document.addEventListener('pointerdown', dismissOutside);
+    document.addEventListener('focusin', dismissFocus);
+    document.addEventListener('keydown', dismissEscape);
+    return () => {
+      document.removeEventListener('pointerdown', dismissOutside);
+      document.removeEventListener('focusin', dismissFocus);
+      document.removeEventListener('keydown', dismissEscape);
+    };
+  }, [openFilter, panelId]);
+
+  function toggle<K extends FilterKey>(group: K, selected: Filters[K][number]) {
     const current = value[group] as string[];
     const next = current.includes(selected as string)
       ? current.filter((entry) => entry !== selected)
@@ -86,52 +76,122 @@ export default function ProblemBankFilters({
     onChange({ ...value, [group]: next });
   }
 
-  return (
-    <fieldset className="mb-5 rounded border border-border-soft p-3">
-      <legend className="px-1 text-sm font-semibold">Filter Problems</legend>
-      <div className="flex flex-wrap items-start gap-2">
-        <FilterGroup
-          label="CIC branch"
-          values={problemBankFilterOptions.branches}
-          selected={value.branch}
-          valueLabel={(branch) => labels.branch[branch]}
-          onToggle={(branch) => toggle('branch', branch)}
-        />
-        <FilterGroup
-          label="Difficulty"
-          values={problemBankFilterOptions.difficulties}
-          selected={value.difficulty}
-          valueLabel={(difficulty) => labels.difficulty[difficulty]}
-          onToggle={(difficulty) => toggle('difficulty', difficulty)}
-        />
-        <FilterGroup
-          label="Category"
-          values={problemBankFilterOptions.categories}
-          selected={value.category}
-          valueLabel={(category) => labels.category[category]}
-          onToggle={(category) => toggle('category', category)}
-        />
-        <FilterGroup
-          label="DSA / algorithm"
-          values={approachTags}
-          selected={value.tag}
-          valueLabel={(tag) => tag}
-          onToggle={(tag) => toggle('tag', tag)}
-        />
+  function filterGroup<T extends string>(
+    key: FilterKey,
+    label: string,
+    options: readonly T[],
+    selected: T[],
+    valueLabel: (option: T) => string,
+  ) {
+    const isOpen = openFilter === key;
+    const id = `${panelId}-${key}`;
+    return (
+      <div className="relative">
         <button
-          className={`${summaryClass} ${activeGroups ? 'border-accent bg-raised font-semibold' : ''}`}
-          disabled={!activeGroups}
-          onClick={() => onChange(emptyProblemBankFilters)}
+          aria-controls={id}
+          aria-expanded={isOpen}
+          onFocus={() => {
+            if (openFilter && openFilter !== key) setOpenFilter(null);
+          }}
+          className={`${triggerClass} ${selected.length ? 'border-accent bg-raised' : ''}`}
+          onClick={(event) => {
+            triggerRef.current = event.currentTarget;
+            setOpenFilter(isOpen ? null : key);
+          }}
           type="button"
         >
-          Clear all{activeGroups ? ` (${activeGroups})` : ''}
+          {label}
+          {selected.length ? ` (${selected.length})` : ''}
+          <span aria-hidden="true">▾</span>
         </button>
+        {isOpen ? (
+          <div
+            className="absolute right-0 z-30 mt-1 max-h-[min(24rem,70dvh)] w-[min(20rem,calc(100vw-2rem))] overflow-y-auto rounded border border-border-strong bg-surface p-2 text-ink shadow-lg"
+            id={id}
+            role="group"
+            aria-label={`${label} options`}
+          >
+            {options.map((option) => (
+              <label className={optionClass} key={option}>
+                <input
+                  checked={selected.includes(option)}
+                  className="size-4 accent-accent"
+                  onChange={() =>
+                    toggle(key, option as Filters[typeof key][number])
+                  }
+                  type="checkbox"
+                  value={option}
+                />
+                {valueLabel(option)}
+              </label>
+            ))}
+          </div>
+        ) : null}
       </div>
-      <p className="mb-0 mt-2 text-sm text-muted" aria-live="polite">
-        {activeValues
-          ? `${activeValues} selected ${activeValues === 1 ? 'value' : 'values'} across ${activeGroups} ${activeGroups === 1 ? 'group' : 'groups'}; values within each group use OR and groups combine with AND.`
-          : 'No filters active.'}
-      </p>
-    </fieldset>
+    );
+  }
+
+  return (
+    <div
+      className="mb-5 flex flex-wrap items-center gap-2"
+      ref={rootRef}
+      aria-label="Problem Bank search and filters"
+      role="group"
+    >
+      <label className="relative min-w-44 flex-1 basis-52 sm:max-w-sm">
+        <span className="sr-only">Search Problems</span>
+        <input
+          className="min-h-11 w-full rounded border border-border-strong bg-surface px-3 pr-9 text-sm text-ink placeholder:text-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          onChange={(event) => onChange({ ...value, name: event.target.value })}
+          placeholder="Search Problems"
+          type="search"
+          value={value.name}
+        />
+      </label>
+      {filterGroup(
+        'branch',
+        'CIC branch',
+        problemBankFilterOptions.branches,
+        value.branch,
+        (branch) => labels.branch[branch],
+      )}
+      {filterGroup(
+        'difficulty',
+        'Difficulty',
+        problemBankFilterOptions.difficulties,
+        value.difficulty,
+        (difficulty) => labels.difficulty[difficulty],
+      )}
+      {filterGroup(
+        'category',
+        'Category',
+        problemBankFilterOptions.categories,
+        value.category,
+        (category) => labels.category[category],
+      )}
+      {filterGroup(
+        'tag',
+        'DSA / algorithm',
+        approachTags,
+        value.tag,
+        (tag) => tag,
+      )}
+      <button
+        className={`${triggerClass} ${activeValues ? 'border-accent bg-raised font-semibold' : ''}`}
+        disabled={!activeValues}
+        onClick={() => {
+          setOpenFilter(null);
+          onChange(emptyProblemBankFilters);
+        }}
+        type="button"
+      >
+        Clear all{activeValues ? ` (${activeValues})` : ''}
+      </button>
+      {activeValues > 0 ? (
+        <span className="sr-only" aria-live="polite">
+          Search and filters active.
+        </span>
+      ) : null}
+    </div>
   );
 }

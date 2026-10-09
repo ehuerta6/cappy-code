@@ -4,11 +4,11 @@ import { expect, test } from '@playwright/test';
 const bankTitle = 'Contest Room Route';
 const sessionTitle = 'Problem Bank Snapshot Session';
 const originalStatement = 'Original statement remains in the Session snapshot.';
-const updatedBankPython = 'BANK_PYTHON_UPDATED_AFTER_REUSE';
+const updatedBankPython = `BANK_PYTHON_UPDATED_AFTER_REUSE_${'x'.repeat(180)}`;
 
 test('Officer edits and reuses a bank Problem as an independent Session snapshot', async ({
   browser,
-}) => {
+}, testInfo) => {
   execFileSync(process.execPath, ['scripts/reset-emulator.mjs'], {
     cwd: process.cwd(),
     stdio: 'inherit',
@@ -39,6 +39,13 @@ test('Officer edits and reuses a bank Problem as an independent Session snapshot
     await officer.getByRole('link', { name: 'Problem Bank' }).click();
     await officer.getByRole('button', { name: bankTitle }).click();
     await expect(officer.getByLabel('Problem title')).toHaveValue(bankTitle);
+    await officer.getByLabel('Tags').fill('Arrays, Hash Map');
+    await officer
+      .getByRole('button', { name: 'Save approach details' })
+      .click();
+    await expect(
+      officer.getByRole('button', { name: 'Save approach details' }),
+    ).toBeDisabled();
     await officer
       .getByLabel('Description (Markdown supported)')
       .fill(originalStatement);
@@ -141,7 +148,14 @@ test('Officer edits and reuses a bank Problem as an independent Session snapshot
     await expect(
       member.getByRole('heading', { name: 'Problem Bank' }),
     ).toBeVisible();
+    await expect(
+      member.getByRole('group', { name: `${bankTitle} classification` }),
+    ).toContainText('Arrays');
     await expect(member.getByText(/Used \d+ times?/)).toHaveCount(0);
+    await member.screenshot({
+      path: testInfo.outputPath('member-bank-first-render.png'),
+      fullPage: true,
+    });
     await member.getByRole('link', { name: bankTitle }).click();
     await expect(
       member.getByRole('heading', { name: 'Used in Sessions' }),
@@ -154,9 +168,22 @@ test('Officer edits and reuses a bank Problem as an independent Session snapshot
       member.getByRole('group', { name: 'Approach: Primary Approach' }),
     ).toBeVisible();
     await expect(member.getByLabel('Language')).toHaveValue('python');
+    await expect
+      .poll(async () => {
+        const renderedCode = await member
+          .getByRole('region', { name: 'Python' })
+          .locator('.view-lines')
+          .innerText();
+        return renderedCode.replace(/\s/g, '');
+      })
+      .toContain(updatedBankPython);
     await expect(
       member.getByRole('heading', { name: 'Python', level: 3 }),
-    ).toBeVisible();
+    ).toHaveClass(/sr-only/);
+    await member.screenshot({
+      path: testInfo.outputPath('member-bank-detail-light.png'),
+      fullPage: true,
+    });
     const bankProblemId = new URL(member.url()).pathname.split('/').at(-1);
     for (const [index, language] of ['python', 'java', 'cpp'].entries()) {
       const response = await member.request.get(
@@ -170,6 +197,22 @@ test('Officer edits and reuses a bank Problem as an independent Session snapshot
         language === 'python' ? updatedBankPython : secrets[index],
       );
     }
+    await expect
+      .poll(async () => {
+        const renderedCode = await member
+          .getByRole('region', { name: 'Python' })
+          .locator('.view-lines')
+          .innerText();
+        return renderedCode.replace(/\s/g, '');
+      })
+      .toContain(updatedBankPython);
+    await expect
+      .poll(() =>
+        member.evaluate(
+          () => document.documentElement.scrollWidth <= window.innerWidth,
+        ),
+      )
+      .toBe(true);
     await expect(member.getByText('Time: O(n)', { exact: true })).toBeVisible();
     await expect(
       member.getByText('Space: O(1)', { exact: true }),
@@ -177,14 +220,42 @@ test('Officer edits and reuses a bank Problem as an independent Session snapshot
     await member.getByLabel('Language').selectOption('java');
     await expect(
       member.getByRole('heading', { name: 'Java', level: 3 }),
-    ).toBeVisible();
+    ).toHaveClass(/sr-only/);
     await expect(member.getByText('Java time.')).toBeVisible();
     await expect(member.getByText('Python time.')).toHaveCount(0);
     await member.getByLabel('Language').selectOption('cpp');
     await expect(
       member.getByRole('heading', { name: 'C++', level: 3 }),
-    ).toBeVisible();
+    ).toHaveClass(/sr-only/);
     await expect(member.getByText('C++ time.')).toBeVisible();
+    await member.getByLabel('Language').selectOption('python');
+    await expect
+      .poll(async () => {
+        const renderedCode = await member
+          .getByRole('region', { name: 'Python' })
+          .locator('.view-lines')
+          .innerText();
+        return renderedCode.replace(/\s/g, '');
+      })
+      .toContain(updatedBankPython);
+    await member.getByRole('button', { name: 'Toggle color theme' }).click();
+    await expect(member.locator('html')).toHaveAttribute('data-theme', 'dark');
+    await member.screenshot({
+      path: testInfo.outputPath('member-bank-detail-dark-long-line.png'),
+      fullPage: true,
+    });
+    await member.setViewportSize({ width: 390, height: 844 });
+    await expect
+      .poll(() =>
+        member.evaluate(
+          () => document.documentElement.scrollWidth <= window.innerWidth,
+        ),
+      )
+      .toBe(true);
+    await member.screenshot({
+      path: testInfo.outputPath('member-bank-detail-mobile-dark.png'),
+      fullPage: true,
+    });
 
     await officer.getByRole('button', { name: 'Go Live' }).click();
     await member.goto('/problem-bank');

@@ -58,6 +58,7 @@ export interface BankProblemContent {
 export interface BankProblemRecord extends BankProblemContent {
   id: string;
   isTemporarilyHidden: boolean;
+  approachTagSummary?: string[];
 }
 
 export type BankSolutions = Record<(typeof languages)[number], Solution>;
@@ -130,12 +131,23 @@ function mapBankSnapshot(snapshot: {
     if (document.metadata.hasPendingWrites)
       throw new Error('Problem Bank changes are awaiting confirmation.');
     const data = document.data();
+    const supportedTags = new Set<string>(approachTags);
     return {
       id: document.id,
       ...validateContent(data),
       isTemporarilyHidden:
         typeof data.hiddenByLiveSessionId === 'string' &&
         data.hiddenByLiveSessionId.length > 0,
+      approachTagSummary: Array.isArray(data.approachTagSummary)
+        ? problemApproachTags([
+            {
+              tags: data.approachTagSummary.filter(
+                (tag): tag is string =>
+                  typeof tag === 'string' && supportedTags.has(tag),
+              ),
+            },
+          ])
+        : [],
     };
   });
 }
@@ -206,6 +218,16 @@ export async function getBankProblem(
     isTemporarilyHidden:
       typeof parentData.hiddenByLiveSessionId === 'string' &&
       parentData.hiddenByLiveSessionId.length > 0,
+    approachTagSummary: Array.isArray(parentData.approachTagSummary)
+      ? problemApproachTags([
+          {
+            tags: parentData.approachTagSummary.filter(
+              (tag): tag is string =>
+                typeof tag === 'string' && approachTags.includes(tag as never),
+            ),
+          },
+        ])
+      : [],
   };
   const approaches = await getApproaches(bankProblemPath(problemId));
   return {
@@ -237,6 +259,7 @@ export async function createBankProblem(): Promise<BankProblemRecord> {
   batch.set(reference, {
     ...problem,
     hiddenByLiveSessionId: null,
+    approachTagSummary: [],
   });
   for (const language of languages)
     batch.set(doc(db, bankSolutionPath(reference.id, language)), { code: '' });
@@ -245,6 +268,7 @@ export async function createBankProblem(): Promise<BankProblemRecord> {
     id: reference.id,
     ...problem,
     isTemporarilyHidden: false,
+    approachTagSummary: [],
   };
 }
 
@@ -460,6 +484,7 @@ export async function materializeSessionProblemInBank(
       ...bankContent,
       hiddenByLiveSessionId: null,
       approachesEnabled: true,
+      approachTagSummary: problemApproachTags(approaches),
     });
     for (const [language, solution] of solutionEntries)
       transaction.set(

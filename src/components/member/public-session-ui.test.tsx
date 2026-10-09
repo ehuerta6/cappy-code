@@ -300,7 +300,7 @@ describe('public member UI scaffold', () => {
     expect(screen.queryByText('hello')).toBeNull();
     expect(screen.queryByText('java output')).toBeNull();
     const leetcodeLink = screen.getByRole('link', {
-      name: 'View on LeetCode ↗',
+      name: 'Problem link ↗',
     });
     expect(leetcodeLink.getAttribute('href')).toBe(
       'https://leetcode.com/problems/two-sum/',
