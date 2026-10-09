@@ -845,7 +845,7 @@ describe('Firestore security rules', () => {
     );
   });
 
-  it('allows deleting a live Session only when its live claim is released atomically', async () => {
+  it('allows atomic deletion of a live Session hierarchy only when its live claim is released', async () => {
     const db = officerDb();
     await environment.withSecurityRulesDisabled(async (context) => {
       const admin = context.firestore();
@@ -862,6 +862,10 @@ describe('Firestore security rules', () => {
       });
     });
     await assertFails(deleteDoc(doc(db, 'sessions/live')));
+    await assertFails(deleteDoc(doc(db, 'sessions/live/problems/hidden')));
+    await assertFails(
+      deleteDoc(doc(db, 'sessions/live/problems/hidden/approaches/primary')),
+    );
 
     const deletion = writeBatch(db);
     deletion.update(doc(db, 'sessionControl/intro'), {
@@ -871,12 +875,79 @@ describe('Firestore security rules', () => {
     deletion.update(doc(db, 'problemBank/used-live'), {
       hiddenByLiveSessionId: 'general-live',
     });
+    deletion.update(doc(db, 'problemBank/used-private'), {
+      hiddenByLiveSessionId: null,
+    });
+    for (const problemId of ['hidden', 'revealed']) {
+      for (const language of ['python', 'java', 'cpp']) {
+        deletion.delete(
+          doc(db, `sessions/live/problems/${problemId}/solutions/${language}`),
+        );
+        deletion.delete(
+          doc(
+            db,
+            `sessions/live/problems/${problemId}/approaches/primary/solutions/${language}`,
+          ),
+        );
+      }
+      deletion.delete(
+        doc(db, `sessions/live/problems/${problemId}/approaches/primary`),
+      );
+      deletion.delete(doc(db, `sessions/live/problems/${problemId}`));
+    }
     deletion.delete(doc(db, 'sessions/live'));
     await assertSucceeds(deletion.commit());
     expect(
       (await getDoc(doc(db, 'sessionControl/general'))).data()?.sessionId,
     ).toBe('general-live');
+    expect(
+      (await getDoc(doc(db, 'problemBank/used-live'))).data()
+        ?.hiddenByLiveSessionId,
+    ).toBe('general-live');
+    expect(
+      (await getDoc(doc(db, 'problemBank/used-private'))).data()
+        ?.hiddenByLiveSessionId,
+    ).toBeNull();
+    for (const problemId of ['hidden', 'revealed']) {
+      expect(
+        (
+          await getDoc(
+            doc(db, `sessions/live/problems/${problemId}/approaches/primary`),
+          )
+        ).exists(),
+      ).toBe(false);
+      expect(
+        (await getDoc(doc(db, `sessions/live/problems/${problemId}`))).exists(),
+      ).toBe(false);
+    }
     await assertFails(getDoc(doc(anonymousDb(), 'problemBank/used-live')));
+  });
+
+  it('allows atomic deletion of an ended Session with nested content', async () => {
+    const db = officerDb();
+    const deletion = writeBatch(db);
+    for (const language of ['python', 'java', 'cpp']) {
+      deletion.delete(
+        doc(db, `sessions/ended/problems/hidden/solutions/${language}`),
+      );
+      deletion.delete(
+        doc(
+          db,
+          `sessions/ended/problems/hidden/approaches/primary/solutions/${language}`,
+        ),
+      );
+    }
+    deletion.delete(
+      doc(db, 'sessions/ended/problems/hidden/approaches/primary'),
+    );
+    deletion.delete(doc(db, 'sessions/ended/problems/hidden'));
+    deletion.delete(doc(db, 'sessions/ended'));
+
+    await assertSucceeds(deletion.commit());
+    expect((await getDoc(doc(db, 'sessions/ended'))).exists()).toBe(false);
+    expect(
+      (await getDoc(doc(db, 'sessions/ended/problems/hidden'))).exists(),
+    ).toBe(false);
   });
 
   it('denies draft and live hidden Solutions and permits all ended Solutions for fixed languages', async () => {

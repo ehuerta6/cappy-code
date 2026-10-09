@@ -55,6 +55,12 @@ service cloud.firestore {
         ).data.status != 'live';
     }
 
+    function sessionDeletedAfter(sessionId) {
+      return !existsAfter(
+        /databases/$(database)/documents/sessions/$(sessionId)
+      );
+    }
+
     function hasSupportedBranch(data) {
       return data.keys().hasAny(['branch'])
         && data.branch in ['intro', 'general', 'icpc'];
@@ -204,7 +210,8 @@ service cloud.firestore {
             || (get(/databases/$(database)/documents/sessions/$(sessionId)).data.status == 'ended'
               && changesOnlyProblemContent()));
         allow delete: if isOfficer()
-          && get(/databases/$(database)/documents/sessions/$(sessionId)).data.status == 'draft';
+          && (get(/databases/$(database)/documents/sessions/$(sessionId)).data.status == 'draft'
+            || sessionDeletedAfter(sessionId));
 
         match /solutions/{language} {
           allow read: if (isOfficer() && language in ['python', 'java', 'cpp']) ||
@@ -225,7 +232,8 @@ service cloud.firestore {
             && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.tags is list
             && request.resource.data.tags.hasOnly(['Arrays', 'Hash Map', 'Two Pointers', 'Binary Search', 'Stack', 'Queue', 'Linked List', 'Tree', 'Graph', 'DFS', 'BFS', 'Dynamic Programming', 'Greedy', 'Backtracking', 'Union Find', 'Shortest Path'])
             && request.resource.data.order is int && request.resource.data.order >= 0;
-          allow delete: if isOfficer() && sessionState() == 'draft';
+          allow delete: if isOfficer()
+            && (sessionState() == 'draft' || sessionDeletedAfter(sessionId));
           allow update: if isOfficer() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'tags', 'order'])
             && request.resource.data.keys().hasAll(['name', 'tags', 'order']) && request.resource.data.keys().hasOnly(['name', 'tags', 'order'])
             && request.resource.data.name is string && request.resource.data.name.size() > 0
