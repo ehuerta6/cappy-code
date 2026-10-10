@@ -800,7 +800,9 @@ describe('Officer Problem workspace', () => {
     );
     expect(api.deleteProblem).not.toHaveBeenCalled();
     fireEvent.keyDown(confirmation, { key: 'Escape' });
-    expect(screen.queryByRole('group')).toBeNull();
+    expect(
+      screen.queryByRole('group', { name: 'Confirm problem deletion' }),
+    ).toBeNull();
     expect(document.activeElement).toBe(
       screen.getByRole('button', { name: 'Manage Two Sum' }),
     );

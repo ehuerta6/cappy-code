@@ -207,7 +207,7 @@ describe('Problem Bank filters', () => {
         { tags: ['Arrays', 'Hash Map'] },
         { tags: ['Arrays', 'Two Pointers'] },
       ]),
-    ).toEqual(['Arrays', 'Hash Map', 'Two Pointers']);
+    ).toEqual(['arrays', 'hash-map', 'two-pointers']);
   });
 
   it('uses OR for multiple values in branch and tag groups', () => {

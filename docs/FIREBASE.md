@@ -205,6 +205,7 @@ responses. Firestore Security Rules independently enforce backend access.
 | `sessions/{sessionId}/problems/{problemId}/solutions/{language}` | `Solution`         | `code`                                                                                                                    |
 | `problemBank/{problemId}`                                        | Bank Problem       | Problem content, `hiddenByLiveSessionId`, derived `approachTagSummary`                                                    |
 | `problemBank/{problemId}/approaches/{approachId}`                | `SolutionApproach` | `name`, `tags`, `order`                                                                                                   |
+| `dsaTags/{tagId}`                                                | DSA tag            | `label`, `family`, `order`, `active`; stable IDs are referenced by Approach `tags`                                        |
 | `problemBank/{problemId}/solutions/{language}`                   | `Solution`         | `code`                                                                                                                    |
 
 - `Language` is exactly `python | java | cpp`; each language identifies its own Solution document.
@@ -498,6 +499,29 @@ Bank parents, and writes in batches of at most 400. Verify every
 formerly missing parent now has a summary, and compare the saved tags with its
 Approach documents. This change does not run the script or modify production
 Firebase data.
+
+### DSA tag catalog migration
+
+The public `dsaTags/{tagId}` catalog stores display metadata with stable IDs.
+Member clients can read this metadata; Officer clients alone can write it.
+Approach documents in both Bank Problems and Session snapshots store unique
+catalog IDs, with a maximum of 16 tags. Renaming a tag only changes its catalog
+document. Archived tags remain readable and render on existing and historical
+content, while filters and new selections use active tags only.
+
+The migration command is dry-run by default. It inventories every Approach
+subcollection and Bank summary, reports unknown legacy labels, and preserves
+those labels as catalog entries using deterministic IDs. Review the output and
+back up Firestore before the explicit production write:
+
+```bash
+npm run dsa-tags:migrate
+npm run dsa-tags:migrate -- --write-production --expected-project-id=cappycode-f133c --accept-unknown-tags
+```
+
+The script is bounded by Firestore's 500-write batch limit and never runs as
+part of application startup. The implementation in this PR does not run this
+script or modify production data.
 
 ## Realtime answer visibility
 

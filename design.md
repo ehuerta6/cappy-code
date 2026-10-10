@@ -132,12 +132,35 @@ so the dashboard remains scannable and initial queries stay focused.
 
 The Member Bank is public, except that a Bank Problem used by any live Session
 is temporarily hidden. It remains hidden until the last live Session using it
-stops. Members can organize and filter by category and branch, and see
-difficulty badges and neutral DSA/algorithm tags. They do not see usage counts,
-history, or planning metadata.
+stops. Members and Officers use the same Problem discovery layout, search,
+filters, category organization, rows, difficulty badges, DSA tags, and responsive
+behavior. Members can organize and filter by category and branch. Member rows do
+not show usage counts or history.
 
-The Officer Bank uses the same visual vocabulary and adds management, usage,
-and history information. Neither view uses publication-state controls.
+Officer discovery adds `+ New Problem` and Officer navigation. It does not show
+repeated zero-use metadata or load Problem Solutions. Selecting a row opens a
+dedicated Officer Problem editor route; creating a Bank Problem opens that
+route as soon as creation succeeds.
+
+The Officer editor uses the Member detail hierarchy: Problem on the left and
+Solution on the right on wide screens, with the Problem first when stacked.
+Problem fields are grouped into Basics, Statement, Constraints, and Example.
+Solution editing follows Approach, Language, selected Approach tags, Monaco,
+and Complexity. Add Approach stays easy to reach; rename, tags, reorder, and
+delete live in the secondary Manage approaches disclosure.
+
+One workspace Save changes action reports unsaved, saving, saved, and retryable
+failure states. Deleting a Bank Problem is in a secondary destructive menu, and
+confirmation explains that historical Session snapshots remain. Detailed usage
+history follows the editor and loads independently, so it cannot blank the
+Problem and Solution workspace.
+
+DSA / algorithm metadata comes from a persisted catalog with stable tag IDs,
+labels, restrained color families, ordering, and active state. Officers choose
+catalog tags through a searchable multi-select. Catalog management is one step
+secondary; renaming keeps IDs stable, and archiving preserves display on
+existing Bank and Session content while removing the tag from new selection
+and filters.
 
 ### Direction
 

@@ -1,5 +1,5 @@
-import { approachTags } from './domain';
 import { problemApproachTags } from './problem-bank-filters';
+import { normalizeDsaTagId } from './dsa-tags';
 
 export const bankApproachTagSummaryTarget = {
   projectId: 'cappycode-f133c',
@@ -9,14 +9,15 @@ export const bankApproachTagSummaryTarget = {
 export function normalizeBankApproachTagSummary(
   approaches: Array<{ tags?: unknown }>,
 ): string[] {
-  const supported = new Set<string>(approachTags);
   return problemApproachTags(
     approaches.map(({ tags }) => ({
       tags: Array.isArray(tags)
-        ? tags.filter(
-            (tag): tag is string =>
-              typeof tag === 'string' && supported.has(tag),
-          )
+        ? tags
+            .filter(
+              (tag): tag is string =>
+                typeof tag === 'string' && Boolean(tag.trim()),
+            )
+            .map(normalizeDsaTagId)
         : [],
     })),
   );

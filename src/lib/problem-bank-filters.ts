@@ -1,5 +1,4 @@
 import {
-  approachTags,
   problemCategories,
   problemDifficulties,
   sessionBranches,
@@ -7,6 +6,7 @@ import {
   type ProblemDifficulty,
   type SessionBranch,
 } from './domain';
+import { normalizeDsaTagId } from './dsa-tags';
 
 export interface FilterableBankProblem {
   id: string;
@@ -20,7 +20,7 @@ export interface ProblemBankFilters {
   branch: SessionBranch[];
   difficulty: ProblemDifficulty[];
   category: ProblemCategory[];
-  tag: Array<(typeof approachTags)[number]>;
+  tag: string[];
 }
 
 export const emptyProblemBankFilters: ProblemBankFilters = {
@@ -35,7 +35,6 @@ export const problemBankFilterOptions = {
   branches: sessionBranches,
   difficulties: problemDifficulties,
   categories: problemCategories,
-  tags: approachTags,
 };
 
 export function filterProblemBank<T extends FilterableBankProblem>(
@@ -72,7 +71,7 @@ export function filterProblemBank<T extends FilterableBankProblem>(
     if (
       filters.tag.length > 0 &&
       !tagsByProblem[problem.id]?.some((tag) =>
-        filters.tag.includes(tag as (typeof approachTags)[number]),
+        filters.tag.map(normalizeDsaTagId).includes(normalizeDsaTagId(tag)),
       )
     )
       return false;
@@ -83,7 +82,7 @@ export function filterProblemBank<T extends FilterableBankProblem>(
 export function problemApproachTags(
   approaches: Array<{ tags: string[] }>,
 ): string[] {
-  return [...new Set(approaches.flatMap(({ tags }) => tags))].sort((a, b) =>
-    a.localeCompare(b),
-  );
+  return [
+    ...new Set(approaches.flatMap(({ tags }) => tags.map(normalizeDsaTagId))),
+  ].sort((a, b) => a.localeCompare(b));
 }

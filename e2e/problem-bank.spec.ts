@@ -37,23 +37,25 @@ test('Officer edits and reuses a bank Problem as an independent Session snapshot
     await expect(officer).toHaveURL('/officer');
 
     await officer.getByRole('link', { name: 'Problem Bank' }).click();
-    await officer.getByRole('button', { name: bankTitle }).click();
-    await expect(officer.getByLabel('Problem title')).toHaveValue(bankTitle);
+    await officer.getByRole('link', { name: bankTitle }).click();
+    await expect(officer).toHaveURL(
+      /\/officer\/problem-bank\/bank-cp-room-route$/,
+    );
+    await expect(officer.getByRole('textbox', { name: 'Title' })).toHaveValue(
+      bankTitle,
+    );
+    await officer.getByText('Manage approaches').click();
+    await officer.getByRole('button', { name: 'Arrays', exact: true }).click();
     await officer
-      .getByRole('textbox', { name: 'Tags' })
-      .fill('Arrays, Hash Map');
-    await officer
-      .getByRole('button', { name: 'Save approach details' })
+      .getByRole('button', { name: 'Hash Map', exact: true })
       .click();
-    await expect(
-      officer.getByRole('button', { name: 'Save approach details' }),
-    ).toBeDisabled();
+    await officer.getByText('Manage approaches').click();
+    await officer.getByLabel(/Description/).fill(originalStatement);
     await officer
-      .getByLabel('Description (optional, Markdown supported)')
-      .fill(originalStatement);
-    await officer.getByLabel('Constraints (optional)').fill('1 ≤ n ≤ 200,000');
-    await officer.getByLabel('Example input (optional)').fill('4 8 12');
-    await officer.getByLabel('Expected output (optional)').fill('12');
+      .getByRole('textbox', { name: 'Constraints' })
+      .fill('1 ≤ n ≤ 200,000');
+    await officer.getByLabel('Input').fill('4 8 12');
+    await officer.getByLabel('Expected output').fill('12');
     const secrets = [
       'BANK_PYTHON_SOLUTION',
       'BANK_JAVA_SOLUTION',
@@ -79,6 +81,7 @@ test('Officer edits and reuses a bank Problem as an independent Session snapshot
     await expect(
       officer.getByRole('button', { name: 'Save changes' }),
     ).toBeDisabled();
+    await expect(officer.getByText('Saved ✓', { exact: true })).toBeVisible();
     await officer.goto('/officer');
     await officer.getByLabel('Branch for new session').selectOption('intro');
     await officer.getByRole('button', { name: '+ New session' }).click();
@@ -106,18 +109,19 @@ test('Officer edits and reuses a bank Problem as an independent Session snapshot
     );
 
     await officer.goto('/officer/problem-bank');
-    await expect(officer.getByRole('button', { name: bankTitle })).toHaveCount(
-      1,
+    await expect(officer.getByRole('link', { name: bankTitle })).toHaveCount(1);
+    await officer.getByRole('link', { name: bankTitle }).click();
+    await expect(officer.getByRole('textbox', { name: 'Title' })).toHaveValue(
+      bankTitle,
     );
-    await officer.getByRole('button', { name: bankTitle }).click();
-    await expect(officer.getByLabel('Problem title')).toHaveValue(bankTitle);
     await officer
-      .getByLabel('Description (optional, Markdown supported)')
+      .getByLabel(/Description/)
       .fill('Updated in the bank after reuse.');
     await officer.getByRole('button', { name: 'Save changes' }).click();
     await expect(
       officer.getByRole('button', { name: 'Save changes' }),
     ).toBeDisabled();
+    await expect(officer.getByText('Saved ✓', { exact: true })).toBeVisible();
     const pythonEditor = officer
       .getByRole('region', { name: 'Python' })
       .locator('.monaco-editor');
@@ -128,6 +132,7 @@ test('Officer edits and reuses a bank Problem as an independent Session snapshot
     await expect(
       officer.getByRole('button', { name: 'Save changes' }),
     ).toBeDisabled();
+    await expect(officer.getByText('Saved ✓', { exact: true })).toBeVisible();
 
     await officer.goto('/officer');
     await officer.getByRole('button', { name: sessionTitle }).click();
@@ -160,7 +165,7 @@ test('Officer edits and reuses a bank Problem as an independent Session snapshot
     });
     await member.getByRole('link', { name: bankTitle }).click();
     await expect(
-      member.getByRole('heading', { name: 'Used in Sessions' }),
+      member.getByRole('heading', { name: 'Usage history' }),
     ).toHaveCount(0);
     await expect(member.getByText(/Used \d+ times?/)).toHaveCount(0);
     await expect(

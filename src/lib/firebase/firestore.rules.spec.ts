@@ -209,6 +209,82 @@ beforeEach(async () => {
   });
 });
 
+describe('DSA tag catalog authorization', () => {
+  it('allows public catalog reads while restricting catalog writes to officers', async () => {
+    const anonymous = environment.unauthenticatedContext().firestore();
+    const officer = environment
+      .authenticatedContext('officer', {
+        firebase: { sign_in_provider: 'password' },
+      })
+      .firestore();
+    await environment.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'dsaTags/arrays'), {
+        label: 'Arrays',
+        family: 'data',
+        order: 0,
+        active: true,
+      });
+    });
+    await assertSucceeds(getDoc(doc(anonymous, 'dsaTags/arrays')));
+    await assertFails(
+      setDoc(doc(anonymous, 'dsaTags/custom'), {
+        label: 'Custom',
+        family: 'data',
+        order: 1,
+        active: true,
+      }),
+    );
+    await assertSucceeds(
+      setDoc(doc(officer, 'dsaTags/custom'), {
+        label: 'Custom',
+        family: 'data',
+        order: 1,
+        active: true,
+      }),
+    );
+    await assertFails(
+      setDoc(doc(officer, 'dsaTags/invalid'), {
+        label: '',
+        family: 'neon',
+        order: -1,
+        active: true,
+      }),
+    );
+  });
+
+  it('requires unique bounded stable IDs for new Approach tags', async () => {
+    const officer = officerDb();
+    await assertSucceeds(
+      setDoc(doc(officer, 'sessions/draft/problems/new/approaches/ok'), {
+        name: 'Primary',
+        tags: ['arrays', 'two-pointers'],
+        order: 0,
+      }),
+    );
+    await assertFails(
+      setDoc(doc(officer, 'sessions/draft/problems/new/approaches/duplicate'), {
+        name: 'Duplicate',
+        tags: ['arrays', 'arrays'],
+        order: 0,
+      }),
+    );
+    await assertFails(
+      setDoc(doc(officer, 'sessions/draft/problems/new/approaches/invalid'), {
+        name: 'Invalid',
+        tags: ['Hash Map'],
+        order: 0,
+      }),
+    );
+    await assertFails(
+      setDoc(doc(officer, 'sessions/draft/problems/new/approaches/too-many'), {
+        name: 'Too many',
+        tags: Array.from({ length: 17 }, (_, index) => `tag-${index}`),
+        order: 0,
+      }),
+    );
+  });
+});
+
 function anonymousDb() {
   return environment.unauthenticatedContext().firestore();
 }
@@ -253,7 +329,7 @@ describe('Firestore security rules', () => {
         db,
         'sessions/atomic-copy/problems/problem-copy/approaches/approach-copy',
       ),
-      { name: 'Primary', tags: ['Arrays'], order: 0 },
+      { name: 'Primary', tags: ['arrays'], order: 0 },
     );
     for (const language of ['python', 'java', 'cpp']) {
       batch.set(
@@ -1322,7 +1398,7 @@ describe('Firestore security rules', () => {
     await assertSucceeds(
       updateDoc(
         doc(officer, 'sessions/live/problems/revealed/approaches/primary'),
-        { name: 'Corrected', tags: ['Tree'] },
+        { name: 'Corrected', tags: ['tree'] },
       ),
     );
     await assertSucceeds(

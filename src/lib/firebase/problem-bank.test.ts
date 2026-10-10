@@ -216,7 +216,7 @@ describe('Problem Bank snapshots', () => {
     expect(sdk.commit).not.toHaveBeenCalled();
   });
 
-  it('derives tag options from every Bank Approach using the supported taxonomy', async () => {
+  it('derives all stable catalog references from every Bank Approach', async () => {
     sdk.getDocsFromServer.mockResolvedValueOnce({
       docs: [
         {
@@ -234,7 +234,7 @@ describe('Problem Bank snapshots', () => {
     await expect(
       listBankProblemApproachTags(['source'], true),
     ).resolves.toEqual({
-      source: ['Arrays', 'Hash Map', 'Two Pointers'],
+      source: ['arrays', 'custom-tag', 'hash-map', 'two-pointers'],
     });
     expect(sdk.getDocsFromServer).toHaveBeenCalledWith({
       path: 'problemBank/source/approaches',
@@ -352,7 +352,11 @@ describe('Problem Bank snapshots', () => {
     sdk.getDocsFromServer.mockResolvedValueOnce({ docs: records });
     const result = await listMemberBankProblems();
     expect(result).toHaveLength(9);
-    expect(result[0].approachTagSummary).toEqual(['Arrays', 'Graph']);
+    expect(result[0].approachTagSummary).toEqual([
+      'arrays',
+      'graph',
+      'unsupported-tag',
+    ]);
     expect(sdk.query).toHaveBeenCalledWith({ path: 'problemBank' }, [
       'hiddenByLiveSessionId',
       '==',
@@ -399,10 +403,10 @@ describe('Problem Bank snapshots', () => {
 
     expect(
       result.find(({ id }) => id === 'legacy')?.approachTagSummary,
-    ).toEqual(['BFS', 'Graph']);
+    ).toEqual(['bfs', 'graph', 'unsupported-tag']);
     expect(
       result.find(({ id }) => id === 'current')?.approachTagSummary,
-    ).toEqual(['Arrays']);
+    ).toEqual(['arrays']);
     expect(sdk.getDocsFromServer).toHaveBeenCalledTimes(2);
     expect(sdk.getDocsFromServer).toHaveBeenCalledWith({
       path: 'problemBank/legacy/approaches',

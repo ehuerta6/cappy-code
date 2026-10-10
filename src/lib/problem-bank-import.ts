@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
-import { approachTags, languages } from './domain';
+import { languages } from './domain';
+import { normalizeDsaTagId } from './dsa-tags';
 
 export const importTarget = {
   projectId: 'cappycode-f133c',
@@ -306,9 +307,11 @@ export function validateManifest(
       orders.add(approach.order);
       if (
         !Array.isArray(approach.tags) ||
-        approach.tags.some((tag) => !approachTags.includes(tag as never))
+        approach.tags.some((tag) => typeof tag !== 'string' || !tag.trim())
       )
-        throw new Error(`${approachPath}.tags contains an unsupported tag.`);
+        throw new Error(
+          `${approachPath}.tags must contain non-empty tag labels or IDs.`,
+        );
       for (const language of languages) {
         const solution = approach.solutions?.[language];
         if (!isObject(solution))
@@ -391,14 +394,39 @@ export function classifyExisting(
           ? problem.canonicalSourceUrl
           : undefined
         : field === 'approachTagSummary'
-          ? [...new Set(problem.approaches.flatMap(({ tags }) => tags))].sort(
-              (a, b) => a.localeCompare(b),
-            )
+          ? [
+              ...new Set(
+                problem.approaches.flatMap(({ tags }) =>
+                  tags.map(normalizeDsaTagId),
+                ),
+              ),
+            ].sort((a, b) => a.localeCompare(b))
           : desired[field];
     const actual = existing.data[field];
     if (actual === undefined || actual === '') {
       if (expected !== undefined && expected !== '') changes = true;
-    } else if (!same(actual, expected)) {
+    } else if (
+      !same(
+        field === 'approachTagSummary' && Array.isArray(actual)
+          ? [
+              ...new Set(
+                actual
+                  .filter((tag): tag is string => typeof tag === 'string')
+                  .map(normalizeDsaTagId),
+              ),
+            ].sort()
+          : actual,
+        field === 'approachTagSummary' && Array.isArray(expected)
+          ? [
+              ...new Set(
+                expected.map((tag) =>
+                  typeof tag === 'string' ? normalizeDsaTagId(tag) : tag,
+                ),
+              ),
+            ].sort()
+          : expected,
+      )
+    ) {
       return 'CONFLICT';
     }
   }
@@ -410,9 +438,26 @@ export function classifyExisting(
     }
     for (const field of ['name', 'tags', 'order'] as const) {
       const actual = saved.data[field];
-      const expected = approach[field];
+      const expected =
+        field === 'tags'
+          ? approach.tags.map(normalizeDsaTagId)
+          : approach[field];
       if (actual === undefined) changes = true;
-      else if (!same(actual, expected)) return 'CONFLICT';
+      else if (
+        !same(
+          field === 'tags' && Array.isArray(actual)
+            ? [
+                ...new Set(
+                  actual
+                    .filter((tag): tag is string => typeof tag === 'string')
+                    .map(normalizeDsaTagId),
+                ),
+              ]
+            : actual,
+          expected,
+        )
+      )
+        return 'CONFLICT';
     }
     for (const language of languages) {
       const savedSolution = saved.solutions[language];
@@ -619,73 +664,81 @@ export function buildImportPlan(
 ): ImportPlan {
   validateManifest(manifest);
   const historicalConflicts: string[] = [];
-  const problems = manifest.problems.map((problem) => {
-    const targetProblemId = state.identityMatches?.[problem.id] ?? problem.id;
-    const status = state.identityConflicts?.[problem.id]
-      ? 'CONFLICT'
-      : classifyExisting(problem, state.problems[targetProblemId]);
-    const backfills: PlannedBackfill[] = [];
-    for (const entry of problem.provenanceBackfills) {
-      const session = state.sessions[entry.sessionId];
-      const snapshot = session?.problems[entry.problemId];
-      if (!session || !snapshot) {
-        historicalConflicts.push(
-          `${problem.title}: missing historical snapshot ${entry.sessionId}/${entry.problemId}`,
+  const problems = manifest.problems
+    .map((problem) => ({
+      ...problem,
+      approaches: problem.approaches.map((approach) => ({
+        ...approach,
+        tags: [...new Set(approach.tags.map(normalizeDsaTagId))],
+      })),
+    }))
+    .map((problem) => {
+      const targetProblemId = state.identityMatches?.[problem.id] ?? problem.id;
+      const status = state.identityConflicts?.[problem.id]
+        ? 'CONFLICT'
+        : classifyExisting(problem, state.problems[targetProblemId]);
+      const backfills: PlannedBackfill[] = [];
+      for (const entry of problem.provenanceBackfills) {
+        const session = state.sessions[entry.sessionId];
+        const snapshot = session?.problems[entry.problemId];
+        if (!session || !snapshot) {
+          historicalConflicts.push(
+            `${problem.title}: missing historical snapshot ${entry.sessionId}/${entry.problemId}`,
+          );
+          continue;
+        }
+        const expected = entry.expectedSnapshot;
+        const exact = Object.entries(expected).every(
+          ([key, value]) => snapshot[key] === value,
         );
-        continue;
+        if (!exact) {
+          historicalConflicts.push(
+            `${problem.title}: historical content changed at ${entry.sessionId}/${entry.problemId}`,
+          );
+          continue;
+        }
+        const linked = snapshot.bankProblemId;
+        if (linked !== undefined && linked !== targetProblemId) {
+          historicalConflicts.push(
+            `${problem.title}: conflicting historical reference at ${entry.sessionId}/${entry.problemId}`,
+          );
+          continue;
+        }
+        const parentIds = session.data.bankProblemIds;
+        if (
+          parentIds !== undefined &&
+          (!Array.isArray(parentIds) ||
+            parentIds.some((id) => typeof id !== 'string'))
+        ) {
+          historicalConflicts.push(
+            `${problem.title}: malformed Session bankProblemIds at ${entry.sessionId}`,
+          );
+          continue;
+        }
+        const sessionIds = Array.isArray(parentIds) ? parentIds : [];
+        const targetOccurrences = sessionIds.filter(
+          (id) => id === targetProblemId,
+        ).length;
+        const sessionChanged =
+          linked !== targetProblemId || targetOccurrences !== 1;
+        if (sessionChanged)
+          backfills.push({
+            sessionId: entry.sessionId,
+            problemId: entry.problemId,
+            targetProblemId,
+            snapshotChanged: linked !== targetProblemId,
+            sessionChanged: targetOccurrences !== 1,
+          });
       }
-      const expected = entry.expectedSnapshot;
-      const exact = Object.entries(expected).every(
-        ([key, value]) => snapshot[key] === value,
-      );
-      if (!exact) {
-        historicalConflicts.push(
-          `${problem.title}: historical content changed at ${entry.sessionId}/${entry.problemId}`,
-        );
-        continue;
-      }
-      const linked = snapshot.bankProblemId;
-      if (linked !== undefined && linked !== targetProblemId) {
-        historicalConflicts.push(
-          `${problem.title}: conflicting historical reference at ${entry.sessionId}/${entry.problemId}`,
-        );
-        continue;
-      }
-      const parentIds = session.data.bankProblemIds;
-      if (
-        parentIds !== undefined &&
-        (!Array.isArray(parentIds) ||
-          parentIds.some((id) => typeof id !== 'string'))
-      ) {
-        historicalConflicts.push(
-          `${problem.title}: malformed Session bankProblemIds at ${entry.sessionId}`,
-        );
-        continue;
-      }
-      const sessionIds = Array.isArray(parentIds) ? parentIds : [];
-      const targetOccurrences = sessionIds.filter(
-        (id) => id === targetProblemId,
-      ).length;
-      const sessionChanged =
-        linked !== targetProblemId || targetOccurrences !== 1;
-      if (sessionChanged)
-        backfills.push({
-          sessionId: entry.sessionId,
-          problemId: entry.problemId,
-          targetProblemId,
-          snapshotChanged: linked !== targetProblemId,
-          sessionChanged: targetOccurrences !== 1,
-        });
-    }
-    return {
-      problemId: problem.id,
-      targetProblemId,
-      title: problem.title,
-      status,
-      occurrences: problem.occurrences.length,
-      backfills,
-    };
-  });
+      return {
+        problemId: problem.id,
+        targetProblemId,
+        title: problem.title,
+        status,
+        occurrences: problem.occurrences.length,
+        backfills,
+      };
+    });
   const counts = { CREATE: 0, RECONCILE: 0, UNCHANGED: 0, CONFLICT: 0 };
   for (const problem of problems) counts[problem.status] += 1;
   const backfillSessions = new Set(

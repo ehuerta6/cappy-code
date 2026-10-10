@@ -8,15 +8,16 @@ so the corrected total is 75. Six General calendar/custom items remain
 irreducibly ambiguous for the evidence-based reasons in the manifest. No
 production write is authorized.
 
-## Final import model verified on main
+## Import model and initial DSA tag catalog
 
 - Problem category and difficulty remain Problem-level fields.
-- DSA/algorithm tags live on Solution Approaches. The finalized supported
-  `approachTags` are `Arrays`, `Hash Map`, `Two Pointers`, `Binary Search`,
+- DSA/algorithm tags live on Solution Approaches and reference persisted
+  catalog IDs. The initial catalog contains `Arrays`, `Hash Map`, `Two Pointers`, `Binary Search`,
   `Stack`, `Queue`, `Linked List`, `Tree`, `Graph`, `DFS`, `BFS`,
   `Dynamic Programming`, `Greedy`, `Backtracking`, `Union Find`, and
-  `Shortest Path`. There is no `Heap / Priority Queue` tag; adding it is
-  outside this blocker.
+  `Shortest Path`. Officers can add catalog tags without an application-code
+  change; unknown legacy labels are surfaced and preserved by the migration.
+  `Heap / Priority Queue` is not part of the initial catalog.
 - Branch usage is derived from Session history. No Problem-level branch,
   filter, usage-counter, or analytics field should be imported.
 - #118 reads `bankProblemId` from each Session Problem snapshot, then obtains

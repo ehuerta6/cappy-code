@@ -2,7 +2,7 @@
 import {
   cleanup,
   fireEvent,
-  render,
+  render as renderBase,
   screen,
   waitFor,
 } from '@testing-library/react';
@@ -13,10 +13,26 @@ const api = vi.hoisted(() => ({
   listMemberBankProblems: vi.fn(),
   listProblemUsageSummaries: vi.fn(),
 }));
+const tagCatalog = vi.hoisted(() => [
+  { id: 'arrays', label: 'Arrays', family: 'data', order: 0, active: true },
+  { id: 'hash-map', label: 'Hash Map', family: 'data', order: 1, active: true },
+  {
+    id: 'two-pointers',
+    label: 'Two Pointers',
+    family: 'data',
+    order: 2,
+    active: true,
+  },
+  { id: 'graph', label: 'Graph', family: 'graph', order: 3, active: true },
+  { id: 'dfs', label: 'DFS', family: 'search', order: 4, active: true },
+]);
 
 vi.mock('@/lib/firebase/problem-bank', () => api);
 vi.mock('@/lib/firebase/problem-usage', () => ({
   listProblemUsageSummaries: api.listProblemUsageSummaries,
+}));
+vi.mock('@/lib/firebase/dsa-tags', () => ({
+  listDsaTags: vi.fn(async () => tagCatalog),
 }));
 vi.mock('next/link', () => ({
   default: ({ href, children, ...props }: React.ComponentProps<'a'>) => (
@@ -41,6 +57,11 @@ import {
   MemberBankProblemPage,
   MemberProblemBank,
 } from './member-problem-bank';
+import { DsaTagCatalogProvider } from '@/components/problems/dsa-tag-catalog-provider';
+
+function render(ui: React.ReactElement) {
+  return renderBase(<DsaTagCatalogProvider>{ui}</DsaTagCatalogProvider>);
+}
 
 const problems = [
   {
@@ -271,7 +292,7 @@ describe('Member Problem Bank metadata', () => {
       );
       expect(badge).toBeTruthy();
       if (!badge) throw new Error(`Missing ${tag} tag badge`);
-      expect(badge.dataset.tagFamily).toMatch(/^tag-/);
+      expect(badge.dataset.tagFamily).toBeTruthy();
       expect(badge.className).toContain('bg-[var(--tag-');
     }
     expect(screen.queryByText('Used 2 times')).toBeNull();
@@ -349,7 +370,7 @@ describe('Member Problem Bank metadata', () => {
       const badge = await screen.findByText(label);
       expect(badge.className).toContain(treatment);
       expect(badge.className).toContain('text-ink');
-      expect(screen.getByText('Arrays').dataset.tagFamily).toBe('tag-data');
+      expect(screen.getByText('Arrays').dataset.tagFamily).toBe('data');
       expect(screen.getByText('Find the pair.')).toBeTruthy();
       expect(screen.getByText('Prepared Solutions')).toBeTruthy();
       const problemLink = screen.getByRole('link', {

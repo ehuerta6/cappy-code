@@ -10,7 +10,6 @@ import {
   ProblemDifficultyBadge,
   ProblemLink,
 } from '@/components/problems/problem-bank-metadata';
-import { problemCategories } from '@/lib/domain';
 import type { SolutionApproach } from '@/lib/domain';
 import {
   getBankProblem,
@@ -21,13 +20,17 @@ import { listProblemUsageSummaries } from '@/lib/firebase/problem-usage';
 import { isPermissionDenied } from '@/lib/firebase/errors';
 import { problemApproachTags } from '@/lib/problem-bank-filters';
 import { Button, StateMessage } from '@/components/ui/primitives';
-import ProblemBankFilters from '@/components/problems/problem-bank-filters';
+import ProblemBankBrowser from '@/components/problems/problem-bank-browser';
 import {
   emptyProblemBankFilters,
   filterProblemBank,
   type ProblemBankFilters as Filters,
 } from '@/lib/problem-bank-filters';
 import type { SessionBranch } from '@/lib/domain';
+import {
+  useDsaTagCatalog,
+  useDsaTagCatalogReady,
+} from '@/components/problems/dsa-tag-catalog-provider';
 
 type MetadataLoad<T> =
   { status: 'loading' } | { status: 'failed' } | { status: 'ready'; value: T };
@@ -39,6 +42,8 @@ const labels = {
 } as const;
 
 export function MemberProblemBank() {
+  const catalog = useDsaTagCatalog();
+  const catalogReady = useDsaTagCatalogReady();
   const [state, setState] = useState<
     | { status: 'loading' }
     | { status: 'error' }
@@ -159,91 +164,45 @@ export function MemberProblemBank() {
         ) : state.records.length === 0 ? (
           <p>No public Problems are available right now.</p>
         ) : (
-          <div className="grid gap-7 md:grid-cols-3">
-            <div className="md:col-span-3">
-              <ProblemBankFilters value={filters} onChange={setFilters} />
-              {(branchMetadata.status === 'failed' ||
-                hasDeferredMetadataFilters) && (
-                <p className="-mt-3 mb-4 text-sm text-muted" role="status">
-                  {branchMetadata.status === 'failed'
-                    ? 'CIC branch filters could not be loaded.'
-                    : 'CIC branch filters are still loading; the selected branch filter is not applied yet.'}{' '}
-                  {branchMetadata.status === 'failed' && (
-                    <button
-                      className="underline underline-offset-2"
-                      onClick={() => setMetadataRetry((value) => value + 1)}
-                    >
-                      Retry branch filters
-                    </button>
-                  )}
-                </p>
-              )}
-              {filteredRecords.length === 0 && (
-                <p role="status">
-                  {hasDeferredMetadataFilters
-                    ? 'No Problems match the available filters; selected branch or DSA filters are not applied yet.'
-                    : 'No Problems match these filters.'}{' '}
+          <>
+            {(branchMetadata.status === 'failed' ||
+              hasDeferredMetadataFilters) && (
+              <p className="mb-4 mt-3 text-sm text-muted" role="status">
+                {branchMetadata.status === 'failed'
+                  ? 'CIC branch filters could not be loaded.'
+                  : 'CIC branch filters are still loading; the selected branch filter is not applied yet.'}{' '}
+                {branchMetadata.status === 'failed' && (
                   <button
-                    className="min-h-11 rounded border border-border-strong bg-surface px-3 py-2"
-                    onClick={() => setFilters(emptyProblemBankFilters)}
+                    className="underline underline-offset-2"
+                    onClick={() => setMetadataRetry((value) => value + 1)}
                   >
-                    Clear filters
+                    Retry branch filters
                   </button>
-                </p>
+                )}
+              </p>
+            )}
+            <ProblemBankBrowser
+              records={filteredRecords}
+              catalog={catalog}
+              catalogReady={catalogReady}
+              filters={filters}
+              onFiltersChange={setFilters}
+              tagsByProblem={Object.fromEntries(
+                state.records.map(({ id, approachTagSummary }) => [
+                  id,
+                  approachTagSummary ?? [],
+                ]),
               )}
-            </div>
-            {problemCategories.map((category) => {
-              const records = filteredRecords.filter(
-                (record) => record.category === category,
-              );
-              return (
-                <section
-                  key={category}
-                  aria-labelledby={`member-bank-${category}`}
-                >
-                  <h2
-                    className="mb-2 mt-0 text-lg font-semibold"
-                    id={`member-bank-${category}`}
-                  >
-                    {labels[category]}
-                  </h2>
-                  {records.length ? (
-                    <ul className="m-0 list-none p-0">
-                      {records.map((record) => (
-                        <li
-                          className="border-b border-border-soft"
-                          key={record.id}
-                        >
-                          <Link
-                            className="flex min-h-12 items-center rounded px-3 py-2 font-semibold text-ink no-underline hover:bg-hover hover:text-accent-hover hover:underline focus-visible:relative focus-visible:z-10"
-                            href={`/problem-bank/${encodeURIComponent(record.id)}`}
-                          >
-                            {record.title}
-                          </Link>
-                          <div
-                            className="flex flex-wrap items-center gap-1.5 px-3 pb-3"
-                            role="group"
-                            aria-label={`${record.title} classification`}
-                          >
-                            <ProblemDifficultyBadge
-                              difficulty={record.difficulty}
-                            />
-                            <ProblemApproachTags
-                              tags={record.approachTagSummary ?? []}
-                            />
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="m-0 text-sm text-muted">
-                      No Problems in this category.
-                    </p>
-                  )}
-                </section>
-              );
-            })}
-          </div>
+              hrefForProblem={(id) => `/problem-bank/${encodeURIComponent(id)}`}
+              idPrefix="member-bank"
+              noResultsMessage={
+                hasDeferredMetadataFilters
+                  ? 'No Problems match the available filters; the selected branch filter is not applied yet.'
+                  : 'No Problems match these filters.'
+              }
+              onClearFilters={() => setFilters(emptyProblemBankFilters)}
+            />
+          </>
         )}
       </section>
     </main>
