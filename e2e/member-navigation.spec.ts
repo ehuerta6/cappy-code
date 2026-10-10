@@ -98,6 +98,26 @@ test('Members can browse live, ended, and bank content without selection fallbac
   await expect(page).toHaveURL(
     /\/sessions\/ended-icpc-practice\/contest-schedule-count$/,
   );
+  await page.goto('/sessions/ended-icpc-practice/contest-room-route');
+  const sessionExamples = page.locator(
+    '#problem-panel-contest-room-route [aria-labelledby="examples-contest-room-route"]',
+  );
+  await expect(
+    sessionExamples.getByRole('heading', { name: 'Examples' }),
+  ).toBeVisible();
+  await expect(
+    sessionExamples.getByRole('heading', { name: 'Input' }),
+  ).toBeVisible();
+  await expect(
+    sessionExamples.getByRole('heading', { name: 'Expected output' }),
+  ).toBeVisible();
+  await expect(sessionExamples.locator('pre code').first()).toHaveText(
+    'doors = [[0, 1], [1, 3], [2, 4]], start = 0, end = 3',
+  );
+  const sessionExampleStyle = await sessionExamples
+    .locator('pre')
+    .first()
+    .getAttribute('class');
   await page.getByRole('link', { name: 'CappyCode home' }).click();
   await expect(page).toHaveURL(/\/$/);
   await expect(page.getByRole('heading', { name: 'Sessions' })).toBeVisible();
@@ -147,6 +167,26 @@ test('Members can browse live, ended, and bank content without selection fallbac
       .locator('xpath=..')
       .getByRole('link'),
   ).toHaveCount(2);
+  await page.getByRole('link', { name: 'Contest Room Route' }).click();
+  const bankExamples = page.locator(
+    '[aria-labelledby="examples-bank-cp-room-route"]',
+  );
+  await expect(
+    bankExamples.getByRole('heading', { name: 'Examples' }),
+  ).toBeVisible();
+  await expect(
+    bankExamples.getByRole('heading', { name: 'Input' }),
+  ).toBeVisible();
+  await expect(
+    bankExamples.getByRole('heading', { name: 'Expected output' }),
+  ).toBeVisible();
+  await expect(bankExamples.locator('pre code').first()).toHaveText(
+    'doors = [[0,1],[1,3],[2,4]], start = 0, end = 3',
+  );
+  await expect(bankExamples.locator('pre').first()).toHaveClass(
+    sessionExampleStyle!,
+  );
+  await page.goto('/problem-bank');
   await page.getByRole('link', { name: 'Longest Unique Substring' }).click();
   await expect(
     page.getByRole('region', { name: 'Python' }).locator('.view-lines'),

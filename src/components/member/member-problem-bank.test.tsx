@@ -216,6 +216,42 @@ describe('Member Problem Bank metadata', () => {
     expect(screen.queryByText('No filters active.')).toBeNull();
   });
 
+  it('shows one reset action when filters return no Problems and omits empty categories', async () => {
+    render(<MemberProblemBank />);
+
+    expect(await screen.findByRole('link', { name: 'Two Sum' })).toBeTruthy();
+    fireEvent.change(
+      screen.getByRole('searchbox', { name: 'Search Problems' }),
+      {
+        target: { value: 'two' },
+      },
+    );
+    expect(
+      screen.getByRole('heading', { name: 'Interview-style' }),
+    ).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: 'Custom' })).toBeNull();
+    expect(
+      screen.queryByRole('heading', { name: 'Competitive Programming' }),
+    ).toBeNull();
+    fireEvent.change(
+      screen.getByRole('searchbox', { name: 'Search Problems' }),
+      {
+        target: { value: 'no matching problem' },
+      },
+    );
+
+    expect(screen.getByRole('status').textContent).toContain(
+      'No Problems match these filters.',
+    );
+    expect(
+      screen.getAllByRole('button', { name: 'Clear filters' }),
+    ).toHaveLength(1);
+    expect(screen.queryByText('No Problems in this category.')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
+    expect(screen.getByRole('link', { name: 'Two Sum' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Custom' })).toBeTruthy();
+  });
+
   it('keeps branch-filter matches honest while tag and branch metadata is loading', async () => {
     let resolveUsage!: (value: typeof usage) => void;
     api.listProblemUsageSummaries.mockReturnValue(
@@ -312,6 +348,19 @@ describe('Member Problem Bank metadata', () => {
     expect(
       await screen.findByRole('heading', { name: 'Graph Search' }),
     ).toBeTruthy();
+  });
+
+  it('keeps a live-session Bank Problem unavailable to Members', async () => {
+    api.getBankProblem.mockRejectedValueOnce({ code: 'permission-denied' });
+    render(<MemberBankProblemPage problemId="hidden-during-live-session" />);
+
+    expect(await screen.findByText('Problem unavailable')).toBeTruthy();
+    expect(
+      screen.getByText(
+        'This Problem is unavailable or is being used by the live Session.',
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText(/permission-denied/)).toBeNull();
   });
 
   it('shows compact difficulty and consistently tinted tags without usage analytics', async () => {
@@ -422,6 +471,10 @@ describe('Member Problem Bank metadata', () => {
       expect(screen.getByText('Arrays').dataset.tagFamily).toBe('data');
       expect(screen.getByText('Find the pair.')).toBeTruthy();
       expect(screen.getByText('Prepared Solutions')).toBeTruthy();
+      expect(screen.getByRole('heading', { name: 'Examples' }).tagName).toBe(
+        'H2',
+      );
+      expect(screen.getByRole('heading', { name: 'Input' }).tagName).toBe('H3');
       const problemLink = screen.getByRole('link', {
         name: 'Problem link ↗',
       });

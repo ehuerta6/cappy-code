@@ -8,6 +8,7 @@ import type { ProblemSolutions } from '@/lib/firebase/solutions';
 import type { ProblemDifficulty } from '@/lib/domain';
 import AppHeader from '@/components/app-header';
 import ProblemMarkdown from '@/components/member/problem-markdown';
+import ProblemExamples from '@/components/member/problem-examples';
 import {
   ProblemDifficultyBadge,
   ProblemLink,
@@ -554,39 +555,12 @@ function ProblemContent({
                   </p>
                 </section>
               ) : null}
-              <section
-                className="border-t border-border-soft pt-4"
-                aria-labelledby={`examples-${problem.id}`}
-              >
-                <h3
-                  className="mb-2 mt-0 text-base font-semibold leading-6"
-                  id={`examples-${problem.id}`}
-                >
-                  Examples
-                </h3>
-                <div className="grid sm:grid-cols-2 sm:divide-x sm:divide-border-soft">
-                  <section className="min-w-0 py-2 sm:pr-5">
-                    <h4 className="mb-1 mt-0 text-sm font-semibold leading-5 text-muted">
-                      Input
-                    </h4>
-                    <div className="min-w-0 break-words font-mono text-[15px] leading-[23px]">
-                      <ProblemMarkdown>
-                        {problem.exampleInput || 'No example input'}
-                      </ProblemMarkdown>
-                    </div>
-                  </section>
-                  <section className="min-w-0 border-t border-border-soft py-3 sm:border-t-0 sm:pl-5 sm:pt-2">
-                    <h4 className="mb-1 mt-0 text-sm font-semibold leading-5 text-muted">
-                      Expected output
-                    </h4>
-                    <div className="min-w-0 break-words font-mono text-[15px] leading-[23px]">
-                      <ProblemMarkdown>
-                        {problem.exampleOutput || 'No expected output'}
-                      </ProblemMarkdown>
-                    </div>
-                  </section>
-                </div>
-              </section>
+              <ProblemExamples
+                id={problem.id}
+                input={problem.exampleInput}
+                output={problem.exampleOutput}
+                headingLevel={3}
+              />
             </div>
           </section>
         </article>

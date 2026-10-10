@@ -23,6 +23,15 @@ test('Member Problem Bank search and filters adapt across themes and widths', as
   await expect(
     page.getByRole('group', { name: 'Contest Room Route classification' }),
   ).toContainText('Graph');
+  await expect(
+    page.getByRole('heading', { name: 'Competitive Programming' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Custom', exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Interview-style', exact: true }),
+  ).toBeVisible();
   await page.screenshot({
     path: testInfo.outputPath('member-bank-desktop-light.png'),
     fullPage: true,
@@ -33,9 +42,47 @@ test('Member Problem Bank search and filters adapt across themes and widths', as
     page.getByRole('link', { name: 'Contest Room Route' }),
   ).toBeVisible();
   await expect(
+    page.getByRole('heading', { name: 'Interview-style', exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole('heading', { name: 'Custom', exact: true }),
+  ).toHaveCount(0);
+  await expect(
     page.getByRole('link', { name: 'Count Grid Regions' }),
   ).toHaveCount(0);
   await search.fill('');
+  await search.fill('no matching problem');
+  await expect(page.getByRole('status')).toContainText(
+    'No Problems match these filters.',
+  );
+  await expect(
+    page.getByRole('button', { name: 'Clear filters' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Competitive Programming' }),
+  ).toHaveCount(0);
+  await page.getByRole('button', { name: 'Clear filters' }).click();
+  await expect(
+    page.getByRole('link', { name: 'Contest Room Route' }),
+  ).toBeVisible();
+  await search.fill('');
+  for (const width of [390, 900, 1440]) {
+    await page.setViewportSize({ width, height: 844 });
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () => document.documentElement.scrollWidth <= window.innerWidth,
+        ),
+      )
+      .toBe(true);
+    const columns = await page
+      .locator('.mt-6.grid.min-w-0.gap-7')
+      .evaluate((element) => getComputedStyle(element).gridTemplateColumns);
+    expect(columns.split(' ').length).toBe(
+      width >= 1280 ? 3 : width >= 640 ? 2 : 1,
+    );
+  }
+  await page.setViewportSize({ width: 1440, height: 900 });
   await page.getByRole('button', { name: 'DSA / algorithm' }).click();
   await page.getByLabel('Graph', { exact: true }).check();
   await expect(
@@ -76,13 +123,6 @@ test('Member Problem Bank search and filters adapt across themes and widths', as
   });
 
   await page.setViewportSize({ width: 390, height: 844 });
-  await expect
-    .poll(() =>
-      page.evaluate(
-        () => document.documentElement.scrollWidth <= window.innerWidth,
-      ),
-    )
-    .toBe(true);
   for (const name of [
     'CIC branch',
     'Difficulty',
