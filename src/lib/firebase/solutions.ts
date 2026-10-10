@@ -10,13 +10,13 @@ import {
 } from 'firebase/firestore';
 import {
   languages,
-  approachTags,
   solutionSchema,
   solutionApproachSchema,
   type Language,
   type Solution,
   type SolutionApproach,
 } from '../domain';
+import { normalizeDsaTagId } from '../dsa-tags';
 import { getOfficerAuth } from './auth';
 import { getFirestoreDb } from './client';
 import {
@@ -45,15 +45,13 @@ function bankTagSummary(
   for (const row of rows) {
     const next = changes.has(row.id) ? changes.get(row.id) : row.tags;
     next?.forEach((tag) => {
-      if (approachTags.includes(tag as (typeof approachTags)[number]))
-        tags.add(tag);
+      tags.add(normalizeDsaTagId(tag));
     });
   }
   changes.forEach((next, id) => {
     if (rows.some((row) => row.id === id) || !next) return;
     next.forEach((tag) => {
-      if (approachTags.includes(tag as (typeof approachTags)[number]))
-        tags.add(tag);
+      tags.add(normalizeDsaTagId(tag));
     });
   });
   return [...tags].sort((a, b) => a.localeCompare(b));
@@ -105,7 +103,9 @@ export async function getApproaches(
         id: entry.id,
         name: typeof data.name === 'string' ? data.name : 'Approach',
         tags: Array.isArray(data.tags)
-          ? data.tags.filter((tag): tag is string => typeof tag === 'string')
+          ? data.tags
+              .filter((tag): tag is string => typeof tag === 'string')
+              .map(normalizeDsaTagId)
           : [],
         order: typeof data.order === 'number' ? data.order : 0,
         solutions: Object.fromEntries(solutions) as ProblemSolutions,
@@ -149,7 +149,10 @@ export async function saveApproach(
   approach: SolutionApproach,
 ): Promise<void> {
   const db = getFirestoreDb();
-  const parsed = solutionApproachSchema.safeParse(approach);
+  const parsed = solutionApproachSchema.safeParse({
+    ...approach,
+    tags: approach.tags.map(normalizeDsaTagId),
+  });
   if (!parsed.success)
     throw new Error('Approach name, tags, or order is invalid.');
   const existing = await getDocFromServer(

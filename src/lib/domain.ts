@@ -148,28 +148,20 @@ export interface SolutionApproach {
   solutions: Record<Language, Solution>;
 }
 
-export const approachTags = [
-  'Arrays',
-  'Hash Map',
-  'Two Pointers',
-  'Binary Search',
-  'Stack',
-  'Queue',
-  'Linked List',
-  'Tree',
-  'Graph',
-  'DFS',
-  'BFS',
-  'Dynamic Programming',
-  'Greedy',
-  'Backtracking',
-  'Union Find',
-  'Shortest Path',
-] as const;
-
 export const solutionApproachSchema = z.object({
   id: z.string().min(1),
   name: z.string().trim().min(1),
-  tags: z.array(z.enum(approachTags)).max(16),
+  tags: z
+    .array(
+      z
+        .string()
+        .max(64)
+        .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
+    )
+    .max(16)
+    .refine(
+      (tags) => new Set(tags).size === tags.length,
+      'Tags must be unique.',
+    ),
   order: z.number().int().nonnegative(),
 });

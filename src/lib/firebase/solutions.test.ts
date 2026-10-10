@@ -90,7 +90,7 @@ describe('officer solution persistence', () => {
       { path: 'problemBank/two-sum' },
       {
         approachesEnabled: true,
-        approachTagSummary: ['DFS', 'Hash Map'],
+        approachTagSummary: ['dfs', 'hash-map'],
       },
     );
   });

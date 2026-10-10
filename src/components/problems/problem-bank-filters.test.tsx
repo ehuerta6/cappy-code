@@ -3,6 +3,15 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { emptyProblemBankFilters } from '@/lib/problem-bank-filters';
 import ProblemBankFilters from './problem-bank-filters';
+const initialDsaTags = [
+  {
+    id: 'arrays',
+    label: 'Arrays',
+    family: 'data' as const,
+    order: 0,
+    active: true,
+  },
+];
 
 describe('ProblemBankFilters', () => {
   afterEach(() => cleanup());
@@ -12,6 +21,7 @@ describe('ProblemBankFilters', () => {
       <ProblemBankFilters
         value={emptyProblemBankFilters}
         onChange={onChange}
+        tags={initialDsaTags}
       />,
     );
     fireEvent.click(screen.getByText('Difficulty'));
@@ -28,6 +38,7 @@ describe('ProblemBankFilters', () => {
           branch: ['general'],
         }}
         onChange={onChange}
+        tags={initialDsaTags}
       />,
     );
     expect(screen.queryByText('No filters active.')).toBeNull();
@@ -37,6 +48,7 @@ describe('ProblemBankFilters', () => {
       <ProblemBankFilters
         value={emptyProblemBankFilters}
         onChange={onChange}
+        tags={initialDsaTags}
       />,
     );
     expect(screen.getByText('CIC branch')).toBeTruthy();
@@ -45,7 +57,11 @@ describe('ProblemBankFilters', () => {
 
   it('keeps only one filter menu open and dismisses it outside or with Escape', () => {
     render(
-      <ProblemBankFilters value={emptyProblemBankFilters} onChange={vi.fn()} />,
+      <ProblemBankFilters
+        value={emptyProblemBankFilters}
+        onChange={vi.fn()}
+        tags={initialDsaTags}
+      />,
     );
     const difficulty = screen.getByRole('button', { name: 'Difficulty' });
     const category = screen.getByRole('button', { name: 'Category' });
@@ -75,7 +91,11 @@ describe('ProblemBankFilters', () => {
 
   it('uses a bounded scrolling panel for the long DSA option list', () => {
     render(
-      <ProblemBankFilters value={emptyProblemBankFilters} onChange={vi.fn()} />,
+      <ProblemBankFilters
+        value={emptyProblemBankFilters}
+        onChange={vi.fn()}
+        tags={initialDsaTags}
+      />,
     );
     fireEvent.click(screen.getByRole('button', { name: 'DSA / algorithm' }));
     const panel = screen.getByRole('group', {

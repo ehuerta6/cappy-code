@@ -1,5 +1,7 @@
 import type { ProblemDifficulty } from '@/lib/domain';
 import { Badge } from '@/components/ui/primitives';
+import { resolveDsaTag, type DsaTagFamily } from '@/lib/dsa-tags';
+import { useDsaTagCatalog } from './dsa-tag-catalog-provider';
 
 const difficultyLabels: Record<ProblemDifficulty, string> = {
   easy: 'Easy',
@@ -46,15 +48,21 @@ export function ProblemApproachTags({ tags }: { tags: string[] }) {
       aria-label="DSA / algorithm tags"
     >
       {tags.map((tag) => (
-        <Badge
-          className={`text-ink ${tagFamilies[approachTagFamily(tag)]}`}
-          data-tag-family={approachTagFamily(tag)}
-          key={tag}
-        >
-          {tag}
-        </Badge>
+        <DsaTagBadge id={tag} key={tag} />
       ))}
     </div>
+  );
+}
+
+export function DsaTagBadge({ id }: { id: string }) {
+  const tag = resolveDsaTag(id, useDsaTagCatalog());
+  return (
+    <Badge
+      className={`text-ink ${tagFamilies[tag.family]}`}
+      data-tag-family={tag.family}
+    >
+      {tag.label}
+    </Badge>
   );
 }
 
@@ -72,29 +80,9 @@ export function ProblemLink({ href }: { href?: string }) {
   );
 }
 
-const tagFamilies: Record<string, string> = {
-  'tag-data': 'border-[var(--tag-data-border)] bg-[var(--tag-data-bg)]',
-  'tag-search': 'border-[var(--tag-search-border)] bg-[var(--tag-search-bg)]',
-  'tag-graph': 'border-[var(--tag-graph-border)] bg-[var(--tag-graph-bg)]',
-  'tag-strategy':
-    'border-[var(--tag-strategy-border)] bg-[var(--tag-strategy-bg)]',
+const tagFamilies: Record<DsaTagFamily, string> = {
+  data: 'border-[var(--tag-data-border)] bg-[var(--tag-data-bg)]',
+  search: 'border-[var(--tag-search-border)] bg-[var(--tag-search-bg)]',
+  graph: 'border-[var(--tag-graph-border)] bg-[var(--tag-graph-bg)]',
+  strategy: 'border-[var(--tag-strategy-border)] bg-[var(--tag-strategy-bg)]',
 };
-
-export function approachTagFamily(tag: string) {
-  if (
-    [
-      'Arrays',
-      'Hash Map',
-      'Two Pointers',
-      'Linked List',
-      'Stack',
-      'Queue',
-      'Tree',
-    ].includes(tag)
-  )
-    return 'tag-data';
-  if (['Binary Search', 'DFS', 'BFS'].includes(tag)) return 'tag-search';
-  if (['Graph', 'Union Find', 'Shortest Path'].includes(tag))
-    return 'tag-graph';
-  return 'tag-strategy';
-}

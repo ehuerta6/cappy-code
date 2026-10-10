@@ -8,6 +8,7 @@ import {
 } from '@firebase/rules-unit-testing';
 import {
   collection,
+  collectionGroup,
   deleteDoc,
   deleteField,
   doc,
@@ -19,8 +20,20 @@ import {
   updateDoc,
   where,
   writeBatch,
+  type Firestore as ModularFirestore,
 } from 'firebase/firestore';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { countDsaTagReferences, deleteDsaTagIfUnused } from './dsa-tags';
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest';
+
+vi.mock('client-only', () => ({}));
 
 const projectId = 'demo-cappycode-rules';
 let environment: RulesTestEnvironment;
@@ -209,6 +222,159 @@ beforeEach(async () => {
   });
 });
 
+describe('DSA tag catalog authorization', () => {
+  it('allows public catalog reads while restricting catalog writes to officers', async () => {
+    const anonymous = environment.unauthenticatedContext().firestore();
+    const officer = environment
+      .authenticatedContext('officer', {
+        firebase: { sign_in_provider: 'password' },
+      })
+      .firestore();
+    await environment.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'dsaTags/arrays'), {
+        label: 'Arrays',
+        family: 'data',
+        order: 0,
+        active: true,
+      });
+    });
+    await assertSucceeds(getDoc(doc(anonymous, 'dsaTags/arrays')));
+    await assertFails(
+      setDoc(doc(anonymous, 'dsaTags/custom'), {
+        label: 'Custom',
+        family: 'data',
+        order: 1,
+        active: true,
+      }),
+    );
+    await assertSucceeds(
+      setDoc(doc(officer, 'dsaTags/custom'), {
+        label: 'Custom',
+        family: 'data',
+        order: 1,
+        active: true,
+      }),
+    );
+    await assertFails(
+      setDoc(doc(officer, 'dsaTags/invalid'), {
+        label: '',
+        family: 'neon',
+        order: -1,
+        active: true,
+      }),
+    );
+  });
+
+  it('requires unique bounded stable IDs for new Approach tags', async () => {
+    const officer = officerDb();
+    await assertSucceeds(
+      setDoc(doc(officer, 'sessions/draft/problems/new/approaches/ok'), {
+        name: 'Primary',
+        tags: ['arrays', 'two-pointers'],
+        order: 0,
+      }),
+    );
+    await assertFails(
+      setDoc(doc(officer, 'sessions/draft/problems/new/approaches/duplicate'), {
+        name: 'Duplicate',
+        tags: ['arrays', 'arrays'],
+        order: 0,
+      }),
+    );
+    await assertFails(
+      setDoc(doc(officer, 'sessions/draft/problems/new/approaches/invalid'), {
+        name: 'Invalid',
+        tags: ['Hash Map'],
+        order: 0,
+      }),
+    );
+    await assertFails(
+      setDoc(doc(officer, 'sessions/draft/problems/new/approaches/too-many'), {
+        name: 'Too many',
+        tags: Array.from({ length: 17 }, (_, index) => `tag-${index}`),
+        order: 0,
+      }),
+    );
+  });
+});
+
+describe('DSA tag deletion integration', () => {
+  it('blocks deletion for Bank and Session references and deletes an unused tag', async () => {
+    const officer = environment
+      .authenticatedContext('tag-manager', {
+        firebase: { sign_in_provider: 'password' },
+      })
+      .firestore();
+    await environment.withSecurityRulesDisabled(async (context) => {
+      const database = context.firestore();
+      for (const id of ['bank-only', 'session-only', 'orphan-only', 'unused'])
+        await setDoc(doc(database, `dsaTags/${id}`), {
+          label: id,
+          family: 'data',
+          order: 0,
+          active: false,
+        });
+      await setDoc(doc(database, 'problemBank/bank-tagged'), { title: 'Bank' });
+      await setDoc(doc(database, 'sessions/history'), {
+        title: 'History',
+        status: 'ended',
+      });
+      await setDoc(doc(database, 'sessions/history/problems/problem-tagged'), {
+        title: 'Problem',
+      });
+      await setDoc(
+        doc(database, 'problemBank/bank-tagged/approaches/primary'),
+        { name: 'Primary', tags: ['bank-only'], order: 0 },
+      );
+      await setDoc(
+        doc(
+          database,
+          'sessions/history/problems/problem-tagged/approaches/primary',
+        ),
+        { name: 'Primary', tags: ['session-only'], order: 0 },
+      );
+      await setDoc(doc(database, 'problemBank/orphan/approaches/primary'), {
+        name: 'Orphaned historical Approach',
+        tags: ['orphan-only'],
+        order: 0,
+      });
+    });
+
+    const modularOfficer = officer as unknown as ModularFirestore;
+    expect(await countDsaTagReferences('bank-only', modularOfficer)).toBe(1);
+    expect(await countDsaTagReferences('session-only', modularOfficer)).toBe(1);
+    expect(await countDsaTagReferences('orphan-only', modularOfficer)).toBe(1);
+    const anonymous = environment.unauthenticatedContext().firestore();
+    await assertFails(
+      getDocs(
+        query(
+          collectionGroup(anonymous, 'approaches'),
+          where('tags', 'array-contains', 'bank-only'),
+        ),
+      ),
+    );
+
+    await expect(
+      deleteDsaTagIfUnused('bank-only', modularOfficer),
+    ).rejects.toThrow('used by existing Approaches');
+    await expect(
+      deleteDsaTagIfUnused('session-only', modularOfficer),
+    ).rejects.toThrow('used by existing Approaches');
+    await expect(
+      deleteDsaTagIfUnused('orphan-only', modularOfficer),
+    ).rejects.toThrow('used by existing Approaches');
+    await expect(
+      deleteDsaTagIfUnused('unused', modularOfficer),
+    ).resolves.toBeUndefined();
+
+    await assertSucceeds(getDoc(doc(officer, 'dsaTags/bank-only')));
+    await assertSucceeds(getDoc(doc(officer, 'dsaTags/session-only')));
+    await assertSucceeds(getDoc(doc(officer, 'dsaTags/orphan-only')));
+    await assertSucceeds(getDoc(doc(officer, 'dsaTags/unused')));
+    expect((await getDoc(doc(officer, 'dsaTags/unused'))).exists()).toBe(false);
+  });
+});
+
 function anonymousDb() {
   return environment.unauthenticatedContext().firestore();
 }
@@ -253,7 +419,7 @@ describe('Firestore security rules', () => {
         db,
         'sessions/atomic-copy/problems/problem-copy/approaches/approach-copy',
       ),
-      { name: 'Primary', tags: ['Arrays'], order: 0 },
+      { name: 'Primary', tags: ['arrays'], order: 0 },
     );
     for (const language of ['python', 'java', 'cpp']) {
       batch.set(
@@ -1322,7 +1488,7 @@ describe('Firestore security rules', () => {
     await assertSucceeds(
       updateDoc(
         doc(officer, 'sessions/live/problems/revealed/approaches/primary'),
-        { name: 'Corrected', tags: ['Tree'] },
+        { name: 'Corrected', tags: ['tree'] },
       ),
     );
     await assertSucceeds(

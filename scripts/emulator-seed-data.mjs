@@ -11,6 +11,32 @@ const officerEmail = 'cappy@gmail.com';
 const officerPassword = 'cappy123';
 
 const timestamp = Timestamp.fromDate(new Date('2026-10-04T18:00:00Z'));
+const tagId = (label) =>
+  label
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+const dsaTags = [
+  ['arrays', 'Arrays', 'data'],
+  ['hash-map', 'Hash Map', 'data'],
+  ['two-pointers', 'Two Pointers', 'data'],
+  ['binary-search', 'Binary Search', 'search'],
+  ['stack', 'Stack', 'data'],
+  ['queue', 'Queue', 'data'],
+  ['linked-list', 'Linked List', 'data'],
+  ['tree', 'Tree', 'data'],
+  ['graph', 'Graph', 'graph'],
+  ['dfs', 'DFS', 'search'],
+  ['bfs', 'BFS', 'search'],
+  ['dynamic-programming', 'Dynamic Programming', 'strategy'],
+  ['greedy', 'Greedy', 'strategy'],
+  ['backtracking', 'Backtracking', 'strategy'],
+  ['union-find', 'Union Find', 'graph'],
+  ['shortest-path', 'Shortest Path', 'graph'],
+].map(([id, label, family], order) => [
+  `dsaTags/${id}`,
+  { label, family, order, active: true },
+]);
 
 const sessions = [
   {
@@ -1504,6 +1530,7 @@ const bankProblems = [
     exampleOutput: '6',
     category: 'custom',
     difficulty: 'easy',
+    approachTagSummary: [],
     hiddenByLiveSessionId: 'live-hash-maps',
     solution: 'first-repeat',
     complexity: {
@@ -1523,6 +1550,7 @@ const bankProblems = [
     exampleInput: 'agenda = ["warm-up", "practice", "review"]',
     exampleOutput: '["review", "practice", "warm-up"]',
     category: 'custom',
+    approachTagSummary: [],
     hiddenByLiveSessionId: null,
     solution: 'reverse-list',
     complexity: {
@@ -1543,6 +1571,7 @@ const bankProblems = [
     exampleOutput: '3',
     category: 'interview-style',
     difficulty: 'medium',
+    approachTagSummary: [],
     hiddenByLiveSessionId: null,
     leetcodeUrl:
       'https://leetcode.com/problems/longest-substring-without-repeating-characters/',
@@ -1566,6 +1595,7 @@ const bankProblems = [
     exampleOutput: '4',
     category: 'interview-style',
     difficulty: 'easy',
+    approachTagSummary: [],
     hiddenByLiveSessionId: null,
     solution: 'binary-search',
     complexity: {
@@ -1586,6 +1616,7 @@ const bankProblems = [
     exampleOutput: 'true',
     category: 'competitive-programming',
     difficulty: 'medium',
+    approachTagSummary: ['BFS', 'Graph'],
     hiddenByLiveSessionId: null,
     solution: 'room-reachability',
     complexity: {
@@ -1606,6 +1637,7 @@ const bankProblems = [
     exampleOutput: '3',
     category: 'competitive-programming',
     difficulty: 'hard',
+    approachTagSummary: [],
     hiddenByLiveSessionId: null,
     solution: 'number-of-islands',
     complexity: {
@@ -1867,6 +1899,7 @@ export async function seedEmulatorData() {
     ]),
   );
   const documents = [
+    ...dsaTags,
     ...sessionDocuments,
     ...problemDocuments,
     ...solutionDocuments,
@@ -1874,7 +1907,7 @@ export async function seedEmulatorData() {
     ...bankSolutionDocuments,
     [
       'problemBank/bank-cp-room-route/approaches/primary',
-      { name: 'Primary Approach', tags: ['Graph', 'BFS'], order: 0 },
+      { name: 'Primary Approach', tags: ['Graph', 'BFS'].map(tagId), order: 0 },
     ],
     ['sessionControl/liveSession', { sessionId: null }],
     [
@@ -1909,7 +1942,10 @@ export async function seedEmulatorData() {
     await environment.withSecurityRulesDisabled(async (context) => {
       const database = context.firestore();
       for (const [path, fields] of documents) {
-        await setDoc(doc(database, path), fields);
+        const values = { ...fields };
+        if (Array.isArray(values.approachTagSummary))
+          values.approachTagSummary = values.approachTagSummary.map(tagId);
+        await setDoc(doc(database, path), values);
       }
     });
   } finally {

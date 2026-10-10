@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
-import { approachTags } from '@/lib/domain';
+import type { DsaTag } from '@/lib/dsa-tags';
 import { Button } from '@/components/ui/primitives';
 import {
   emptyProblemBankFilters,
@@ -26,9 +26,11 @@ type FilterKey = 'branch' | 'difficulty' | 'category' | 'tag';
 export default function ProblemBankFilters({
   value,
   onChange,
+  tags,
 }: {
   value: Filters;
   onChange: (value: Filters) => void;
+  tags: DsaTag[];
 }) {
   const [openFilter, setOpenFilter] = useState<FilterKey | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -213,9 +215,9 @@ export default function ProblemBankFilters({
       {filterGroup(
         'tag',
         'DSA / algorithm',
-        approachTags,
+        tags.map(({ id }) => id),
         value.tag,
-        (tag) => tag,
+        (tagId) => tags.find(({ id }) => id === tagId)?.label ?? tagId,
       )}
       <Button
         variant="secondary"

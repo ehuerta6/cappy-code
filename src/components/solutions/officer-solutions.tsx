@@ -25,6 +25,7 @@ import type {
 import { isPermissionDenied } from '@/lib/firebase/errors';
 import { problemPath } from '@/lib/firebase/paths';
 import { ProblemApproachTags } from '@/components/problems/problem-bank-metadata';
+import DsaTagPicker from '@/components/problems/dsa-tag-picker';
 
 const buttonClass =
   'min-h-10 rounded border border-border-strong bg-surface px-3 py-2 text-ink hover:bg-hover disabled:cursor-default disabled:bg-raised disabled:text-muted';
@@ -65,7 +66,7 @@ function ProblemSolutionsEditor({
   const [approachId, setApproachId] = useState('primary');
   const [language, setLanguage] = useState<Language>('python');
   const [approachName, setApproachName] = useState('Primary Approach');
-  const [approachTags, setApproachTags] = useState('');
+  const [approachTags, setApproachTags] = useState<string[]>([]);
   const [currentCode, setCurrentCode] = useState<Record<
     Language,
     string
@@ -101,10 +102,7 @@ function ProblemSolutionsEditor({
         ? {
             ...selectedApproach,
             name: approachName,
-            tags: approachTags
-              .split(',')
-              .map((tag) => tag.trim())
-              .filter(Boolean),
+            tags: approachTags,
           }
         : null,
     [approachName, approachTags, selectedApproach],
@@ -240,7 +238,7 @@ function ProblemSolutionsEditor({
             loaded.find(({ id }) => id === approachId) ?? loaded[0];
           setApproachId(selected?.id ?? 'primary');
           setApproachName(selected?.name ?? 'Primary Approach');
-          setApproachTags(selected?.tags.join(', ') ?? '');
+          setApproachTags(selected?.tags ?? []);
           setSolutions(selected?.solutions ?? null);
           setSavedSolutions(selected?.solutions ?? null);
           setLanguage(
@@ -284,7 +282,7 @@ function ProblemSolutionsEditor({
               if (!approach) return;
               setApproachId(approach.id);
               setApproachName(approach.name);
-              setApproachTags(approach.tags.join(', '));
+              setApproachTags(approach.tags);
               setSolutions(approach.solutions);
               setSavedSolutions(approach.solutions);
               setLanguage(
@@ -327,7 +325,7 @@ function ProblemSolutionsEditor({
                   setApproaches(next);
                   setApproachId(added.id);
                   setApproachName(added.name);
-                  setApproachTags('');
+                  setApproachTags([]);
                   setSolutions(added.solutions);
                   setSavedSolutions(added.solutions);
                   setLanguage('python');
@@ -344,12 +342,7 @@ function ProblemSolutionsEditor({
           )}
           {selectedApproach && (
             <>
-              <ProblemApproachTags
-                tags={approachTags
-                  .split(',')
-                  .map((tag) => tag.trim())
-                  .filter(Boolean)}
-              />
+              <ProblemApproachTags tags={approachTags} />
               <label>
                 Approach name
                 <input
@@ -358,14 +351,15 @@ function ProblemSolutionsEditor({
                   onChange={(event) => setApproachName(event.target.value)}
                 />
               </label>
-              <label>
-                Tags (comma separated)
-                <input
-                  className="ml-2 rounded border border-border-strong bg-surface px-2 py-2"
-                  value={approachTags}
-                  onChange={(event) => setApproachTags(event.target.value)}
+              <fieldset className="grid max-w-lg gap-2 border-0 p-0">
+                <legend className="text-sm font-semibold">
+                  DSA / algorithm tags
+                </legend>
+                <DsaTagPicker
+                  selected={approachTags}
+                  onChange={setApproachTags}
                 />
-              </label>
+              </fieldset>
               <button
                 className={buttonClass}
                 type="button"
@@ -393,7 +387,7 @@ function ProblemSolutionsEditor({
                     setApproaches(nextApproaches);
                     setApproachId(next?.id ?? 'primary');
                     setApproachName(next?.name ?? '');
-                    setApproachTags(next?.tags.join(', ') ?? '');
+                    setApproachTags(next?.tags ?? []);
                     setSolutions(next?.solutions ?? null);
                     setSavedSolutions(next?.solutions ?? null);
                     setCurrentCode(

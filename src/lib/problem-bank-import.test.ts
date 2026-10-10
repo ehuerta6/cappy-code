@@ -93,8 +93,8 @@ describe('Problem Bank import manifest', () => {
     expect(() => validateManifest(incomplete)).toThrow(/title/);
 
     const unsupported = structuredClone(manifest);
-    unsupported.problems[0].approaches[0].tags.push('Heap / Priority Queue');
-    expect(() => validateManifest(unsupported)).toThrow(/unsupported tag/);
+    unsupported.problems[0].approaches[0].tags.push('');
+    expect(() => validateManifest(unsupported)).toThrow(/non-empty tag/);
   });
 
   it('does not include an unresolved difficulty in an executable plan', () => {

@@ -2,21 +2,39 @@
 import {
   cleanup,
   fireEvent,
-  render,
+  render as renderBase,
   screen,
   waitFor,
 } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const api = vi.hoisted(() => ({
   getBankProblem: vi.fn(),
   listMemberBankProblems: vi.fn(),
   listProblemUsageSummaries: vi.fn(),
+  listDsaTags: vi.fn(),
 }));
+const tagCatalog = vi.hoisted(() => [
+  { id: 'arrays', label: 'Arrays', family: 'data', order: 0, active: true },
+  { id: 'hash-map', label: 'Hash Map', family: 'data', order: 1, active: true },
+  {
+    id: 'two-pointers',
+    label: 'Two Pointers',
+    family: 'data',
+    order: 2,
+    active: true,
+  },
+  { id: 'graph', label: 'Graph', family: 'graph', order: 3, active: true },
+  { id: 'dfs', label: 'DFS', family: 'search', order: 4, active: true },
+]);
 
 vi.mock('@/lib/firebase/problem-bank', () => api);
 vi.mock('@/lib/firebase/problem-usage', () => ({
   listProblemUsageSummaries: api.listProblemUsageSummaries,
+}));
+vi.mock('@/lib/firebase/dsa-tags', () => ({
+  listDsaTags: api.listDsaTags,
 }));
 vi.mock('next/link', () => ({
   default: ({ href, children, ...props }: React.ComponentProps<'a'>) => (
@@ -41,6 +59,11 @@ import {
   MemberBankProblemPage,
   MemberProblemBank,
 } from './member-problem-bank';
+import { DsaTagCatalogProvider } from '@/components/problems/dsa-tag-catalog-provider';
+
+function render(ui: React.ReactElement) {
+  return renderBase(<DsaTagCatalogProvider>{ui}</DsaTagCatalogProvider>);
+}
 
 const problems = [
   {
@@ -114,6 +137,7 @@ beforeEach(() => {
   vi.resetAllMocks();
   api.listMemberBankProblems.mockResolvedValue(problems);
   api.listProblemUsageSummaries.mockResolvedValue(usage);
+  api.listDsaTags.mockResolvedValue(tagCatalog);
   api.getBankProblem.mockResolvedValue({
     problem: problems[0],
     solutions,
@@ -132,6 +156,52 @@ beforeEach(() => {
 afterEach(() => cleanup());
 
 describe('Member Problem Bank metadata', () => {
+  it('recovers from a DSA catalog failure and restores filters and browsing', async () => {
+    const user = userEvent.setup();
+    let rejectCatalog!: (reason: Error) => void;
+    api.listDsaTags.mockReturnValueOnce(
+      new Promise((_, reject) => {
+        rejectCatalog = reject;
+      }),
+    );
+    api.listDsaTags.mockResolvedValueOnce(tagCatalog);
+    render(<MemberProblemBank />);
+
+    expect(await screen.findByRole('link', { name: 'Two Sum' })).toBeTruthy();
+    expect(screen.getByText('Loading DSA tag catalog…')).toBeTruthy();
+    rejectCatalog(new Error('Catalog service unavailable'));
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toContain('DSA tag filters could not be loaded.');
+    expect(screen.queryByText('Loading DSA tag catalog…')).toBeNull();
+    expect(
+      screen.getByRole('searchbox', { name: 'Search Problems' }),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Difficulty' }));
+    fireEvent.click(screen.getByLabelText('Easy'));
+
+    await user.tab();
+    while (
+      document.activeElement !==
+      screen.getByRole('button', { name: 'Retry loading tags' })
+    ) {
+      await user.tab();
+    }
+    await user.keyboard('{Enter}');
+
+    await screen.findByRole('button', { name: /DSA \/ algorithm/ });
+    fireEvent.click(screen.getByRole('button', { name: 'Difficulty (1)' }));
+    expect((screen.getByLabelText('Easy') as HTMLInputElement).checked).toBe(
+      true,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /DSA \/ algorithm/ }));
+    expect(await screen.findByLabelText('Arrays')).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Two Sum' })).toBeTruthy();
+    fireEvent.click(screen.getByLabelText('Arrays'));
+    expect(screen.getByRole('link', { name: 'Two Sum' })).toBeTruthy();
+    expect(screen.queryByRole('link', { name: 'Graph Search' })).toBeNull();
+    expect(api.listDsaTags).toHaveBeenCalledTimes(2);
+  });
+
   it('renders DSA metadata with the initial Problem results without Approach reads', async () => {
     render(<MemberProblemBank />);
 
@@ -271,7 +341,7 @@ describe('Member Problem Bank metadata', () => {
       );
       expect(badge).toBeTruthy();
       if (!badge) throw new Error(`Missing ${tag} tag badge`);
-      expect(badge.dataset.tagFamily).toMatch(/^tag-/);
+      expect(badge.dataset.tagFamily).toBeTruthy();
       expect(badge.className).toContain('bg-[var(--tag-');
     }
     expect(screen.queryByText('Used 2 times')).toBeNull();
@@ -349,7 +419,7 @@ describe('Member Problem Bank metadata', () => {
       const badge = await screen.findByText(label);
       expect(badge.className).toContain(treatment);
       expect(badge.className).toContain('text-ink');
-      expect(screen.getByText('Arrays').dataset.tagFamily).toBe('tag-data');
+      expect(screen.getByText('Arrays').dataset.tagFamily).toBe('data');
       expect(screen.getByText('Find the pair.')).toBeTruthy();
       expect(screen.getByText('Prepared Solutions')).toBeTruthy();
       const problemLink = screen.getByRole('link', {

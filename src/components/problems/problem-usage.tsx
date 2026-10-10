@@ -45,9 +45,11 @@ export function ProblemUsageMetadata({
 export function ProblemUsageHistory({
   summary,
   failed = false,
+  title = 'Used in Sessions',
 }: {
   summary: ProblemUsageSummary | undefined;
   failed?: boolean;
+  title?: string;
 }) {
   return (
     <section className="mt-6" aria-labelledby="usage-history-heading">
@@ -55,7 +57,7 @@ export function ProblemUsageHistory({
         className="mb-2 mt-0 text-lg font-semibold"
         id="usage-history-heading"
       >
-        Used in Sessions
+        {title}
       </h2>
       {!summary ? (
         <p role="status">

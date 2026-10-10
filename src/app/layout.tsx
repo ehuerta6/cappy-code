@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { appInfo } from '@/lib/app-info';
 import { ThemeProvider } from '@/components/theme-provider';
+import { DsaTagCatalogProvider } from '@/components/problems/dsa-tag-catalog-provider';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -24,7 +25,9 @@ export default function RootLayout({
         />
       </head>
       <body>
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          <DsaTagCatalogProvider>{children}</DsaTagCatalogProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

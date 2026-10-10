@@ -7,14 +7,14 @@ import {
 } from './problem-bank-tag-summary';
 
 describe('Bank approach tag summary compatibility', () => {
-  it('normalizes supported tags from legacy Approach documents', () => {
+  it('normalizes known and unknown legacy tags without dropping existing data', () => {
     expect(
       normalizeBankApproachTagSummary([
         { tags: ['Hash Map', 'Arrays'] },
         { tags: ['Arrays', 'Unsupported tag'] },
         { tags: null },
       ]),
-    ).toEqual(['Arrays', 'Hash Map']);
+    ).toEqual(['arrays', 'hash-map', 'unsupported-tag']);
   });
 
   it('plans summaries only for parents missing the denormalized field', () => {
@@ -33,7 +33,7 @@ describe('Bank approach tag summary compatibility', () => {
         { id: 'untagged', data: {}, approaches: [] },
       ]),
     ).toEqual([
-      { id: 'legacy', approachTagSummary: ['Graph'] },
+      { id: 'legacy', approachTagSummary: ['graph'] },
       { id: 'untagged', approachTagSummary: [] },
     ]);
   });

@@ -205,6 +205,7 @@ responses. Firestore Security Rules independently enforce backend access.
 | `sessions/{sessionId}/problems/{problemId}/solutions/{language}` | `Solution`         | `code`                                                                                                                    |
 | `problemBank/{problemId}`                                        | Bank Problem       | Problem content, `hiddenByLiveSessionId`, derived `approachTagSummary`                                                    |
 | `problemBank/{problemId}/approaches/{approachId}`                | `SolutionApproach` | `name`, `tags`, `order`                                                                                                   |
+| `dsaTags/{tagId}`                                                | DSA tag            | `label`, `family`, `order`, `active`; stable IDs are referenced by Approach `tags`                                        |
 | `problemBank/{problemId}/solutions/{language}`                   | `Solution`         | `code`                                                                                                                    |
 
 - `Language` is exactly `python | java | cpp`; each language identifies its own Solution document.
@@ -498,6 +499,105 @@ Bank parents, and writes in batches of at most 400. Verify every
 formerly missing parent now has a summary, and compare the saved tags with its
 Approach documents. This change does not run the script or modify production
 Firebase data.
+
+### DSA tag catalog migration
+
+The public `dsaTags/{tagId}` catalog stores display metadata with stable IDs.
+Member clients can read this metadata; Officer clients alone can write it.
+Approach documents in both Bank Problems and Session snapshots store unique
+catalog IDs, with a maximum of 16 tags. Renaming a tag only changes its catalog
+document. Archived tags remain readable and render on existing and historical
+content, while filters and new selections use active tags only.
+
+Deleting an unused tag queries the `approaches` collection group, which spans
+Bank Approaches and Session snapshots (including historical or orphaned
+Approach documents). The collection-group query filters `tags` with
+`array-contains`; its single-field collection-group index is configured in
+`firestore.indexes.json`, as required for filtered collection-group queries by
+[Firestore's index documentation](https://firebase.google.com/docs/firestore/query-data/index-overview).
+A recursive Rules match grants read access to this
+query for Officers only; Members keep the existing path-specific visibility
+rules. Rules cannot query an arbitrary collection group to prove that a tag has
+no references, so permanent deletion goes through the Officer operation which
+performs this scan immediately before deleting. A referenced tag is archived
+instead. This is an application invariant, not a Rules-level guarantee against
+a direct delete issued by a separately authorized Officer client.
+
+#### Production rollout
+
+The deployed application and Rules currently use the legacy display strings
+(`Arrays`, `Hash Map`, and the other built-in labels). The application in this
+change writes stable catalog IDs, and the matching Rules validate IDs. The two
+versions are not safe to roll out independently: old clients can submit labels
+the new Rules reject, and new clients can submit IDs old Rules reject. Use a
+short maintenance window that pauses Officer Approach edits through migration
+and coordinated application/Rules rollout. Do not reopen Officer edits until
+the new application and Rules are both active.
+
+1. **Confirm compatibility and scope.** Confirm the target is
+   `cappycode-f133c`, the production app is still on the legacy-label schema,
+   and no other writer or import script will update Approach tags during the
+   maintenance window. Check that the deployed Rules still permit the current
+   legacy application. Do not deploy only the new app or only the new Rules.
+2. **Run a dry run.** The command is read-only unless `--write-production` is
+   supplied. It scans all Approach subcollections plus Bank tag summaries and
+   reports the target project, tag totals, updates, unknown labels, and ID
+   collisions:
+
+   ```bash
+   npm run dsa-tags:migrate
+   ```
+
+3. **Reconcile unknown labels.** The 16 built-in labels map to the stable IDs
+   seeded by the migration. For every `unknownLegacyTags` entry, decide whether
+   to preserve its exact label or map it to an existing catalog concept. To
+   assign a reviewed ID, display label, and color family or resolve a slug
+   collision, copy `scripts/dsa-tag-reconciliation.example.json` to a
+   restricted local file and add an exact legacy-label mapping. Rerun the dry
+   run with `--reconciliation-file=/path/to/dsa-tag-reconciliation.json` and
+   confirm `reconciledLegacyTags` lists the intended entries,
+   `unusedReconciliations` is empty, and `tagIdCollisions` is empty. Leave the
+   mapping file out of the repository if it contains production taxonomy
+   decisions. Unknown labels without an explicit mapping are preserved verbatim
+   with deterministic IDs and the `strategy` color family. Do not use the write
+   flag until every unknown is accounted for. The write command requires
+   `--accept-unknown-tags` as an explicit acknowledgment.
+4. **Apply in this order.** Keep Officer edits paused. First deploy the new
+   Rules and index. Wait until the index is enabled, then run the reviewed
+   migration write command. Deploy the new application immediately afterward,
+   with the maintenance banner or access control still preventing Officer edits
+   until the application, Rules, and index are confirmed active. Never run the
+   migration against the old writer after it is complete.
+
+   ```bash
+   firebase deploy --only firestore:rules,firestore:indexes --project cappycode-f133c
+   npm run dsa-tags:migrate -- --write-production \
+     --expected-project-id=cappycode-f133c --accept-unknown-tags
+   ```
+
+   Add `--reconciliation-file=/path/to/dsa-tag-reconciliation.json` to both
+   migration commands when a reconciliation file is used.
+
+   Coordinate the application release through the normal deployment workflow;
+   this document does not authorize or perform that deployment.
+   If any step fails after migration writes begin, keep Officer edits paused.
+   The migration is rerunnable, but do not resume the legacy writer against
+   stable IDs; inspect the dry-run result and either complete the rollout
+   forward after reviewing the failure and current data state.
+
+5. **Verify before reopening edits.** Rerun the dry run with the same
+   reconciliation file and confirm zero Approach documents and Bank summaries
+   need migration, no unknown labels or collisions remain, every referenced ID
+   resolves to a catalog label, and archived tags remain present for historical
+   references. In the application, inspect representative Bank and Session
+   Approaches, Member filters, and Officer selection. Confirm an archived tag
+   remains visible on its historical content, is absent from new selections,
+   an in-use tag cannot be deleted through the Officer catalog operation, and
+   an unused tag can be removed. Only then reopen Officer editing.
+
+The migration is bounded by Firestore's 500-write batch limit, writes in batches
+of at most 450, and never runs on application startup. No production migration,
+Rules deployment, or application deployment was run as part of this change.
 
 ## Realtime answer visibility
 

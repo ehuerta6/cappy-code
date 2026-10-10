@@ -81,6 +81,42 @@ service cloud.firestore {
         && (!data.keys().hasAny(['spaceComplexityReason']) || data.spaceComplexityReason is string);
     }
 
+    function validApproachTags(tags) {
+      return tags is list
+        && tags.size() <= 16
+        && tags.toSet().size() == tags.size()
+        && (tags.size() < 1 || validDsaTagId(tags[0]))
+        && (tags.size() < 2 || validDsaTagId(tags[1]))
+        && (tags.size() < 3 || validDsaTagId(tags[2]))
+        && (tags.size() < 4 || validDsaTagId(tags[3]))
+        && (tags.size() < 5 || validDsaTagId(tags[4]))
+        && (tags.size() < 6 || validDsaTagId(tags[5]))
+        && (tags.size() < 7 || validDsaTagId(tags[6]))
+        && (tags.size() < 8 || validDsaTagId(tags[7]))
+        && (tags.size() < 9 || validDsaTagId(tags[8]))
+        && (tags.size() < 10 || validDsaTagId(tags[9]))
+        && (tags.size() < 11 || validDsaTagId(tags[10]))
+        && (tags.size() < 12 || validDsaTagId(tags[11]))
+        && (tags.size() < 13 || validDsaTagId(tags[12]))
+        && (tags.size() < 14 || validDsaTagId(tags[13]))
+        && (tags.size() < 15 || validDsaTagId(tags[14]))
+        && (tags.size() < 16 || validDsaTagId(tags[15]));
+    }
+
+    function validDsaTagId(id) {
+      return id is string && id.size() <= 64
+        && id.matches('^[a-z0-9]+(-[a-z0-9]+)*$');
+    }
+
+    function validDsaTag(data) {
+      return data.keys().hasAll(['label', 'family', 'order', 'active'])
+        && data.keys().hasOnly(['label', 'family', 'order', 'active'])
+        && data.label is string && data.label.size() > 0 && data.label.size() <= 512
+        && data.family in ['data', 'search', 'graph', 'strategy']
+        && data.order is int && data.order >= 0
+        && data.active is bool;
+    }
+
     function changesOnlyProblemContent() {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
         'title',
@@ -168,6 +204,17 @@ service cloud.firestore {
         && !bankProblemUsedByActiveSession(problemId);
     }
 
+    match /dsaTags/{tagId} {
+      allow read: if true;
+      allow create, update: if isOfficer() && validDsaTag(request.resource.data)
+        && tagId.matches('^[a-z0-9]+(-[a-z0-9]+)*$');
+      allow delete: if isOfficer();
+    }
+
+    match /{path=**}/approaches/{approachId} {
+      allow read: if isOfficer();
+    }
+
     match /sessions/{sessionId} {
       allow read: if isOfficer() || resource.data.status in ['live', 'ended'];
       allow create: if isOfficer()
@@ -229,15 +276,14 @@ service cloud.firestore {
             (sessionIsEnded(sessionId) || answersAreVisible(sessionId, problemId)));
           allow create: if isOfficer() && sessionStateAfter() == 'draft'
             && request.resource.data.keys().hasAll(['name', 'tags', 'order']) && request.resource.data.keys().hasOnly(['name', 'tags', 'order'])
-            && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.tags is list
-            && request.resource.data.tags.hasOnly(['Arrays', 'Hash Map', 'Two Pointers', 'Binary Search', 'Stack', 'Queue', 'Linked List', 'Tree', 'Graph', 'DFS', 'BFS', 'Dynamic Programming', 'Greedy', 'Backtracking', 'Union Find', 'Shortest Path'])
+            && request.resource.data.name is string && request.resource.data.name.size() > 0 && validApproachTags(request.resource.data.tags)
             && request.resource.data.order is int && request.resource.data.order >= 0;
           allow delete: if isOfficer()
             && (sessionState() == 'draft' || sessionDeletedAfter(sessionId));
           allow update: if isOfficer() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'tags', 'order'])
             && request.resource.data.keys().hasAll(['name', 'tags', 'order']) && request.resource.data.keys().hasOnly(['name', 'tags', 'order'])
             && request.resource.data.name is string && request.resource.data.name.size() > 0
-            && request.resource.data.tags is list && request.resource.data.tags.hasOnly(['Arrays', 'Hash Map', 'Two Pointers', 'Binary Search', 'Stack', 'Queue', 'Linked List', 'Tree', 'Graph', 'DFS', 'BFS', 'Dynamic Programming', 'Greedy', 'Backtracking', 'Union Find', 'Shortest Path'])
+            && validApproachTags(request.resource.data.tags)
             && request.resource.data.order is int && request.resource.data.order >= 0
             && ((sessionState() == 'draft') ||
               (sessionState() in ['live', 'ended'] && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['order'])));
@@ -313,8 +359,8 @@ service cloud.firestore {
 
       match /approaches/{approachId} {
         allow read: if isOfficer() || bankSolutionParentIsEffectivelyVisible(problemId);
-        allow create: if isOfficer() && request.resource.data.keys().hasAll(['name', 'tags', 'order']) && request.resource.data.keys().hasOnly(['name', 'tags', 'order']) && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.tags is list && request.resource.data.tags.hasOnly(['Arrays', 'Hash Map', 'Two Pointers', 'Binary Search', 'Stack', 'Queue', 'Linked List', 'Tree', 'Graph', 'DFS', 'BFS', 'Dynamic Programming', 'Greedy', 'Backtracking', 'Union Find', 'Shortest Path']) && request.resource.data.order is int && request.resource.data.order >= 0;
-        allow update: if isOfficer() && request.resource.data.keys().hasAll(['name', 'tags', 'order']) && request.resource.data.keys().hasOnly(['name', 'tags', 'order']) && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.tags is list && request.resource.data.tags.hasOnly(['Arrays', 'Hash Map', 'Two Pointers', 'Binary Search', 'Stack', 'Queue', 'Linked List', 'Tree', 'Graph', 'DFS', 'BFS', 'Dynamic Programming', 'Greedy', 'Backtracking', 'Union Find', 'Shortest Path']) && request.resource.data.order is int && request.resource.data.order >= 0;
+        allow create: if isOfficer() && request.resource.data.keys().hasAll(['name', 'tags', 'order']) && request.resource.data.keys().hasOnly(['name', 'tags', 'order']) && request.resource.data.name is string && request.resource.data.name.size() > 0 && validApproachTags(request.resource.data.tags) && request.resource.data.order is int && request.resource.data.order >= 0;
+        allow update: if isOfficer() && request.resource.data.keys().hasAll(['name', 'tags', 'order']) && request.resource.data.keys().hasOnly(['name', 'tags', 'order']) && request.resource.data.name is string && request.resource.data.name.size() > 0 && validApproachTags(request.resource.data.tags) && request.resource.data.order is int && request.resource.data.order >= 0;
         allow delete: if isOfficer();
         match /solutions/{language} {
           allow read: if (isOfficer() && language in ['python', 'java', 'cpp']) ||

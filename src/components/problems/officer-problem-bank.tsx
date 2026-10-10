@@ -1,949 +1,226 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import SolutionPanel from '@/components/solutions/solution-panel';
-import { ProblemUsageHistory, ProblemUsageMetadata } from './problem-usage';
-import { getSharedEditorHeight } from '@/components/solutions/solution-sizing';
+import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import ProblemBankBrowser from './problem-bank-browser';
 import {
-  createApproach,
-  deleteApproach,
-  reorderApproaches,
-} from '@/lib/firebase/solutions';
-import { bankProblemPath } from '@/lib/firebase/paths';
-import {
-  languages,
-  problemCategories,
-  type Language,
-  type Solution,
-  type SolutionApproach,
-} from '@/lib/domain';
+  useDsaTagCatalog,
+  useDsaTagCatalogState,
+} from './dsa-tag-catalog-provider';
+import { Button, StateMessage } from '@/components/ui/primitives';
 import {
   createBankProblem,
-  deleteBankProblem,
-  getBankProblem,
-  listBankProblemApproachTags,
   listOfficerBankProblems,
-  updateBankProblem,
-  updateBankSolution,
-  updateBankApproach,
-  type BankProblemContent,
   type BankProblemRecord,
-  type BankSolutions,
 } from '@/lib/firebase/problem-bank';
 import { listProblemUsageSummaries } from '@/lib/firebase/problem-usage';
 import type { ProblemUsageSummary } from '@/lib/problem-usage';
-import ProblemBankFilters from './problem-bank-filters';
-import {
-  ProblemApproachTags,
-  ProblemDifficultyBadge,
-} from './problem-bank-metadata';
 import {
   emptyProblemBankFilters,
   filterProblemBank,
-  type ProblemBankFilters as Filters,
+  type ProblemBankFilters,
 } from '@/lib/problem-bank-filters';
 
-const labels = {
-  custom: 'Custom',
-  'interview-style': 'Interview-style',
-  'competitive-programming': 'Competitive Programming',
-} as const;
-const buttonClass = 'ui-button ui-button--secondary';
+type LoadState = 'loading' | 'ready' | 'error';
 
 export default function OfficerProblemBank() {
+  const catalog = useDsaTagCatalog();
+  const catalogState = useDsaTagCatalogState();
+  const router = useRouter();
   const [records, setRecords] = useState<BankProblemRecord[]>([]);
   const [usage, setUsage] = useState<Record<string, ProblemUsageSummary>>({});
-  const [usageFailed, setUsageFailed] = useState(false);
-  const [tagsByProblem, setTagsByProblem] = useState<Record<string, string[]>>(
-    {},
+  const [loadState, setLoadState] = useState<LoadState>('loading');
+  const [usageState, setUsageState] = useState<LoadState>('loading');
+  const [filters, setFilters] = useState<ProblemBankFilters>(
+    emptyProblemBankFilters,
   );
-  const [filters, setFilters] = useState<Filters>(emptyProblemBankFilters);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [content, setContent] = useState<BankProblemContent | null>(null);
-  const [savedContent, setSavedContent] = useState<BankProblemContent | null>(
-    null,
-  );
-  const [solutions, setSolutions] = useState<BankSolutions | null>(null);
-  const [approaches, setApproaches] = useState<SolutionApproach[]>([]);
-  const [savedApproaches, setSavedApproaches] = useState<SolutionApproach[]>(
-    [],
-  );
-  const [approachId, setApproachId] = useState('primary');
-  const [language, setLanguage] = useState<Language>('python');
-  const [loadedContentFor, setLoadedContentFor] = useState<string | null>(null);
-  const activeApproach = approaches.find(({ id }) => id === approachId);
-  const [savedSolutions, setSavedSolutions] = useState<BankSolutions | null>(
-    null,
-  );
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState(false);
-  const [structuralBusy, setStructuralBusy] = useState(false);
-  const [revision, setRevision] = useState(0);
-  const selected = records.find(({ id }) => id === selectedId);
-  const filteredRecords = filterProblemBank(
-    records,
-    filters,
-    tagsByProblem,
-    usage,
-  );
-  const dirty =
-    Boolean(
-      content &&
-      savedContent &&
-      JSON.stringify(content) !== JSON.stringify(savedContent),
-    ) ||
-    Boolean(
-      solutions &&
-      savedSolutions &&
-      languages.some(
-        (language) =>
-          JSON.stringify(solutions[language]) !==
-          JSON.stringify(savedSolutions[language]),
-      ),
-    ) ||
-    JSON.stringify(approaches) !== JSON.stringify(savedApproaches);
-  const approachActionsDisabled = dirty || saving || structuralBusy;
-
-  useEffect(() => {
-    if (!dirty && !saving) return;
-    const beforeUnload = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
-      event.returnValue = '';
-    };
-    const guardLink = (event: MouseEvent) => {
-      const target = event.target;
-      if (!(target instanceof Element)) return;
-      const link = target.closest('a[href]');
-      if (!(link instanceof HTMLAnchorElement)) return;
-      if (link.origin !== window.location.origin) return;
-      if (
-        !window.confirm(
-          'Leave this page and discard unsaved Problem Bank changes?',
-        )
-      ) {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-      }
-    };
-    window.addEventListener('beforeunload', beforeUnload);
-    document.addEventListener('click', guardLink, true);
-    return () => {
-      window.removeEventListener('beforeunload', beforeUnload);
-      document.removeEventListener('click', guardLink, true);
-    };
-  }, [dirty, saving]);
+  const [retry, setRetry] = useState(0);
+  const [usageRetry, setUsageRetry] = useState(0);
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState(false);
 
   useEffect(() => {
     let active = true;
-    setLoading(true);
-    setError(null);
+    setLoadState('loading');
+    setUsageState('loading');
+    setRecords([]);
     setUsage({});
-    setTagsByProblem({});
-    setUsageFailed(false);
+    setFilters(emptyProblemBankFilters);
     listOfficerBankProblems().then(
       (items) => {
         if (!active) return;
         setRecords(items);
-        setFilters(emptyProblemBankFilters);
-        setUsageFailed(false);
-        if (items.length === 0) {
-          setUsage({});
-          setTagsByProblem({});
-        } else {
-          listProblemUsageSummaries(
-            items.map(({ id }) => id),
-            true,
-          ).then(
-            (summaries) => {
-              if (active) setUsage(summaries);
-            },
-            () => {
-              if (active) {
-                setUsage({});
-                setUsageFailed(true);
-              }
-            },
-          );
-          listBankProblemApproachTags(
-            items.map(({ id }) => id),
-            true,
-          ).then(
-            (tags) => {
-              if (active) setTagsByProblem(tags);
-            },
-            () => {
-              if (active)
-                setError(
-                  'Problem filter data could not be loaded. Reload the Problem Bank.',
-                );
-            },
-          );
-        }
-        setSelectedId((current) =>
-          current && items.some((item) => item.id === current)
-            ? current
-            : (items[0]?.id ?? null),
-        );
-        setLoading(false);
+        setLoadState('ready');
       },
       () => {
-        if (!active) return;
-        setError('Problem Bank could not be loaded.');
-        setLoading(false);
+        if (active) setLoadState('error');
       },
     );
     return () => {
       active = false;
     };
-  }, [revision]);
+  }, [retry]);
 
   useEffect(() => {
-    if (!selectedId) {
-      setLoadedContentFor(null);
-      setContent(null);
-      setSavedContent(null);
-      setSolutions(null);
-      setSavedSolutions(null);
-      setApproaches([]);
-      setSavedApproaches([]);
+    if (loadState !== 'ready') return;
+    if (!records.length) {
+      setUsage({});
+      setUsageState('ready');
       return;
     }
     let active = true;
-    setContent(null);
-    setSolutions(null);
-    setError(null);
-    getBankProblem(selectedId, true).then(
-      (result) => {
-        if (!active) return;
-        if (!result) {
-          setError('This Problem no longer exists. Reload the Problem Bank.');
-          return;
+    setUsageState('loading');
+    listProblemUsageSummaries(
+      records.map(({ id }) => id),
+      true,
+    ).then(
+      (summaries) => {
+        if (active) {
+          setUsage(summaries);
+          setUsageState('ready');
         }
-        const fields = Object.fromEntries(
-          Object.entries(result.problem).filter(
-            ([key]) => key !== 'id' && key !== 'isTemporarilyHidden',
-          ),
-        ) as BankProblemContent;
-        setContent(fields);
-        setSavedContent(fields);
-        setSolutions(result.solutions);
-        setSavedSolutions(result.solutions);
-        setApproaches(result.approaches);
-        setSavedApproaches(result.approaches);
-        setLoadedContentFor(selectedId);
-        setApproachId(result.approaches[0]?.id ?? 'primary');
-        setLanguage(
-          languages.find((item) =>
-            result.approaches[0]?.solutions[item].code.trim(),
-          ) ?? 'python',
-        );
-        setError(null);
       },
       () => {
-        if (active) setError('Problem content could not be loaded.');
+        if (active) setUsageState('error');
       },
     );
     return () => {
       active = false;
     };
-  }, [revision, selectedId]);
+  }, [loadState, records, usageRetry]);
 
-  const save = useCallback(async () => {
-    if (!selectedId || !content || !solutions || saving) return;
-    setSaving(true);
-    setError(null);
-    try {
-      const work: Promise<void>[] = [];
-      if (
-        savedContent &&
-        JSON.stringify(content) !== JSON.stringify(savedContent)
-      )
-        work.push(updateBankProblem(selectedId, content));
-      for (const language of languages) {
-        if (
-          savedSolutions &&
-          JSON.stringify(solutions[language]) !==
-            JSON.stringify(savedSolutions[language])
-        )
-          work.push(
-            updateBankSolution(
-              selectedId,
-              language,
-              solutions[language],
-              approachId,
-            ),
-          );
-      }
-      // Persist language values before legacy-primary conversion reads the old
-      // flat documents. Once conversion completes, nested data is canonical.
-      await Promise.all(work);
-      if (activeApproach)
-        await updateBankApproach(selectedId, {
-          ...activeApproach,
-          solutions,
-        });
-      const savedApproachList = approaches.map((approach) =>
-        approach.id === approachId ? { ...approach, solutions } : approach,
-      );
-      setSavedContent(content);
-      setSavedSolutions(solutions);
-      setApproaches(savedApproachList);
-      setSavedApproaches(savedApproachList);
-      setRecords((items) =>
-        items.map((item) =>
-          item.id === selectedId ? { ...item, ...content } : item,
-        ),
-      );
-    } catch {
-      setError(
-        'Save failed. Your edits are still here. Check the connection and retry.',
-      );
-    } finally {
-      setSaving(false);
-    }
-  }, [
-    activeApproach,
-    approaches,
-    approachId,
-    content,
-    savedContent,
-    savedSolutions,
-    saving,
-    selectedId,
-    solutions,
-  ]);
+  const branchesByProblem = Object.fromEntries(
+    Object.entries(usage).map(([id, summary]) => [id, summary.branches]),
+  );
+  const filteredRecords = filterProblemBank(
+    records,
+    {
+      ...filters,
+      branch: usageState === 'ready' ? filters.branch : [],
+    },
+    Object.fromEntries(
+      records.map(({ id, approachTagSummary }) => [
+        id,
+        approachTagSummary ?? [],
+      ]),
+    ),
+    branchesByProblem,
+  );
+  const branchesPending = filters.branch.length > 0 && usageState === 'loading';
 
-  async function add() {
-    setError(null);
-    setSaving(true);
+  async function createProblem() {
+    if (creating) return;
+    setCreating(true);
+    setCreateError(false);
     try {
-      const record = await createBankProblem();
-      setRecords((items) => [...items, record]);
-      setSelectedId(record.id);
+      const created = await createBankProblem();
+      router.push(`/officer/problem-bank/${encodeURIComponent(created.id)}`);
     } catch {
-      setError('Problem Bank entry could not be created.');
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function removeSelected(retry = false) {
-    if (!selectedId || dirty || saving || deleting || structuralBusy) return;
-    if (
-      !retry &&
-      !window.confirm(
-        'Delete this reusable Problem Bank source and its stored Approaches and Solutions? Existing Session copies and their history will remain unchanged.',
-      )
-    )
-      return;
-    setDeleting(true);
-    setDeleteError(false);
-    try {
-      await deleteBankProblem(selectedId);
-      const remaining = records.filter((item) => item.id !== selectedId);
-      setRecords(remaining);
-      setUsage((current) => {
-        const next = { ...current };
-        delete next[selectedId];
-        return next;
-      });
-      setTagsByProblem((current) => {
-        const next = { ...current };
-        delete next[selectedId];
-        return next;
-      });
-      setSelectedId(remaining[0]?.id ?? null);
-      setContent(null);
-      setSolutions(null);
-      setError(null);
-    } catch {
-      setDeleteError(true);
-    } finally {
-      setDeleting(false);
+      setCreateError(true);
+      setCreating(false);
     }
   }
 
   return (
-    <section aria-labelledby="problem-bank-heading">
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1
-            className="m-0 text-[28px] font-semibold leading-9 tracking-tight"
-            id="problem-bank-heading"
-          >
-            Problem Bank
-          </h1>
-          <p className="mb-0 mt-1 text-muted">
-            Prepare reusable Problems and their Python, Java, and C++ Solutions.
-            Changes apply to future Session copies; existing Sessions keep their
-            snapshots.
-          </p>
-        </div>
-        <button
-          className={buttonClass}
-          disabled={saving || dirty || deleting}
-          onClick={() => void add()}
-        >
-          + New Problem
-        </button>
-      </div>
-      {error && (
-        <p role="alert">
-          {error}{' '}
-          <button
-            className={buttonClass}
-            onClick={() => setRevision((value) => value + 1)}
-          >
-            Reload
-          </button>
-        </p>
-      )}
-      {loading ? (
-        <p role="status">Loading Problem Bank…</p>
-      ) : records.length === 0 ? (
-        <p>No reusable Problems yet. Create one here or from a Session.</p>
-      ) : (
-        <div className="grid gap-6 lg:grid-cols-[minmax(220px,300px)_minmax(0,1fr)]">
-          <div className="lg:col-span-2">
-            <ProblemBankFilters value={filters} onChange={setFilters} />
-            {filteredRecords.length === 0 && (
-              <p role="status">
-                No Problems match these filters.{' '}
-                <button
-                  className={buttonClass}
-                  onClick={() => setFilters(emptyProblemBankFilters)}
-                >
-                  Clear filters
-                </button>
-              </p>
-            )}
-          </div>
-          <nav aria-label="Bank Problems" className="space-y-5">
-            {problemCategories.map((category) => {
-              const items = filteredRecords.filter(
-                (item) => item.category === category,
-              );
-              return (
-                <section key={category} aria-labelledby={`bank-${category}`}>
-                  <h2
-                    className="mb-2 mt-0 text-base font-semibold"
-                    id={`bank-${category}`}
-                  >
-                    {labels[category]}
-                  </h2>
-                  {items.length ? (
-                    <ul className="m-0 list-none p-0">
-                      {items.map((item) => (
-                        <li key={item.id}>
-                          <button
-                            className={`min-h-11 w-full rounded px-3 py-2 text-left hover:bg-hover ${selectedId === item.id ? 'bg-raised font-semibold' : ''}`}
-                            aria-current={
-                              selectedId === item.id ? 'true' : undefined
-                            }
-                            disabled={saving || dirty || deleting}
-                            onClick={() => setSelectedId(item.id)}
-                          >
-                            {item.title}
-                          </button>
-                          <ProblemUsageMetadata
-                            summary={usage[item.id]}
-                            failed={usageFailed}
-                          />
-                          <div
-                            className="flex flex-wrap items-center gap-1.5 px-3 pb-2"
-                            role="group"
-                            aria-label={`${item.title} classification`}
-                          >
-                            <ProblemDifficultyBadge
-                              difficulty={item.difficulty}
-                            />
-                            <ProblemApproachTags
-                              tags={tagsByProblem[item.id] ?? []}
-                            />
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="m-0 text-sm text-muted">No Problems</p>
-                  )}
-                </section>
-              );
-            })}
-          </nav>
-          {filteredRecords.length > 0 &&
-          selected &&
-          content &&
-          solutions &&
-          loadedContentFor === selected.id ? (
-            <section className="min-w-0" aria-label={`Edit ${selected.title}`}>
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                <button
-                  className={buttonClass}
-                  disabled={!dirty || saving}
-                  onClick={() => void save()}
-                >
-                  {saving ? 'Saving…' : 'Save changes'}
-                </button>
-                <button
-                  className={buttonClass}
-                  disabled={dirty || saving || deleting}
-                  onClick={() => void removeSelected()}
-                >
-                  {deleting ? 'Deleting…' : 'Delete Problem'}
-                </button>
-              </div>
-              {deleteError && (
-                <p role="alert">
-                  Delete failed. The Problem is still in the Bank; retry when
-                  the connection is available.{' '}
-                  <button
-                    className={buttonClass}
-                    disabled={deleting}
-                    onClick={() => void removeSelected(true)}
-                  >
-                    Retry delete
-                  </button>
-                </p>
-              )}
-              <p
-                className="mb-4 mt-0 text-sm text-muted"
-                role="status"
-                aria-live="polite"
-              >
-                {saving ? 'Saving…' : dirty ? 'Unsaved changes' : 'Saved ✓'}
-              </p>
-              <div className="grid min-w-0 gap-6 min-[1350px]:h-[calc(100dvh-14rem)] min-[1350px]:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)] min-[1350px]:gap-0 min-[1350px]:overflow-hidden min-[1350px]:divide-x min-[1350px]:divide-border-soft">
-                <div className="min-w-0 min-[1350px]:h-full min-[1350px]:overflow-y-auto min-[1350px]:overscroll-contain min-[1350px]:pr-5">
-                  <div className="grid max-w-3xl gap-4 sm:grid-cols-2">
-                    <label className="grid gap-1 font-medium">
-                      Problem title
-                      <input
-                        className="ui-field font-normal"
-                        value={content.title}
-                        disabled={saving || deleting}
-                        onChange={(event) =>
-                          setContent({ ...content, title: event.target.value })
-                        }
-                      />
-                    </label>
-                    <label className="grid gap-1 font-medium">
-                      Problem type
-                      <select
-                        className="ui-field font-normal"
-                        value={content.category}
-                        disabled={saving || deleting}
-                        onChange={(event) =>
-                          setContent({
-                            ...content,
-                            category: event.target
-                              .value as BankProblemContent['category'],
-                          })
-                        }
-                      >
-                        {problemCategories.map((category) => (
-                          <option key={category} value={category}>
-                            {labels[category]}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="grid gap-1 font-medium">
-                      Difficulty
-                      <select
-                        className="ui-field font-normal"
-                        value={content.difficulty ?? ''}
-                        disabled={saving || deleting}
-                        onChange={(event) =>
-                          setContent({
-                            ...content,
-                            difficulty: event.target.value
-                              ? (event.target
-                                  .value as BankProblemContent['difficulty'])
-                              : undefined,
-                          })
-                        }
-                      >
-                        <option value="">Not set</option>
-                        <option value="easy">Easy</option>
-                        <option value="medium">Medium</option>
-                        <option value="hard">Hard</option>
-                      </select>
-                    </label>
-                    <label className="grid gap-1 font-medium">
-                      Problem link (optional)
-                      <input
-                        className="ui-field font-normal"
-                        type="url"
-                        disabled={saving || deleting}
-                        value={content.leetcodeUrl ?? ''}
-                        placeholder="https://leetcode.com/problems/two-sum/"
-                        onChange={(event) =>
-                          setContent({
-                            ...content,
-                            leetcodeUrl: event.target.value || undefined,
-                          })
-                        }
-                      />
-                    </label>
-                  </div>
-                  <label className="my-4 grid max-w-3xl gap-1 font-medium">
-                    Description (optional, Markdown supported)
-                    <textarea
-                      className="ui-field min-h-32 font-normal"
-                      value={content.description}
-                      disabled={saving || deleting}
-                      onChange={(event) =>
-                        setContent({
-                          ...content,
-                          description: event.target.value,
-                        })
-                      }
-                    />
-                  </label>
-                  <label className="my-4 grid max-w-3xl gap-1 font-medium">
-                    Constraints (optional)
-                    <textarea
-                      className="ui-field min-h-20 font-normal"
-                      value={content.constraints}
-                      disabled={saving || deleting}
-                      onChange={(event) =>
-                        setContent({
-                          ...content,
-                          constraints: event.target.value,
-                        })
-                      }
-                    />
-                  </label>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <label className="grid gap-1 font-medium">
-                      Example input (optional)
-                      <textarea
-                        className="ui-field min-h-20 font-mono font-normal"
-                        value={content.exampleInput}
-                        disabled={saving}
-                        onChange={(event) =>
-                          setContent({
-                            ...content,
-                            exampleInput: event.target.value,
-                          })
-                        }
-                      />
-                    </label>
-                    <label className="grid gap-1 font-medium">
-                      Expected output (optional)
-                      <textarea
-                        className="ui-field min-h-20 font-mono font-normal"
-                        value={content.exampleOutput}
-                        disabled={saving}
-                        onChange={(event) =>
-                          setContent({
-                            ...content,
-                            exampleOutput: event.target.value,
-                          })
-                        }
-                      />
-                    </label>
-                  </div>
-                </div>
-                <section
-                  className="min-w-0 min-[1350px]:h-full min-[1350px]:overflow-y-auto min-[1350px]:overscroll-contain min-[1350px]:pl-5"
-                  aria-label="Approach and solution"
-                >
-                  {approaches.length > 1 && (
-                    <div
-                      className="mb-3 flex flex-wrap gap-2"
-                      aria-label="Solution approaches"
-                    >
-                      {approaches.map((approach) => (
-                        <button
-                          key={approach.id}
-                          type="button"
-                          className={buttonClass}
-                          disabled={approachActionsDisabled}
-                          aria-pressed={approach.id === approachId}
-                          onClick={() => {
-                            setApproachId(approach.id);
-                            setSolutions(approach.solutions);
-                            setSavedSolutions(approach.solutions);
-                            setLanguage(
-                              languages.find((item) =>
-                                approach.solutions[item].code.trim(),
-                              ) ?? 'python',
-                            );
-                          }}
-                        >
-                          {approach.name}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  <div className="mb-3 flex flex-wrap items-end gap-2">
-                    <button
-                      className={buttonClass}
-                      type="button"
-                      disabled={approachActionsDisabled}
-                      onClick={async () => {
-                        setError(null);
-                        setStructuralBusy(true);
-                        try {
-                          const added = await createApproach(
-                            bankProblemPath(selected.id),
-                          );
-                          const next = [...approaches, added].map(
-                            (approach, order) => ({ ...approach, order }),
-                          );
-                          setApproaches(next);
-                          setSavedApproaches(next);
-                          setApproachId(added.id);
-                          setSolutions(added.solutions);
-                          setSavedSolutions(added.solutions);
-                        } catch {
-                          setError('Approach could not be added. Retry.');
-                        } finally {
-                          setStructuralBusy(false);
-                        }
-                      }}
-                    >
-                      Add Approach
-                    </button>
-                    {activeApproach && (
-                      <>
-                        <label>
-                          Approach name
-                          <input
-                            className="ml-2 rounded border border-border-strong bg-surface px-2 py-2"
-                            disabled={saving || deleting}
-                            value={activeApproach.name}
-                            onChange={(event) =>
-                              setApproaches((items) =>
-                                items.map((item) =>
-                                  item.id === approachId
-                                    ? { ...item, name: event.target.value }
-                                    : item,
-                                ),
-                              )
-                            }
-                          />
-                        </label>
-                        <label>
-                          Tags
-                          <input
-                            className="ml-2 rounded border border-border-strong bg-surface px-2 py-2"
-                            disabled={saving || deleting}
-                            value={activeApproach.tags.join(', ')}
-                            onChange={(event) =>
-                              setApproaches((items) =>
-                                items.map((item) =>
-                                  item.id === approachId
-                                    ? {
-                                        ...item,
-                                        tags: event.target.value
-                                          .split(',')
-                                          .map((tag) => tag.trim())
-                                          .filter(Boolean),
-                                      }
-                                    : item,
-                                ),
-                              )
-                            }
-                          />
-                        </label>
-                        <ProblemApproachTags tags={activeApproach.tags} />
-                        <button
-                          className={buttonClass}
-                          type="button"
-                          disabled={saving || deleting}
-                          onClick={() => void save()}
-                        >
-                          Save approach details
-                        </button>
-                        <button
-                          className={buttonClass}
-                          type="button"
-                          disabled={approachActionsDisabled}
-                          onClick={async () => {
-                            setError(null);
-                            setStructuralBusy(true);
-                            try {
-                              await deleteApproach(
-                                bankProblemPath(selected.id),
-                                approachId,
-                              );
-                              const next = approaches
-                                .filter(
-                                  (approach) => approach.id !== approachId,
-                                )
-                                .map((approach, order) => ({
-                                  ...approach,
-                                  order,
-                                }));
-                              const empty = {
-                                python: { code: '' },
-                                java: { code: '' },
-                                cpp: { code: '' },
-                              };
-                              setApproaches(next);
-                              setSavedApproaches(next);
-                              setApproachId(next[0]?.id ?? '');
-                              setSolutions(next[0]?.solutions ?? empty);
-                              setSavedSolutions(next[0]?.solutions ?? empty);
-                            } catch {
-                              setError('Approach could not be deleted. Retry.');
-                            } finally {
-                              setStructuralBusy(false);
-                            }
-                          }}
-                        >
-                          Delete Approach
-                        </button>
-                        <button
-                          className={buttonClass}
-                          type="button"
-                          disabled={approachActionsDisabled}
-                          onClick={async () => {
-                            const index = approaches.findIndex(
-                              (item) => item.id === approachId,
-                            );
-                            if (index > 0) {
-                              const order = [...approaches];
-                              [order[index - 1], order[index]] = [
-                                order[index],
-                                order[index - 1],
-                              ];
-                              setError(null);
-                              setStructuralBusy(true);
-                              try {
-                                await reorderApproaches(
-                                  bankProblemPath(selected.id),
-                                  order,
-                                );
-                                const next = order.map((item, i) => ({
-                                  ...item,
-                                  order: i,
-                                }));
-                                setApproaches(next);
-                                setSavedApproaches(next);
-                              } catch {
-                                setError(
-                                  'Approaches could not be reordered. Retry.',
-                                );
-                              } finally {
-                                setStructuralBusy(false);
-                              }
-                            }
-                          }}
-                        >
-                          Move Approach earlier
-                        </button>
-                        <button
-                          className={buttonClass}
-                          type="button"
-                          disabled={approachActionsDisabled}
-                          onClick={async () => {
-                            const index = approaches.findIndex(
-                              (item) => item.id === approachId,
-                            );
-                            if (index >= 0 && index < approaches.length - 1) {
-                              const order = [...approaches];
-                              [order[index], order[index + 1]] = [
-                                order[index + 1],
-                                order[index],
-                              ];
-                              setError(null);
-                              setStructuralBusy(true);
-                              try {
-                                await reorderApproaches(
-                                  bankProblemPath(selected.id),
-                                  order,
-                                );
-                                const next = order.map((item, i) => ({
-                                  ...item,
-                                  order: i,
-                                }));
-                                setApproaches(next);
-                                setSavedApproaches(next);
-                              } catch {
-                                setError(
-                                  'Approaches could not be reordered. Retry.',
-                                );
-                              } finally {
-                                setStructuralBusy(false);
-                              }
-                            }
-                          }}
-                        >
-                          Move Approach later
-                        </button>
-                      </>
-                    )}
-                  </div>
-                  {activeApproach?.tags.length ? (
-                    <p className="text-sm text-muted">
-                      {activeApproach.tags.join(' · ')}
-                    </p>
-                  ) : null}
-                  <label className="mb-3 mt-7 grid max-w-sm gap-1 text-sm font-semibold">
-                    Language
-                    <select
-                      className="min-h-11 min-w-0 rounded border border-border-strong bg-surface px-3 text-ink"
-                      aria-label="Language"
-                      value={language}
-                      disabled={saving || deleting}
-                      onChange={(event) =>
-                        setLanguage(event.target.value as Language)
-                      }
-                    >
-                      {languages.map((item) => (
-                        <option key={item} value={item}>
-                          {item === 'cpp'
-                            ? 'C++'
-                            : item[0].toUpperCase() + item.slice(1)}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  {activeApproach ? (
-                    <SolutionPanel
-                      mode="officer"
-                      language={language}
-                      solution={solutions[language]}
-                      modelPath={`bank/${selectedId}/${approachId}/${language}`}
-                      editorHeight={getSharedEditorHeight(solutions)}
-                      onChange={(solution: Solution) =>
-                        setSolutions((current) =>
-                          current
-                            ? { ...current, [language]: solution }
-                            : current,
-                        )
-                      }
-                      disabled={saving || deleting}
-                    />
-                  ) : (
-                    <p>
-                      No solution approaches yet. Add an Approach to prepare
-                      Solutions.
-                    </p>
-                  )}
-                </section>
-              </div>
-              <ProblemUsageHistory
-                summary={usage[selected.id]}
-                failed={usageFailed}
-              />
-            </section>
-          ) : filteredRecords.length === 0 || !selected ? null : (
-            <p role={error ? 'alert' : 'status'}>
-              {error
-                ? 'Problem details could not be loaded. Use Reload above to retry.'
-                : 'Loading selected Problem…'}
+    <main className="min-h-screen bg-canvas text-ink">
+      <section className="ui-page-shell" aria-labelledby="officer-bank-heading">
+        <header className="mb-5 flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h1
+              className="m-0 text-[28px] font-semibold leading-9 tracking-tight"
+              id="officer-bank-heading"
+            >
+              Problem Bank
+            </h1>
+            <p className="mb-0 mt-1 text-muted">
+              Browse reusable Problems and open one to edit its content and
+              Solutions.
             </p>
-          )}
-        </div>
-      )}
-    </section>
+          </div>
+          <Button
+            variant="primary"
+            onClick={() => void createProblem()}
+            disabled={creating}
+          >
+            {creating ? 'Creating Problem…' : '+ New Problem'}
+          </Button>
+        </header>
+        {createError && (
+          <StateMessage role="alert">
+            Problem could not be created. Retry when the connection is
+            available.{' '}
+            <Button onClick={() => void createProblem()}>Retry</Button>
+          </StateMessage>
+        )}
+        {loadState === 'loading' ? (
+          <div className="ui-loading-block mt-5 min-h-56" aria-busy="true">
+            <StateMessage className="sr-only">
+              Loading Problem Bank…
+            </StateMessage>
+            <div className="ui-skeleton mb-5 h-5 w-36" aria-hidden="true" />
+            <div
+              className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
+              aria-hidden="true"
+            >
+              <div className="ui-skeleton h-12" />
+              <div className="ui-skeleton h-12" />
+              <div className="ui-skeleton h-12" />
+            </div>
+          </div>
+        ) : loadState === 'error' ? (
+          <StateMessage role="alert">
+            Problem Bank could not be loaded.{' '}
+            <Button onClick={() => setRetry((value) => value + 1)}>
+              Retry
+            </Button>
+          </StateMessage>
+        ) : records.length === 0 ? (
+          <p>No reusable Problems yet. Create one here or from a Session.</p>
+        ) : (
+          <>
+            {(usageState === 'error' || branchesPending) && (
+              <StateMessage>
+                {usageState === 'error'
+                  ? 'CIC branch filters could not be loaded.'
+                  : 'CIC branch filters are loading; this branch filter is not applied yet.'}{' '}
+                {usageState === 'error' && (
+                  <button
+                    className="underline underline-offset-2"
+                    onClick={() => setUsageRetry((value) => value + 1)}
+                  >
+                    Retry filters
+                  </button>
+                )}
+              </StateMessage>
+            )}
+            <ProblemBankBrowser
+              records={filteredRecords}
+              catalog={catalog}
+              catalogStatus={catalogState.status}
+              catalogError={catalogState.error}
+              onRetryCatalog={() => void catalogState.refresh().catch(() => {})}
+              filters={filters}
+              onFiltersChange={setFilters}
+              tagsByProblem={Object.fromEntries(
+                records.map(({ id, approachTagSummary }) => [
+                  id,
+                  approachTagSummary ?? [],
+                ]),
+              )}
+              hrefForProblem={(id) =>
+                `/officer/problem-bank/${encodeURIComponent(id)}`
+              }
+              idPrefix="officer-bank"
+              noResultsMessage={
+                branchesPending
+                  ? 'No Problems match the available filters; the selected branch filter is not applied yet.'
+                  : 'No Problems match these filters.'
+              }
+              onClearFilters={() => setFilters(emptyProblemBankFilters)}
+            />
+          </>
+        )}
+      </section>
+    </main>
   );
 }
