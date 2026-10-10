@@ -539,22 +539,7 @@ the new application and Rules are both active.
    and no other writer or import script will update Approach tags during the
    maintenance window. Check that the deployed Rules still permit the current
    legacy application. Do not deploy only the new app or only the new Rules.
-2. **Back up Firestore.** Export the full production database to a secured,
-   access-controlled Cloud Storage bucket and wait for the export operation to
-   finish before proceeding. For example, after selecting the production
-   project and an approved bucket:
-
-   ```bash
-   gcloud firestore export gs://BUCKET_NAME/cappycode-pre-dsa-tag-catalog \
-     --project=cappycode-f133c --database='(default)'
-   ```
-
-   See Google's [managed export and import documentation](https://cloud.google.com/firestore/docs/manage-data/export-import).
-   The managed export is a recovery artifact, not a transactionally consistent
-   point-in-time snapshot while writes continue. Keep the Officer write pause
-   in place for the migration window.
-
-3. **Run a dry run.** The command is read-only unless `--write-production` is
+2. **Run a dry run.** The command is read-only unless `--write-production` is
    supplied. It scans all Approach subcollections plus Bank tag summaries and
    reports the target project, tag totals, updates, unknown labels, and ID
    collisions:
@@ -563,7 +548,7 @@ the new application and Rules are both active.
    npm run dsa-tags:migrate
    ```
 
-4. **Reconcile unknown labels.** The 16 built-in labels map to the stable IDs
+3. **Reconcile unknown labels.** The 16 built-in labels map to the stable IDs
    seeded by the migration. For every `unknownLegacyTags` entry, decide whether
    to preserve its exact label or map it to an existing catalog concept. To
    assign a reviewed ID, display label, and color family or resolve a slug
@@ -577,7 +562,7 @@ the new application and Rules are both active.
    with deterministic IDs and the `strategy` color family. Do not use the write
    flag until every unknown is accounted for. The write command requires
    `--accept-unknown-tags` as an explicit acknowledgment.
-5. **Apply in this order.** Keep Officer edits paused. First deploy the new
+4. **Apply in this order.** Keep Officer edits paused. First deploy the new
    Rules and index. Wait until the index is enabled, then run the reviewed
    migration write command. Deploy the new application immediately afterward,
    with the maintenance banner or access control still preventing Officer edits
@@ -598,9 +583,9 @@ the new application and Rules are both active.
    If any step fails after migration writes begin, keep Officer edits paused.
    The migration is rerunnable, but do not resume the legacy writer against
    stable IDs; inspect the dry-run result and either complete the rollout
-   forward or use the approved backup recovery procedure.
+   forward after reviewing the failure and current data state.
 
-6. **Verify before reopening edits.** Rerun the dry run with the same
+5. **Verify before reopening edits.** Rerun the dry run with the same
    reconciliation file and confirm zero Approach documents and Bank summaries
    need migration, no unknown labels or collisions remain, every referenced ID
    resolves to a catalog label, and archived tags remain present for historical
