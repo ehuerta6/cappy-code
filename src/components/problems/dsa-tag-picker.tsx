@@ -21,6 +21,7 @@ import {
   useDsaTagCatalog,
   useDsaTagCatalogReady,
   useDsaTagCatalogRefresh,
+  useDsaTagCatalogState,
 } from './dsa-tag-catalog-provider';
 import { DsaTagBadge } from './problem-bank-metadata';
 
@@ -41,6 +42,7 @@ export default function DsaTagPicker({
   const catalog = useDsaTagCatalog();
   const catalogReady = useDsaTagCatalogReady();
   const refreshCatalog = useDsaTagCatalogRefresh();
+  const catalogState = useDsaTagCatalogState();
   const [search, setSearch] = useState('');
   const [manageOpen, setManageOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -130,7 +132,21 @@ export default function DsaTagPicker({
         className="grid max-h-44 gap-1 overflow-y-auto rounded-lg border border-border-soft p-1"
         aria-label="Tag suggestions"
       >
-        {!catalogReady ? (
+        {catalogState.status === 'error' ? (
+          <div className="m-2 grid gap-2 text-sm" role="alert">
+            <p className="m-0">
+              Could not load DSA tags
+              {catalogState.error ? `: ${catalogState.error}` : '.'}
+            </p>
+            <button
+              className="min-h-10 justify-self-start rounded border border-border-strong px-3"
+              onClick={() => void refreshCatalog().catch(() => {})}
+              type="button"
+            >
+              Retry loading tags
+            </button>
+          </div>
+        ) : !catalogReady ? (
           <p className="m-2 text-sm text-muted">Loading DSA tags…</p>
         ) : suggestions.length ? (
           suggestions.map((tag) => {

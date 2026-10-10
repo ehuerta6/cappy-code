@@ -211,6 +211,10 @@ service cloud.firestore {
       allow delete: if isOfficer();
     }
 
+    match /{path=**}/approaches/{approachId} {
+      allow read: if isOfficer();
+    }
+
     match /sessions/{sessionId} {
       allow read: if isOfficer() || resource.data.status in ['live', 'ended'];
       allow create: if isOfficer()

@@ -1,0 +1,19 @@
+{
+  "indexes": [],
+  "fieldOverrides": [
+    {
+      "collectionGroup": "approaches",
+      "fieldPath": "tags",
+      "indexes": [
+        {
+          "queryScope": "COLLECTION",
+          "arrayConfig": "CONTAINS"
+        },
+        {
+          "queryScope": "COLLECTION_GROUP",
+          "arrayConfig": "CONTAINS"
+        }
+      ]
+    }
+  ]
+}

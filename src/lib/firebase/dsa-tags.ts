@@ -111,10 +111,15 @@ export async function updateDsaTag(tag: DsaTag): Promise<void> {
   });
 }
 
-export async function countDsaTagReferences(tagId: string): Promise<number> {
+export async function countDsaTagReferences(
+  tagId: string,
+  database = getFirestoreDb(),
+): Promise<number> {
+  // Collection-group Rules below authorize Officers across both persisted
+  // hierarchies, including any legacy/orphaned Approach documents.
   const snapshot = await getDocsFromServer(
     query(
-      collectionGroup(getFirestoreDb(), 'approaches'),
+      collectionGroup(database, 'approaches'),
       where('tags', 'array-contains', tagId),
     ),
   );
@@ -127,12 +132,19 @@ export async function archiveDsaTag(tag: DsaTag): Promise<void> {
 
 export async function deleteUnusedDsaTag(tagId: string): Promise<void> {
   const db = officerDb();
-  if ((await countDsaTagReferences(tagId)) > 0) {
+  return deleteDsaTagIfUnused(tagId, db);
+}
+
+export async function deleteDsaTagIfUnused(
+  tagId: string,
+  database: ReturnType<typeof getFirestoreDb>,
+): Promise<void> {
+  if ((await countDsaTagReferences(tagId, database)) > 0) {
     throw new Error(
       'This tag is used by existing Approaches. Archive it to preserve historical content.',
     );
   }
-  await deleteDoc(doc(db, catalogPath, tagId));
+  await deleteDoc(doc(database, catalogPath, tagId));
 }
 
 export async function reorderDsaTags(tags: DsaTag[]): Promise<void> {

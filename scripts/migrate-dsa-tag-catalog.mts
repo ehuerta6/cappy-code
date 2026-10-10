@@ -1,5 +1,6 @@
 import { applicationDefault, initializeApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
+import { readFileSync } from 'node:fs';
 import {
   normalizeDsaTagId,
   orderDsaTagIds,
@@ -33,6 +34,9 @@ const acceptUnknown = process.argv.includes('--accept-unknown-tags');
 const expectedProjectId = process.argv
   .find((arg) => arg.startsWith('--expected-project-id='))
   ?.split('=')[1];
+const reconciliationFile = process.argv
+  .find((arg) => arg.startsWith('--reconciliation-file='))
+  ?.slice('--reconciliation-file='.length);
 const targetProjectId = 'cappycode-f133c';
 if (write && expectedProjectId !== targetProjectId)
   throw new Error(
@@ -47,7 +51,8 @@ if (
     (arg) =>
       arg.startsWith('--') &&
       !['--write-production', '--accept-unknown-tags'].includes(arg) &&
-      !arg.startsWith('--expected-project-id='),
+      !arg.startsWith('--expected-project-id=') &&
+      !arg.startsWith('--reconciliation-file='),
   )
 )
   throw new Error('Unsupported migration flag.');
@@ -62,6 +67,27 @@ const app = initializeApp({
   projectId: targetProjectId,
 });
 const db = getFirestore(app);
+type Reconciliation = { id: string; label: string; family: DsaTag['family'] };
+let reconciliations: Record<string, Reconciliation> = {};
+if (reconciliationFile) {
+  const parsed: unknown = JSON.parse(readFileSync(reconciliationFile, 'utf8'));
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))
+    throw new Error('The reconciliation file must contain a JSON object.');
+  reconciliations = parsed as Record<string, Reconciliation>;
+  for (const [legacyLabel, tag] of Object.entries(reconciliations)) {
+    if (
+      !legacyLabel.trim() ||
+      !tag ||
+      typeof tag.id !== 'string' ||
+      !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(tag.id) ||
+      tag.id.length > 64 ||
+      typeof tag.label !== 'string' ||
+      !tag.label.trim() ||
+      !['data', 'search', 'graph', 'strategy'].includes(tag.family)
+    )
+      throw new Error(`Invalid reconciliation for legacy tag: ${legacyLabel}`);
+  }
+}
 const existingCatalog = await db.collection('dsaTags').get();
 const catalogById = new Map<string, DsaTag>(
   initialDsaTags.map((tag) => [tag.id, tag]),
@@ -69,12 +95,41 @@ const catalogById = new Map<string, DsaTag>(
 for (const entry of existingCatalog.docs)
   catalogById.set(entry.id, { id: entry.id, ...entry.data() } as DsaTag);
 const knownCatalogIds = new Set(catalogById.keys());
+const reconciledTagsById = new Map<string, Reconciliation>();
+for (const [legacyLabel, tag] of Object.entries(reconciliations)) {
+  const previous = reconciledTagsById.get(tag.id);
+  if (
+    previous &&
+    (previous.label.trim() !== tag.label.trim() ||
+      previous.family !== tag.family)
+  )
+    throw new Error(
+      `Reconciliations for ${tag.id} disagree on label or family; use one canonical definition.`,
+    );
+  const existing = catalogById.get(tag.id);
+  if (
+    existing &&
+    (existing.label.trim() !== tag.label.trim() ||
+      existing.family !== tag.family)
+  )
+    throw new Error(
+      `Reconciliation for ${legacyLabel} targets existing tag ${tag.id} with a different label or family. Match the existing catalog definition.`,
+    );
+  reconciledTagsById.set(tag.id, tag);
+}
 const approaches = await db.collectionGroup('approaches').get();
 const observedUnknown = new Set<string>();
 const labelsByUnknownId = new Map<string, Set<string>>();
+const usedReconciliations = new Set<string>();
 const bankTagsByProblem = new Map<string, string[]>();
+function idForLegacyTag(label: string): string {
+  const reconciliation = reconciliations[label];
+  if (reconciliation) usedReconciliations.add(label);
+  return reconciliation?.id ?? normalizeDsaTagId(label);
+}
 function includeUnknownLegacyTag(label: string) {
-  const id = normalizeDsaTagId(label);
+  const reconciliation = reconciliations[label];
+  const id = idForLegacyTag(label);
   if (knownCatalogIds.has(id)) return;
   observedUnknown.add(label);
   const labels = labelsByUnknownId.get(id) ?? new Set<string>();
@@ -83,8 +138,8 @@ function includeUnknownLegacyTag(label: string) {
   if (!catalogById.has(id))
     catalogById.set(id, {
       id,
-      label,
-      family: 'strategy',
+      label: reconciliation?.label.trim() ?? label,
+      family: reconciliation?.family ?? 'strategy',
       order: catalogById.size,
       active: true,
     });
@@ -106,7 +161,9 @@ for (const entry of approaches.docs) {
     ]);
   }
   values.forEach(includeUnknownLegacyTag);
-  const tags = orderDsaTagIds(values, [...catalogById.values()]);
+  const tags = orderDsaTagIds(values.map(idForLegacyTag), [
+    ...catalogById.values(),
+  ]);
   if (JSON.stringify(tags) !== JSON.stringify(raw))
     updates.push({ ref: entry.ref, tags });
 }
@@ -121,12 +178,17 @@ for (const parent of bankParents.docs) {
     ? raw.filter((tag): tag is string => typeof tag === 'string')
     : (bankTagsByProblem.get(parent.id) ?? []);
   sourceTags.forEach(includeUnknownLegacyTag);
-  const tags = orderDsaTagIds(sourceTags, [...catalogById.values()]);
+  const tags = orderDsaTagIds(sourceTags.map(idForLegacyTag), [
+    ...catalogById.values(),
+  ]);
   if (JSON.stringify(tags) !== JSON.stringify(raw))
     summaries.push({ ref: parent.ref, tags });
 }
 const collisions = [...labelsByUnknownId.entries()]
-  .filter(([, labels]) => labels.size > 1)
+  .filter(
+    ([, labels]) =>
+      labels.size > 1 && [...labels].some((label) => !reconciliations[label]),
+  )
   .map(([id, labels]) => ({ id, labels: [...labels].sort() }));
 console.log(
   JSON.stringify(
@@ -139,6 +201,10 @@ console.log(
       bankSummariesToMigrate: summaries.length,
       unknownLegacyTags: [...observedUnknown].sort(),
       tagIdCollisions: collisions,
+      reconciledLegacyTags: [...usedReconciliations].sort(),
+      unusedReconciliations: Object.keys(reconciliations)
+        .filter((label) => !usedReconciliations.has(label))
+        .sort(),
     },
     null,
     2,

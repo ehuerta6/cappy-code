@@ -13,17 +13,33 @@ import type { DsaTag } from '@/lib/dsa-tags';
 
 const DsaTagCatalogContext = createContext<{
   tags: DsaTag[];
-  ready: boolean;
+  status: 'loading' | 'ready' | 'error';
+  error: string | null;
   refresh: () => Promise<void>;
-}>({ tags: [], ready: true, refresh: async () => {} });
+}>({ tags: [], status: 'ready', error: null, refresh: async () => {} });
 
 export function DsaTagCatalogProvider({ children }: { children: ReactNode }) {
   const [catalog, setCatalog] = useState<DsaTag[]>([]);
-  const [ready, setReady] = useState(false);
+  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>(
+    'loading',
+  );
+  const [error, setError] = useState<string | null>(null);
   const refresh = useCallback(async () => {
-    const tags = await listDsaTags(true);
-    setCatalog(tags);
-    setReady(true);
+    setStatus('loading');
+    setError(null);
+    try {
+      const tags = await listDsaTags(true);
+      setCatalog(tags);
+      setStatus('ready');
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : 'Could not load the DSA tag catalog.',
+      );
+      setStatus('error');
+      throw cause;
+    }
   }, []);
   useEffect(() => {
     let active = true;
@@ -31,13 +47,17 @@ export function DsaTagCatalogProvider({ children }: { children: ReactNode }) {
       (tags) => {
         if (active) {
           setCatalog(tags);
-          setReady(true);
+          setStatus('ready');
         }
       },
-      () => {
+      (cause: unknown) => {
         if (active) {
-          setCatalog([]);
-          setReady(true);
+          setError(
+            cause instanceof Error
+              ? cause.message
+              : 'Could not load the DSA tag catalog.',
+          );
+          setStatus('error');
         }
       },
     );
@@ -46,7 +66,9 @@ export function DsaTagCatalogProvider({ children }: { children: ReactNode }) {
     };
   }, []);
   return (
-    <DsaTagCatalogContext.Provider value={{ tags: catalog, ready, refresh }}>
+    <DsaTagCatalogContext.Provider
+      value={{ tags: catalog, status, error, refresh }}
+    >
       {children}
     </DsaTagCatalogContext.Provider>
   );
@@ -61,5 +83,10 @@ export function useDsaTagCatalogRefresh() {
 }
 
 export function useDsaTagCatalogReady() {
-  return useContext(DsaTagCatalogContext).ready;
+  return useContext(DsaTagCatalogContext).status === 'ready';
+}
+
+export function useDsaTagCatalogState() {
+  const { status, error } = useContext(DsaTagCatalogContext);
+  return { status, error };
 }

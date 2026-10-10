@@ -69,6 +69,25 @@ describe('DsaTagPicker', () => {
     expect(onChange).toHaveBeenCalledWith(['hash-map']);
   });
 
+  it('shows a recoverable catalog error and retries loading', async () => {
+    catalog.listDsaTags
+      .mockReset()
+      .mockRejectedValueOnce(new Error('Permission denied'))
+      .mockResolvedValue(initialDsaTags);
+    render(
+      <DsaTagCatalogProvider>
+        <DsaTagPicker selected={[]} onChange={vi.fn()} />
+      </DsaTagCatalogProvider>,
+    );
+
+    expect((await screen.findByRole('alert')).textContent).toContain(
+      'Could not load DSA tags: Permission denied',
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Retry loading tags' }));
+    expect(await screen.findByRole('button', { name: /Arrays/ })).toBeTruthy();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
   it('selects tags with the keyboard', async () => {
     const onChange = vi.fn();
     const user = userEvent.setup();

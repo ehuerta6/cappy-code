@@ -8,6 +8,7 @@ import {
 } from '@firebase/rules-unit-testing';
 import {
   collection,
+  collectionGroup,
   deleteDoc,
   deleteField,
   doc,
@@ -19,8 +20,20 @@ import {
   updateDoc,
   where,
   writeBatch,
+  type Firestore as ModularFirestore,
 } from 'firebase/firestore';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { countDsaTagReferences, deleteDsaTagIfUnused } from './dsa-tags';
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest';
+
+vi.mock('client-only', () => ({}));
 
 const projectId = 'demo-cappycode-rules';
 let environment: RulesTestEnvironment;
@@ -282,6 +295,83 @@ describe('DSA tag catalog authorization', () => {
         order: 0,
       }),
     );
+  });
+});
+
+describe('DSA tag deletion integration', () => {
+  it('blocks deletion for Bank and Session references and deletes an unused tag', async () => {
+    const officer = environment
+      .authenticatedContext('tag-manager', {
+        firebase: { sign_in_provider: 'password' },
+      })
+      .firestore();
+    await environment.withSecurityRulesDisabled(async (context) => {
+      const database = context.firestore();
+      for (const id of ['bank-only', 'session-only', 'orphan-only', 'unused'])
+        await setDoc(doc(database, `dsaTags/${id}`), {
+          label: id,
+          family: 'data',
+          order: 0,
+          active: false,
+        });
+      await setDoc(doc(database, 'problemBank/bank-tagged'), { title: 'Bank' });
+      await setDoc(doc(database, 'sessions/history'), {
+        title: 'History',
+        status: 'ended',
+      });
+      await setDoc(doc(database, 'sessions/history/problems/problem-tagged'), {
+        title: 'Problem',
+      });
+      await setDoc(
+        doc(database, 'problemBank/bank-tagged/approaches/primary'),
+        { name: 'Primary', tags: ['bank-only'], order: 0 },
+      );
+      await setDoc(
+        doc(
+          database,
+          'sessions/history/problems/problem-tagged/approaches/primary',
+        ),
+        { name: 'Primary', tags: ['session-only'], order: 0 },
+      );
+      await setDoc(doc(database, 'problemBank/orphan/approaches/primary'), {
+        name: 'Orphaned historical Approach',
+        tags: ['orphan-only'],
+        order: 0,
+      });
+    });
+
+    const modularOfficer = officer as unknown as ModularFirestore;
+    expect(await countDsaTagReferences('bank-only', modularOfficer)).toBe(1);
+    expect(await countDsaTagReferences('session-only', modularOfficer)).toBe(1);
+    expect(await countDsaTagReferences('orphan-only', modularOfficer)).toBe(1);
+    const anonymous = environment.unauthenticatedContext().firestore();
+    await assertFails(
+      getDocs(
+        query(
+          collectionGroup(anonymous, 'approaches'),
+          where('tags', 'array-contains', 'bank-only'),
+        ),
+      ),
+    );
+
+    await expect(
+      deleteDsaTagIfUnused('bank-only', modularOfficer),
+    ).rejects.toThrow('used by existing Approaches');
+    await expect(
+      deleteDsaTagIfUnused('session-only', modularOfficer),
+    ).rejects.toThrow('used by existing Approaches');
+    await expect(
+      deleteDsaTagIfUnused('orphan-only', modularOfficer),
+    ).rejects.toThrow('used by existing Approaches');
+    await expect(
+      deleteDsaTagIfUnused('unused', modularOfficer),
+    ).resolves.toBeUndefined();
+
+    await assertSucceeds(getDoc(doc(officer, 'dsaTags/bank-only')));
+    await assertSucceeds(getDoc(doc(officer, 'dsaTags/session-only')));
+    await assertSucceeds(getDoc(doc(officer, 'dsaTags/orphan-only')));
+    await assertSucceeds(getDoc(doc(officer, 'dsaTags/unused')));
+    expect((await getDoc(doc(officer, 'dsaTags/unused'))).exists()).toBe(false);
   });
 });
 
