@@ -287,13 +287,9 @@ export function PublicSessionView({ state }: { state: SessionState }) {
               ? 'You do not have permission to view this Session.'
               : 'Session updates could not be synchronized. Check your connection and retry.'}
           </p>
-          <button
-            className="min-h-11 rounded border border-border-strong bg-surface px-3 py-2 text-ink hover:bg-hover"
-            type="button"
-            onClick={state.onRetry}
-          >
+          <Button className="min-h-11" onClick={state.onRetry}>
             Retry session updates
-          </button>
+          </Button>
         </section>
       ) : (
         <SessionContent key={state.session.id} state={state} />
@@ -390,13 +386,9 @@ function SessionContent({
               ? 'You do not have permission to view these Problems.'
               : 'Problems could not be loaded. Check your connection and retry.'}
           </p>
-          <button
-            className="min-h-11 rounded border border-border-strong bg-surface px-3 py-2 hover:bg-hover"
-            type="button"
-            onClick={state.problems.onRetry}
-          >
+          <Button className="min-h-11" onClick={state.problems.onRetry}>
             Retry problems
-          </button>
+          </Button>
         </div>
       ) : requestedProblemId !== null && !selectedProblem ? (
         <section role="alert" aria-labelledby="problem-unavailable-title">
@@ -624,12 +616,12 @@ function ProblemContent({
             role="status"
           >
             <p>Answer visibility could not be synchronized.</p>
-            <button
-              type="button"
+            <Button
+              className="min-h-11"
               onClick={() => setVisibilityRetry((value) => value + 1)}
             >
               Retry sync
-            </button>
+            </Button>
           </div>
         ) : !visibility.value ? (
           <div className="flex min-h-40 flex-col items-center justify-center border border-border-soft bg-surface p-6 text-center">
@@ -732,12 +724,12 @@ function RevealedSolutions({
         role="alert"
       >
         <p>Solutions could not be loaded.</p>
-        <button
-          type="button"
+        <Button
+          className="min-h-11"
           onClick={() => setRetryCount((count) => count + 1)}
         >
           Retry solutions
-        </button>
+        </Button>
       </div>
     );
   }
