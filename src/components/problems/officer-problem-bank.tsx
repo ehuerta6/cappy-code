@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import ProblemBankBrowser from './problem-bank-browser';
 import {
   useDsaTagCatalog,
-  useDsaTagCatalogReady,
+  useDsaTagCatalogState,
 } from './dsa-tag-catalog-provider';
 import { Button, StateMessage } from '@/components/ui/primitives';
 import {
@@ -25,7 +25,7 @@ type LoadState = 'loading' | 'ready' | 'error';
 
 export default function OfficerProblemBank() {
   const catalog = useDsaTagCatalog();
-  const catalogReady = useDsaTagCatalogReady();
+  const catalogState = useDsaTagCatalogState();
   const router = useRouter();
   const [records, setRecords] = useState<BankProblemRecord[]>([]);
   const [usage, setUsage] = useState<Record<string, ProblemUsageSummary>>({});
@@ -196,7 +196,9 @@ export default function OfficerProblemBank() {
             <ProblemBankBrowser
               records={filteredRecords}
               catalog={catalog}
-              catalogReady={catalogReady}
+              catalogStatus={catalogState.status}
+              catalogError={catalogState.error}
+              onRetryCatalog={() => void catalogState.refresh().catch(() => {})}
               filters={filters}
               onFiltersChange={setFilters}
               tagsByProblem={Object.fromEntries(

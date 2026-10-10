@@ -29,7 +29,7 @@ import {
 import type { SessionBranch } from '@/lib/domain';
 import {
   useDsaTagCatalog,
-  useDsaTagCatalogReady,
+  useDsaTagCatalogState,
 } from '@/components/problems/dsa-tag-catalog-provider';
 
 type MetadataLoad<T> =
@@ -43,7 +43,7 @@ const labels = {
 
 export function MemberProblemBank() {
   const catalog = useDsaTagCatalog();
-  const catalogReady = useDsaTagCatalogReady();
+  const catalogState = useDsaTagCatalogState();
   const [state, setState] = useState<
     | { status: 'loading' }
     | { status: 'error' }
@@ -184,7 +184,9 @@ export function MemberProblemBank() {
             <ProblemBankBrowser
               records={filteredRecords}
               catalog={catalog}
-              catalogReady={catalogReady}
+              catalogStatus={catalogState.status}
+              catalogError={catalogState.error}
+              onRetryCatalog={() => void catalogState.refresh().catch(() => {})}
               filters={filters}
               onFiltersChange={setFilters}
               tagsByProblem={Object.fromEntries(

@@ -87,6 +87,6 @@ export function useDsaTagCatalogReady() {
 }
 
 export function useDsaTagCatalogState() {
-  const { status, error } = useContext(DsaTagCatalogContext);
-  return { status, error };
+  const { status, error, refresh } = useContext(DsaTagCatalogContext);
+  return { status, error, refresh };
 }
