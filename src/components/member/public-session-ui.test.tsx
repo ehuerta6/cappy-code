@@ -341,6 +341,12 @@ describe('public member UI scaffold', () => {
       within(problemContent).getAllByRole('heading', { name: 'Examples' }),
     ).toHaveLength(1);
     expect(
+      within(problemContent).getByRole('heading', { name: 'Examples' }).tagName,
+    ).toBe('H3');
+    expect(
+      within(problemContent).getByRole('heading', { name: 'Input' }).tagName,
+    ).toBe('H4');
+    expect(
       within(problemContent).getByRole('heading', { name: 'Input' }),
     ).toBeTruthy();
     expect(

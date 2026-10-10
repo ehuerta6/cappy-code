@@ -358,6 +358,7 @@ export function MemberBankProblemPage({ problemId }: { problemId: string }) {
                   id={problemId}
                   input={currentState.problem.exampleInput}
                   output={currentState.problem.exampleOutput}
+                  headingLevel={2}
                 />
               </div>
               <section

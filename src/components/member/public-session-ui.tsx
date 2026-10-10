@@ -559,6 +559,7 @@ function ProblemContent({
                 id={problem.id}
                 input={problem.exampleInput}
                 output={problem.exampleOutput}
+                headingLevel={3}
               />
             </div>
           </section>

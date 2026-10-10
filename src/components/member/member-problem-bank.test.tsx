@@ -471,6 +471,10 @@ describe('Member Problem Bank metadata', () => {
       expect(screen.getByText('Arrays').dataset.tagFamily).toBe('data');
       expect(screen.getByText('Find the pair.')).toBeTruthy();
       expect(screen.getByText('Prepared Solutions')).toBeTruthy();
+      expect(screen.getByRole('heading', { name: 'Examples' }).tagName).toBe(
+        'H2',
+      );
+      expect(screen.getByRole('heading', { name: 'Input' }).tagName).toBe('H3');
       const problemLink = screen.getByRole('link', {
         name: 'Problem link ↗',
       });
