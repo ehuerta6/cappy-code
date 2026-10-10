@@ -116,24 +116,28 @@ preview results do not establish production behavior. Avoid creating production
 content for routine checks; production data changes require a separately
 approved operation.
 
-## Verified production Firestore target (#134)
+## Historical production verification from October 8, 2026 (#134)
 
-Verified on October 8, 2026 against Vercel and Firebase configuration:
+This records the production configuration observed on October 8, 2026. It is
+historical verification and does not identify the current production
+deployment. At that time:
 
 - Vercel project: `cappycode`, connected to `ehuerta6/cappy-code`.
-- Current production deployment: READY, built from `main` at
+- Production deployment observed: READY, built from `main` at
   `484656a02a79abcf13d620f2095090a37bca3dc0`.
-- The Vercel Production environment's `NEXT_PUBLIC_FIREBASE_PROJECT_ID` is
-  `cappycode-f133c`; `NEXT_PUBLIC_USE_FIREBASE_EMULATORS` is `false`.
-- The deployed client calls Firebase's default `getFirestore` instance. The
-  active Firebase project `cappycode-f133c` has the native Firestore database
+- At that time, the Vercel Production environment's
+  `NEXT_PUBLIC_FIREBASE_PROJECT_ID` was `cappycode-f133c` and
+  `NEXT_PUBLIC_USE_FIREBASE_EMULATORS` was `false`.
+- The deployed client called Firebase's default `getFirestore` instance. The
+  Firebase project `cappycode-f133c` had the native Firestore database
   `projects/cappycode-f133c/databases/(default)`.
 
-Therefore the deployed CappyCode app and the intended #131 import target are
-`cappycode-f133c` / `(default)`. This verification used the Vercel Production
-deployment and environment configuration plus Firebase project/database
-metadata, not `.firebaserc` or local emulator settings. No secret values are
-recorded here. No production data was written during verification.
+That verification identified `cappycode-f133c` / `(default)` as the deployed
+app's Firestore target and the intended #131 import target at the time. It used
+the Vercel Production deployment and environment configuration plus Firebase
+project/database metadata, not `.firebaserc` or local emulator settings. No
+secret values are recorded here. No production data was written during
+verification.
 
 ## Local and production configuration
 
@@ -363,10 +367,11 @@ missing value as empty, with no migration required. Officers can enter a link in
 Problem editor, where a blank value clears the field and a nonblank value must
 be an HTTPS URL on `leetcode.com` or `www.leetcode.com` at `/problems/{slug}`.
 The link saves with the Problem's explicit **Save changes** workflow. Members
-see **View on LeetCode** only when a link exists. The Officer Sessions dashboard
-loads an ordered Problem summary under each Past Session, using existing
-Problem documents to show titles, descriptions, constraints, and links (or the Officer-only
-**No LeetCode link provided** label). Draft and live Sessions do not load this
+see **Problem link ↗** when a link exists. The Officer Sessions dashboard loads
+Past Session Problem history on demand when an Officer expands **Show
+Problems**. It reads the ordered Problem documents to show titles, descriptions,
+constraints, and links under the **Problem link:** label, or **No Problem link
+provided** when a link is absent. Draft and live Sessions do not load this
 history, and no separate history records are stored.
 No Solution documents or Solution fields are created in Problem metadata.
 Server reads validate the existing `Problem` model and reject pending writes.
@@ -416,10 +421,10 @@ officer workspace requests all three fixed documents from the server when a
 Problem is selected. It does not store Solution fields in Problem metadata.
 
 The Problem editor prepares the shared example input and expected output. The
-three integrated Solution panels appear below the selected Problem content and
-contain a language heading and Monaco source editor. Source updates stay local
-while editing; the selected Problem's single explicit save persists dirty
-Problem content and language documents.
+Solution workspace lets the Officer select an Approach and a Language, then
+shows one Monaco editor for that selection. Source and complexity edits stay
+local while editing; the selected Problem's explicit save persists dirty
+Problem content and language Solutions.
 Confirmed language documents stay confirmed if another write fails. Failed saves
 retain edits, identify the affected Language, and can be retried without rewriting
 clean language documents. Unsaved changes block Problem switching and leaving the
