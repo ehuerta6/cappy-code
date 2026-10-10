@@ -19,6 +19,7 @@ import {
 
 const presentation = vi.hoisted(() => ({
   answersVisible: false,
+  visibilityStatus: 'ready' as 'ready' | 'error' | 'loading',
 }));
 const navigation = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }));
 
@@ -27,7 +28,7 @@ vi.mock('next/navigation', () => ({ useRouter: () => navigation }));
 vi.mock('@/hooks/use-answer-visibility', async (original) => ({
   ...(await original<typeof import('@/hooks/use-answer-visibility')>()),
   useAnswersVisible: () => ({
-    status: 'ready',
+    status: presentation.visibilityStatus,
     value: presentation.answersVisible,
   }),
 }));
@@ -60,6 +61,7 @@ vi.mock('@monaco-editor/react', () => ({
 
 beforeEach(() => {
   presentation.answersVisible = false;
+  presentation.visibilityStatus = 'ready';
   navigation.push.mockClear();
   navigation.replace.mockClear();
   window.localStorage.clear();
@@ -260,7 +262,49 @@ describe('public member UI scaffold', () => {
       <PublicSessionDiscovery state={{ status: 'error', onRetry: retry }} />,
     );
     fireEvent.click(screen.getByRole('button', { name: 'Retry sessions' }));
+    expect(
+      screen.getByRole('button', { name: 'Retry sessions' }).className,
+    ).toContain('ui-button');
     expect(retry).toHaveBeenCalledOnce();
+  });
+
+  it('uses shared focusable buttons for Member recovery controls', async () => {
+    const load = vi.fn().mockRejectedValueOnce(new Error('temporary failure'));
+    const failedProblemState = {
+      ...viewState(load),
+      problems: {
+        status: 'error' as const,
+        errorKind: 'connection' as const,
+        onRetry: vi.fn(),
+      },
+    };
+    const { rerender } = render(
+      <PublicSessionView state={failedProblemState} />,
+    );
+    const retryProblems = screen.getByRole('button', {
+      name: 'Retry problems',
+    });
+    expect(retryProblems.className).toContain('ui-button');
+    retryProblems.focus();
+    expect(document.activeElement).toBe(retryProblems);
+
+    presentation.visibilityStatus = 'error';
+    rerender(<PublicSessionView state={viewState(load)} />);
+    const retrySync = screen.getByRole('button', { name: 'Retry sync' });
+    expect(retrySync.className).toContain('ui-button');
+    expect(screen.queryByLabelText('Python Solution, read-only')).toBeNull();
+
+    presentation.visibilityStatus = 'ready';
+    presentation.answersVisible = true;
+    rerender(
+      <PublicSessionView
+        state={viewState(load, [{ ...problems[1], answersVisible: true }])}
+      />,
+    );
+    const retrySolutions = await screen.findByRole('button', {
+      name: 'Retry solutions',
+    });
+    expect(retrySolutions.className).toContain('ui-button');
   });
 
   it('opens a permitted session and routes ordered problem tabs', () => {
