@@ -45,6 +45,34 @@ export interface PublicProblem {
   difficulty?: ProblemDifficulty;
 }
 
+function restoreProblemTabFocus(key: string, problemId: string) {
+  let attempts = 0;
+  const focusWhenReady = () => {
+    try {
+      if (window.sessionStorage.getItem(key) !== problemId) return;
+      const tab = document.getElementById(
+        `problem-tab-${problemId}`,
+      ) as HTMLButtonElement | null;
+      if (tab?.getAttribute('aria-selected') === 'true') {
+        tab.focus();
+        if (document.activeElement === tab) {
+          window.sessionStorage.removeItem(key);
+          return;
+        }
+      }
+      attempts += 1;
+      if (attempts < 180) {
+        window.requestAnimationFrame(focusWhenReady);
+      } else {
+        window.sessionStorage.removeItem(key);
+      }
+    } catch {
+      // Focus restoration is an enhancement; navigation still works if storage is unavailable.
+    }
+  };
+  window.requestAnimationFrame(focusWhenReady);
+}
+
 export type DiscoveryState =
   | { status: 'loading' }
   | {
@@ -320,6 +348,19 @@ function SessionContent({
   const selectedProblem = problems.find(
     (problem) => problem.id === effectiveSelectedProblemId,
   );
+  const problemTabFocusKey = `member-problem-tab-focus:${state.session.id}`;
+
+  useEffect(() => {
+    try {
+      const requestedFocusId =
+        window.sessionStorage.getItem(problemTabFocusKey);
+      if (!requestedFocusId) return;
+      if (requestedFocusId !== effectiveSelectedProblemId) return;
+      restoreProblemTabFocus(problemTabFocusKey, requestedFocusId);
+    } catch {
+      // Focus restoration is an enhancement; navigation still works if storage is unavailable.
+    }
+  }, [effectiveSelectedProblemId, problemTabFocusKey]);
 
   useEffect(() => {
     if (
@@ -340,6 +381,11 @@ function SessionContent({
   ]);
 
   function selectProblem(problemId: string) {
+    try {
+      window.sessionStorage.setItem(problemTabFocusKey, problemId);
+    } catch {
+      // Keep route navigation available when browser storage is unavailable.
+    }
     router.push(
       `/sessions/${encodeURIComponent(state.session.id)}/${encodeURIComponent(problemId)}`,
     );
@@ -449,7 +495,6 @@ function ProblemTabs({
       event.preventDefault();
       const nextProblem = problems[nextIndex];
       onSelect(nextProblem.id);
-      document.getElementById(`problem-tab-${nextProblem.id}`)?.focus();
     }
   }
 
@@ -466,6 +511,11 @@ function ProblemTabs({
           type="button"
           role="tab"
           aria-selected={problem.id === selectedId}
+          aria-controls={
+            problem.id === selectedId
+              ? `problem-panel-${problem.id}`
+              : undefined
+          }
           className="min-h-12 shrink-0 rounded-t px-3 py-2 text-[15px] font-medium text-muted hover:bg-hover hover:text-ink focus-visible:relative focus-visible:z-10 aria-selected:border-b-2 aria-selected:border-accent aria-selected:font-semibold aria-selected:text-ink"
           tabIndex={problem.id === selectedId ? 0 : -1}
           onClick={() => onSelect(problem.id)}

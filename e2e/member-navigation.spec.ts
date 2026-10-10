@@ -1,6 +1,28 @@
 import { execFileSync } from 'node:child_process';
 import { expect, test } from '@playwright/test';
 
+function contrastRatio(foreground: string, background: string) {
+  const luminance = (color: string) => {
+    const channels = color
+      .match(/[\d.]+/g)
+      ?.slice(0, 3)
+      .map(Number);
+    if (!channels || channels.length !== 3)
+      throw new Error(`Invalid color: ${color}`);
+    const [red, green, blue] = channels.map((channel) => {
+      const value = channel / 255;
+      return value <= 0.04045
+        ? value / 12.92
+        : ((value + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+  };
+  const values = [luminance(foreground), luminance(background)].sort(
+    (a, b) => b - a,
+  );
+  return (values[0] + 0.05) / (values[1] + 0.05);
+}
+
 function resetEmulators() {
   execFileSync(process.execPath, ['scripts/reset-emulator.mjs'], {
     cwd: process.cwd(),
@@ -10,7 +32,7 @@ function resetEmulators() {
 
 test('Members can browse live, ended, and bank content without selection fallback', async ({
   page,
-}) => {
+}, testInfo) => {
   resetEmulators();
 
   await page.goto('/');
@@ -42,12 +64,60 @@ test('Members can browse live, ended, and bank content without selection fallbac
   await introHistory.getByRole('link', { name: /Hash Maps & Arrays/ }).click();
   await expect(page).toHaveURL(/\/sessions\/live-hash-maps\/two-sum$/);
   await expect(page.getByRole('heading', { name: 'Two Sum' })).toBeVisible();
-  await page
-    .getByRole('tab', { name: 'Custom: First Repeated Workshop ID' })
-    .click();
+  const liveStatus = page.getByText('Live', { exact: true });
+  const liveColors = await liveStatus.evaluate((element) => ({
+    foreground: getComputedStyle(element).color,
+    background: getComputedStyle(element).backgroundColor,
+  }));
+  expect(
+    contrastRatio(liveColors.foreground, liveColors.background),
+  ).toBeGreaterThanOrEqual(4.5);
+  const themeToggle = page.getByRole('button', { name: 'Toggle color theme' });
+  if ((await page.locator('html').getAttribute('data-theme')) !== 'light') {
+    await themeToggle.click();
+  }
+  const lightLiveColors = await liveStatus.evaluate((element) => ({
+    foreground: getComputedStyle(element).color,
+    background: getComputedStyle(element).backgroundColor,
+  }));
+  expect(
+    contrastRatio(lightLiveColors.foreground, lightLiveColors.background),
+  ).toBeGreaterThanOrEqual(4.5);
+  await themeToggle.click();
+  const darkLiveColors = await liveStatus.evaluate((element) => ({
+    foreground: getComputedStyle(element).color,
+    background: getComputedStyle(element).backgroundColor,
+  }));
+  expect(
+    contrastRatio(darkLiveColors.foreground, darkLiveColors.background),
+  ).toBeGreaterThanOrEqual(4.5);
+  await themeToggle.click();
+  const firstTab = page.getByRole('tab', { name: 'Two Sum' });
+  await expect(firstTab).toHaveAttribute(
+    'aria-controls',
+    'problem-panel-two-sum',
+  );
+  await firstTab.focus();
+  await firstTab.press('ArrowRight');
   await expect(page).toHaveURL(
     /\/sessions\/live-hash-maps\/custom-frequency-map$/,
   );
+  const selectedTab = page.getByRole('tab', {
+    name: 'Custom: First Repeated Workshop ID',
+  });
+  await expect(selectedTab).toBeFocused();
+  await expect(selectedTab).toHaveAttribute(
+    'aria-controls',
+    'problem-panel-custom-frequency-map',
+  );
+  await expect(page.getByRole('tabpanel')).toHaveAttribute(
+    'aria-labelledby',
+    'problem-tab-custom-frequency-map',
+  );
+  await selectedTab.press('Tab');
+  await expect(page.getByRole('tabpanel')).toBeFocused();
+  await page.keyboard.press('Shift+Tab');
+  await expect(selectedTab).toBeFocused();
   await expect(
     page.getByRole('heading', { name: 'Custom: First Repeated Workshop ID' }),
   ).toBeVisible();
@@ -79,6 +149,109 @@ test('Members can browse live, ended, and bank content without selection fallbac
   await expect(
     page.getByRole('heading', { name: 'Campus Pair Sum' }),
   ).toBeVisible();
+  await page.setViewportSize({ width: 1440, height: 384 });
+  await expect
+    .poll(() =>
+      page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+    )
+    .toBe(true);
+  const problemRegion = page.getByRole('region', {
+    name: 'Problem',
+    exact: true,
+  });
+  const solutionsRegion = page
+    .getByRole('heading', { name: 'Solutions' })
+    .locator('xpath=..');
+  await expect
+    .poll(() =>
+      Promise.all([
+        problemRegion.evaluate(
+          (element) => element.scrollHeight > element.clientHeight,
+        ),
+        solutionsRegion.evaluate(
+          (element) => element.scrollHeight > element.clientHeight,
+        ),
+      ]),
+    )
+    .toEqual([true, true]);
+  await page.screenshot({
+    path: testInfo.outputPath('member-session-wide-low-height.png'),
+    fullPage: true,
+  });
+  await problemRegion.focus();
+  await page.keyboard.press('PageDown');
+  await expect
+    .poll(() => problemRegion.evaluate((element) => element.scrollTop))
+    .toBeGreaterThan(0);
+  await page.setViewportSize({ width: 683, height: 384 });
+  await expect
+    .poll(() =>
+      page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+    )
+    .toBe(true);
+  await expect(
+    page.getByRole('region', { name: 'Python' }).locator('.view-lines'),
+  ).toBeVisible();
+  await page.screenshot({
+    path: testInfo.outputPath('member-session-reduced-height.png'),
+    fullPage: true,
+  });
+  await problemRegion.focus();
+  await page.keyboard.press('Tab');
+  await page.keyboard.press('Shift+Tab');
+  await expect(problemRegion).toBeFocused();
+  await expect
+    .poll(() =>
+      problemRegion.evaluate(
+        (element) => getComputedStyle(element).outlineWidth,
+      ),
+    )
+    .toBe('2px');
+  const languageSelect = page.getByLabel('Language');
+  await languageSelect.focus();
+  await page.keyboard.press('Tab');
+  await page.keyboard.press('Shift+Tab');
+  await expect(languageSelect).toBeFocused();
+  await expect
+    .poll(() =>
+      languageSelect.evaluate(
+        (element) => getComputedStyle(element).outlineWidth,
+      ),
+    )
+    .toBe('2px');
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await expect
+    .poll(() =>
+      page
+        .locator('.bg-monaco')
+        .first()
+        .evaluate((element) =>
+          Number.parseFloat(getComputedStyle(element).transitionDuration),
+        ),
+    )
+    .toBeLessThan(0.001);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect
+    .poll(() =>
+      page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+    )
+    .toBe(true);
+  await page.screenshot({
+    path: testInfo.outputPath('member-session-narrow.png'),
+    fullPage: true,
+  });
+  await themeToggle.click();
+  const firstThemeBackground = await page
+    .locator('.bg-monaco')
+    .first()
+    .evaluate((element) => getComputedStyle(element).backgroundColor);
+  await themeToggle.click();
+  const secondThemeBackground = await page
+    .locator('.bg-monaco')
+    .first()
+    .evaluate((element) => getComputedStyle(element).backgroundColor);
+  expect(secondThemeBackground).not.toBe(firstThemeBackground);
+  await page.setViewportSize({ width: 1440, height: 900 });
 
   await page.goto('/sessions/ended-intro-review');
   await expect(page).toHaveURL(

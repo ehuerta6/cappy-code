@@ -32,11 +32,11 @@
   --border-strong: #b8c2cc;
   --text-primary: #18212b;
   --text-secondary: #65717d;
-  --text-muted: #8a949e;
+  --text-muted: #65717d;
   --accent: #2563eb;
   --accent-hover: #1d4ed8;
   --accent-contrast: #ffffff;
-  --success: #3f8f5f;
+  --success: #2f7048;
   --success-surface: #edf7f0;
   --warning: #8a5a16;
   --danger: #b42335;
@@ -62,7 +62,7 @@
   --border-strong: #35404c;
   --text-primary: #e6ebf0;
   --text-secondary: #a0aab5;
-  --text-muted: #707b87;
+  --text-muted: #8a949e;
   --accent: #4d8dff;
   --accent-hover: #69a0ff;
   --accent-contrast: #0f1318;
@@ -93,7 +93,7 @@
     --border-strong: #35404c;
     --text-primary: #e6ebf0;
     --text-secondary: #a0aab5;
-    --text-muted: #707b87;
+    --text-muted: #8a949e;
     --accent: #4d8dff;
     --accent-hover: #69a0ff;
     --accent-contrast: #0f1318;
@@ -144,6 +144,8 @@
   a:focus-visible,
   input:focus-visible,
   textarea:focus-visible,
+  select:focus-visible,
+  [role='region']:focus-visible,
   [role='tabpanel']:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 2px;

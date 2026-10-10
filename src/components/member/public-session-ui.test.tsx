@@ -65,6 +65,7 @@ beforeEach(() => {
   navigation.push.mockClear();
   navigation.replace.mockClear();
   window.localStorage.clear();
+  window.sessionStorage.clear();
   document.documentElement.removeAttribute('data-theme');
   vi.stubGlobal('matchMedia', () => ({
     matches: false,
@@ -76,6 +77,7 @@ afterEach(() => {
   cleanup();
   document.documentElement.removeAttribute('data-theme');
   window.localStorage.clear();
+  window.sessionStorage.clear();
   vi.unstubAllGlobals();
 });
 
@@ -307,7 +309,7 @@ describe('public member UI scaffold', () => {
     expect(retrySolutions.className).toContain('ui-button');
   });
 
-  it('opens a permitted session and routes ordered problem tabs', () => {
+  it('opens a permitted session and routes ordered problem tabs', async () => {
     const load = vi.fn().mockResolvedValue(solutions);
     const { container, rerender } = render(
       <PublicSessionView state={viewState(load)} />,
@@ -321,6 +323,11 @@ describe('public member UI scaffold', () => {
       'First problem',
       'Second problem',
     ]);
+    expect(tabs[0].getAttribute('aria-controls')).toBe('problem-panel-first');
+    expect(tabs[1].getAttribute('aria-controls')).toBeNull();
+    expect(screen.getByRole('tabpanel').getAttribute('aria-labelledby')).toBe(
+      'problem-tab-first',
+    );
     expect(screen.getByText('First description')).toBeTruthy();
     expect(screen.getByText('Medium')).toBeTruthy();
     expect(screen.getByText('first input')).toBeTruthy();
@@ -372,9 +379,6 @@ describe('public member UI scaffold', () => {
     fireEvent.keyDown(screen.getByRole('tab', { name: 'First problem' }), {
       key: 'ArrowRight',
     });
-    expect(document.activeElement).toBe(
-      screen.getByRole('tab', { name: 'Second problem' }),
-    );
     expect(navigation.push).toHaveBeenCalledWith(
       '/sessions/live-session/later',
     );
@@ -383,19 +387,36 @@ describe('public member UI scaffold', () => {
         state={{ ...viewState(load), selectedProblemId: 'later' }}
       />,
     );
+    expect(
+      screen
+        .getByRole('tab', { name: 'Second problem' })
+        .getAttribute('aria-controls'),
+    ).toBe('problem-panel-later');
+    expect(
+      screen
+        .getByRole('tab', { name: 'First problem' })
+        .getAttribute('aria-controls'),
+    ).toBeNull();
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByRole('tab', { name: 'Second problem' }),
+      ),
+    );
     fireEvent.keyDown(screen.getByRole('tab', { name: 'Second problem' }), {
       key: 'ArrowLeft',
     });
     expect(navigation.push).toHaveBeenLastCalledWith(
       '/sessions/live-session/first',
     );
-    expect(document.activeElement).toBe(
-      screen.getByRole('tab', { name: 'First problem' }),
-    );
     rerender(
       <PublicSessionView
         state={{ ...viewState(load), selectedProblemId: 'first' }}
       />,
+    );
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByRole('tab', { name: 'First problem' }),
+      ),
     );
     fireEvent.keyDown(screen.getByRole('tab', { name: 'First problem' }), {
       key: 'End',
@@ -403,19 +424,31 @@ describe('public member UI scaffold', () => {
     expect(navigation.push).toHaveBeenLastCalledWith(
       '/sessions/live-session/later',
     );
-    expect(document.activeElement).toBe(
-      screen.getByRole('tab', { name: 'Second problem' }),
-    );
     rerender(
       <PublicSessionView
         state={{ ...viewState(load), selectedProblemId: 'later' }}
       />,
+    );
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByRole('tab', { name: 'Second problem' }),
+      ),
     );
     fireEvent.keyDown(screen.getByRole('tab', { name: 'Second problem' }), {
       key: 'Home',
     });
     expect(navigation.push).toHaveBeenLastCalledWith(
       '/sessions/live-session/first',
+    );
+    rerender(
+      <PublicSessionView
+        state={{ ...viewState(load), selectedProblemId: 'first' }}
+      />,
+    );
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByRole('tab', { name: 'First problem' }),
+      ),
     );
     expect(screen.queryByRole('checkbox')).toBeNull();
     expect(load).not.toHaveBeenCalled();
