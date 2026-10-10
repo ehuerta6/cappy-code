@@ -18,9 +18,9 @@ Branch names should use:
 Examples:
 
 ```text
-feat/add-player-inventory
-fix/game-reset-state
-docs/update-local-setup
+feat/add-session-filter
+fix/problem-navigation
+docs/update-readme
 ```
 
 For CappyCode, examples may include:
@@ -65,7 +65,7 @@ A branch named:
 feat/code-editor
 ```
 
-should not also introduce deployment configuration, unrelated documentation rewrites, and a new API architecture unless those changes are genuinely required for the editor feature.
+should not also introduce deployment configuration, unrelated documentation rewrites, or a new API architecture unless those changes are required for that issue.
 
 ## GitHub Issues
 
@@ -81,14 +81,8 @@ This should appear in the PR description.
 
 Make sure the branch is based on the latest `main`.
 
-Run the project's relevant checks before opening the PR:
-
-- lint;
-- typecheck;
-- tests;
-- production build.
-
-The exact commands should be documented in the repository once the technical stack is finalized.
+Run the checks relevant to the change before opening the PR. The current
+commands are listed in [Getting started](GETTING_STARTED.md#development-checks).
 
 ## Pull Request Description
 
@@ -129,7 +123,7 @@ Remove `Closes #123` when the PR is not associated with an Issue.
 
 ## Merging
 
-Merge PRs using **Squash and Merge**.
+After review and approval, merge PRs using **Squash and Merge**.
 
 The squash commit on `main` should use the PR title so merged history stays clean:
 

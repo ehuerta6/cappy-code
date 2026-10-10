@@ -11,7 +11,7 @@ Copy the local example and start the emulators in one terminal:
 
 ```bash
 cp .env.example .env.local
-npm install
+npm ci
 npm run emulators
 ```
 
@@ -86,11 +86,11 @@ production.
 
 The Next.js production app is deployed to Vercel at
 <https://cappycode.vercel.app>. The Vercel project `cappycode` is connected to
-the GitHub repository `ehuerta6/cappy-code` (formerly
-`ehuerta6/multi-language-ide`) and uses `main` as its production branch. Changes
-merged to `main` trigger production deployments. Firebase remains the backend
-for Firestore, Authentication, and Security Rules; do not enable Firebase App
-Hosting or upgrade the Firebase project to Blaze for this deployment.
+the GitHub repository `ehuerta6/cappy-code` and uses `main` as its production
+branch. Changes merged to `main` trigger production deployments. Firebase
+provides Authentication and Firestore; Firestore Security Rules deploy
+separately. The project stays on Firebase Spark. Do not enable Firebase App
+Hosting, Blaze, Storage, or another paid Firebase service.
 
 Configure the following project-level Vercel variables for the **Production**
 environment, using the Web app config from the existing Firebase project
@@ -110,55 +110,54 @@ Firestore requests target `cappycode-f133c`; production requests must not use
 localhost or emulator endpoints. Deploy Firestore Security Rules separately
 with the Firebase CLI when Rules changes are in scope.
 
-For a production release, verify anonymous Member access and authenticated
-Officer workflows with the production account, including explicit Save,
-LeetCode links and history, solution reveal/hide, Session lifecycle and ended
-archive, Monaco languages, and themes. Use only approved temporary smoke data
-and remove it when finished. Do not treat emulator or preview-deployment
-results as production verification.
+For an authorized production release, verify anonymous Member access and
+authenticated Officer workflows against the deployed application. Emulator or
+preview results do not establish production behavior. Avoid creating production
+content for routine checks; production data changes require a separately
+approved operation.
 
-## Verified production Firestore target (#134)
+## Historical production verification from October 8, 2026 (#134)
 
-Verified on October 8, 2026 against Vercel and Firebase configuration:
+This records the production configuration observed on October 8, 2026. It is
+historical verification and does not identify the current production
+deployment. At that time:
 
 - Vercel project: `cappycode`, connected to `ehuerta6/cappy-code`.
-- Current production deployment: READY, built from `main` at
+- Production deployment observed: READY, built from `main` at
   `484656a02a79abcf13d620f2095090a37bca3dc0`.
-- The Vercel Production environment's `NEXT_PUBLIC_FIREBASE_PROJECT_ID` is
-  `cappycode-f133c`; `NEXT_PUBLIC_USE_FIREBASE_EMULATORS` is `false`.
-- The deployed client calls Firebase's default `getFirestore` instance. The
-  active Firebase project `cappycode-f133c` has the native Firestore database
+- At that time, the Vercel Production environment's
+  `NEXT_PUBLIC_FIREBASE_PROJECT_ID` was `cappycode-f133c` and
+  `NEXT_PUBLIC_USE_FIREBASE_EMULATORS` was `false`.
+- The deployed client called Firebase's default `getFirestore` instance. The
+  Firebase project `cappycode-f133c` had the native Firestore database
   `projects/cappycode-f133c/databases/(default)`.
 
-Therefore the deployed CappyCode app and the intended #131 import target are
-`cappycode-f133c` / `(default)`. This verification used the Vercel Production
-deployment and environment configuration plus Firebase project/database
-metadata, not `.firebaserc` or local emulator settings. No secret values are
-recorded here. No production data was written during verification.
+That verification identified `cappycode-f133c` / `(default)` as the deployed
+app's Firestore target and the intended #131 import target at the time. It used
+the Vercel Production deployment and environment configuration plus Firebase
+project/database metadata, not `.firebaserc` or local emulator settings. No
+secret values are recorded here. No production data was written during
+verification.
 
-## Local setup
+## Local and production configuration
 
-1. Create or select a Firebase project in the [Firebase Console](https://console.firebase.google.com/).
-2. Register a Web app under **Project settings → General → Your apps**. Copy its SDK configuration values. The [official Web SDK setup guide](https://firebase.google.com/docs/web/setup) describes these steps.
-3. Create the default Cloud Firestore database under **Build → Firestore Database**, using production mode. Deploy [`firestore.rules`](../firestore.rules) before enabling public Session access.
-4. Copy the checked-in environment example at the repository root:
+Use the Auth and Firestore emulators for development, tests, and destructive
+testing. Follow [Getting started](GETTING_STARTED.md) for the supported
+`npm ci`, seed, reset, and development commands. The local example uses the
+`demo-cappycode-local` project ID and cannot fall back to production.
 
-   ```bash
-   cp .env.example .env.local
-   ```
+Production uses Firebase project `cappycode-f133c` with the existing Web app
+configuration. Vercel supplies the `NEXT_PUBLIC_FIREBASE_*` values and sets
+`NEXT_PUBLIC_USE_FIREBASE_EMULATORS=false`. Next.js embeds `NEXT_PUBLIC_`
+values in the production build, so configuration changes require a new
+deployment. These Firebase client values are public configuration, not
+authorization credentials. Never put Officer passwords, service account keys,
+or server secrets in them. `.env.local` is ignored by Git.
 
-5. Fill in these values from the Web app configuration:
-
-   | Environment variable               | Firebase config field |
-   | ---------------------------------- | --------------------- |
-   | `NEXT_PUBLIC_FIREBASE_API_KEY`     | `apiKey`              |
-   | `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` | `authDomain`          |
-   | `NEXT_PUBLIC_FIREBASE_PROJECT_ID`  | `projectId`           |
-   | `NEXT_PUBLIC_FIREBASE_APP_ID`      | `appId`               |
-
-6. Install dependencies with `npm install`, then start the existing application with `npm run dev`. Restart the server after changing `.env.local`.
-
-These are public Firebase client configuration values, bundled into browser code by Next.js. They are not authorization credentials. Never put officer passwords, service account keys, or server secrets in `NEXT_PUBLIC_` variables. `.env.local` is ignored by Git. Storage, Analytics, and Messaging configuration is unnecessary for this foundation.
+Firebase remains on Spark and is used for Authentication, Firestore, and
+Firestore Security Rules. Production web hosting is on Vercel. There is no
+Firebase App Hosting deployment or paid Firebase service. Deploy Firestore
+Rules separately when an approved change requires it.
 
 ## Client access
 
@@ -179,7 +178,7 @@ Builds and normal unit tests require no live Firebase project. Concrete Session,
 
 ## Officer authentication
 
-Enable **Email/Password** under Firebase Console → Authentication → Sign-in method, then create the single shared CIC Intro officer account under **Users → Add user**. Configure the application's host under Authentication → Settings → Authorized domains if needed. Keep the account password outside the repository and environment example. There is no signup or member account flow.
+Enable **Email/Password** under Firebase Console → Authentication → Sign-in method, then create the shared CIC Officer account under **Users → Add user**. Configure the application's host under Authentication → Settings → Authorized domains if needed. Keep the account password outside the repository and environment example. There is no signup or member account flow.
 
 The secondary **Officer Login** link opens `/officer`. Its layout uses `OfficerAuthGate`, which renders a checking state until `useOfficerAuth()` receives Firebase's `onAuthStateChanged` result. Anonymous visitors see a compact login form; only confirmed authenticated users see the protected page. Initialization failures show an unavailable state without exposing Firebase configuration/errors. Logout calls Firebase `signOut`, hides protected content while pending, and returns to the login form when Firebase reports an anonymous session. Member Mode stays accessible through the public link throughout.
 
@@ -368,10 +367,11 @@ missing value as empty, with no migration required. Officers can enter a link in
 Problem editor, where a blank value clears the field and a nonblank value must
 be an HTTPS URL on `leetcode.com` or `www.leetcode.com` at `/problems/{slug}`.
 The link saves with the Problem's explicit **Save changes** workflow. Members
-see **View on LeetCode** only when a link exists. The Officer Sessions dashboard
-loads an ordered Problem summary under each Past Session, using existing
-Problem documents to show titles, descriptions, constraints, and links (or the Officer-only
-**No LeetCode link provided** label). Draft and live Sessions do not load this
+see **Problem link ↗** when a link exists. The Officer Sessions dashboard loads
+Past Session Problem history on demand when an Officer expands **Show
+Problems**. It reads the ordered Problem documents to show titles, descriptions,
+constraints, and links under the **Problem link:** label, or **No Problem link
+provided** when a link is absent. Draft and live Sessions do not load this
 history, and no separate history records are stored.
 No Solution documents or Solution fields are created in Problem metadata.
 Server reads validate the existing `Problem` model and reject pending writes.
@@ -421,10 +421,10 @@ officer workspace requests all three fixed documents from the server when a
 Problem is selected. It does not store Solution fields in Problem metadata.
 
 The Problem editor prepares the shared example input and expected output. The
-three integrated Solution panels appear below the selected Problem content and
-contain a language heading and Monaco source editor. Source updates stay local
-while editing; the selected Problem's single explicit save persists dirty
-Problem content and language documents.
+Solution workspace lets the Officer select an Approach and a Language, then
+shows one Monaco editor for that selection. Source and complexity edits stay
+local while editing; the selected Problem's explicit save persists dirty
+Problem content and language Solutions.
 Confirmed language documents stay confirmed if another write fails. Failed saves
 retain edits, identify the affected Language, and can be retried without rewriting
 clean language documents. Unsaved changes block Problem switching and leaving the

@@ -1,67 +1,123 @@
-# Project Scope
+# Project scope
 
-## Product definition
+## Product
 
-CappyCode is **a live solution showcase platform for CIC sessions** across Intro, General, and ICPC. CIC officers prepare problems and their solutions ahead of time, then present them to members during a session. Members join through an anonymous, read-only public view.
+CappyCode is a live solution showcase for Coding Interview Club (CIC) Intro,
+General, and ICPC sessions. All three branches use one shared workflow. Officers
+prepare content before a session; Members follow along through an anonymous,
+read-only view.
 
-CappyCode is not an IDE, code translator, transpiler, AI product, online judge, or code-execution tool. Officers prepare Problem examples and source code; the runtime displays that content without generating or executing it.
+The current product is a prepared-content presenter. It displays source code and
+expected output entered by Officers. It does not generate, translate, compile,
+or execute code, assess solutions, or accept submissions.
 
 ## Users and access
 
 ### Officers
 
-CIC officers are the authenticated content managers and presenters. Firebase Authentication is used only for Officer Mode. The proof of concept has one shared CIC officer account. Officers can create and manage sessions, add and order problems, prepare solution content, and control answer visibility.
+Officers sign in with Firebase Authentication to prepare Session and Problem
+content, manage the Problem Bank, and control live solution reveals. Officer
+edits remain local until the relevant explicit **Save changes** action confirms
+the write. Save states distinguish unsaved edits, saving, success, and errors;
+failed edits remain available to retry. Production currently uses one shared
+Officer account.
 
 ### Members
 
-Members are anonymous viewers. They do not create accounts or authenticate. Member Mode provides anonymous, read-only access to every live and ended session. Draft sessions are officer-only. Problem descriptions and examples are public for live and ended sessions. Live-session Solution documents are readable only when their Problem's `answersVisible` is true. Every fixed-language Solution for an ended session is publicly readable under Firestore Security Rules.
+Members do not sign in. They can read live and ended Sessions and Problem Bank
+entries that are not hidden by a live Session. They cannot edit content. In a
+live Session, Problem descriptions and examples are public while
+prepared Solutions stay protected until revealed. Ended Sessions form the
+public archive, where their prepared Solutions are readable.
 
-## Persistence and architecture
+Firestore Security Rules enforce these permissions. Hiding a Solution in the
+interface alone is not a security boundary.
 
-Firestore is the canonical persistence layer. It stores session content, session history, prepared solutions, and each problem's answer visibility. Firebase Authentication protects Officer Mode; public membership does not depend on authentication.
+## Shared Session → Problem → Solution workflow
 
-Keep problem metadata separate from solution documents. Metadata includes the problem title, description, shared example input and expected output, order, and `answersVisible`. These fields are member-readable for live and ended sessions; a draft's metadata remains officer-only. Live solutions are protected until revealed, while ended-session solutions are public. Solution documents include manually prepared Python, Java, and C++ source. Separation lets Firestore Security Rules enforce answer access independently of what the UI renders.
+Intro, General, and ICPC use the same data model and Officer and Member flows;
+they are branch values, not separate applications. Each branch can have one
+live Session at a time, so the three branches can present concurrently.
 
-Firestore Security Rules are the actual hidden-answer permission boundary. A hidden answer must not be readable by an anonymous member client. Live Solution-document reads require the parent Problem's `answersVisible` to be true. Ended-session Solution reads do not depend on `answersVisible`; draft Solutions remain officer-only. Rules also restrict session and problem management to authenticated officers. UI state such as **Hide Answers** is not a substitute for these rules.
+Officers create a draft Session, add and order Problems, prepare content, and
+then make the Session live. A Session moves through `draft`, `live`, and
+`ended`; ended Sessions are terminal. Officers can take a live Session offline
+and return it to draft. Ending a Session makes it public in the archive without
+changing each Problem's answer visibility value. A live Session can contain
+multiple ordered Problems. Member Problem selection is independent and does not
+change Session state.
 
-Problem Bank content is public by default and is hidden while referenced by any
-live Session. Intro, General, and ICPC may each have one live Session at the
-same time. Not Live, End, and supported live Session deletion release only that
-Session's references; a shared Bank Problem remains hidden until its final live
-use stops. Firestore Rules enforce this for Bank metadata and nested content.
+Each Problem stores its title, description, constraints, shared example input
+and expected output, order, and `answersVisible` state. Problem metadata is
+separate from protected Solution documents. The example and expected output
+appear once with the Problem statement; expected output is authored content,
+not program execution output.
 
-## Session model and presentation behavior
+A Problem may have multiple named Solution Approaches. Each Approach can carry
+DSA/algorithm tags and language-specific prepared code and complexity details.
+Members select one Approach and one language at a time. Python, Java, and C++
+are first-class supported languages. Monaco is the code presentation and
+editing surface: Members see read-only code, while Officers edit prepared code.
 
-Sessions have three states:
+For a live Session, **Show Answers** and **Hide Answers** update the selected
+Problem's `answersVisible` value. Member views receive the change in realtime.
+Rules permit anonymous reads of the fixed-language Solution documents only
+while that value is true. Ended Session Solutions are public regardless of the
+stored value; draft Session content remains Officer-only.
 
-- `draft` — officers prepare and order session problems and their content; members cannot read the session or its problem metadata.
-- `live` — members can read the session and its problem metadata; the officer controls each problem's answer visibility, which gates member Solution access.
-- `ended` — the session remains in officer history and appears in the public Past sessions archive; all prepared Solutions are public regardless of `answersVisible`.
+## Problem Bank
 
-A session contains multiple ordered problems. Each problem has a description and examples, its own `answersVisible` field, and separately stored solution content. Members choose problems independently in their own view.
+The Problem Bank stores reusable Problems separately from Session snapshots.
+Problems are grouped as Custom, Interview-style, or Competitive Programming.
+Officers can prepare their metadata, Approaches, language Solutions, and
+complexity details. Public Bank discovery supports name search and filters for
+CIC branch usage, difficulty, category, and DSA/algorithm tags. Search and
+filtering operate on the loaded list. Bank detail uses the same Problem and
+Solution workspace as Session content.
 
-The public home shows Live now and Past sessions, including an explicit no-live state. **Show Answers** and **Hide Answers** update `answersVisible` only for a live session; members viewing that Problem receive changes in realtime. Ending a Session changes only its status and does not rewrite child Problems.
+Bank entries are public unless currently used by a live Session. Legacy
+publication fields do not control current Member visibility. A shared Bank
+Problem stays hidden until its last live Session use ends. The visibility
+marker and Firestore Rules enforce this behavior. Adding a Bank Problem to a
+Session copies its content into a Session snapshot so later Bank edits do not
+rewrite Session history.
 
-## Editors and presentation UI
+## Current interface behavior
 
-Show the Problem's shared example input and expected output once before the three Python, Java, and C++ solutions. There is no source-language selector and no translation flow. Monaco editors are editable in Officer Mode for preparing solutions, and read-only in Member Mode.
+Member Session and Problem Bank details use a responsive Problem/Solution
+workspace. The Problem statement and selected prepared Solution have distinct
+columns on wider screens and stack on narrow screens. Only one read-only Monaco
+editor is shown at a time; long lines wrap within its viewport and long files
+scroll vertically. Problem links and metadata use concise labels. Bank search
+and filters have a compact responsive toolbar, with one filter menu open at a
+time. Tags use a consistent restrained color treatment, with text labels
+retained.
 
-The interface is presentation-focused: responsive, readable at a distance, and clear on the projected screen used during a CIC Intro session. Preserve a layout that keeps the problem and the three language panels easy to compare.
+Member and Officer screens share navigation, controls, status treatments, and
+loading and error patterns. Officer Session history is disclosed when needed;
+the workspace clarifies which edits each Save action persists. See [Design](../design.md)
+for the detailed interface source of truth.
 
-## Content scope
+## Persistence and hosting
 
-Officers prepare common interview-style problems and solutions, including topics such as arrays and strings, hash maps and sets, stacks and queues, linked lists, two pointers, sliding window, binary search, trees, graph traversal, recursion, and introductory dynamic programming. The app stores and displays prepared content; it does not assess whether a solution is correct.
+Firestore is the canonical persistence layer for Sessions, Problems, Solutions,
+Bank records, and live answer visibility. Firebase Authentication protects
+Officer Mode. The local Auth and Firestore Emulator Suite supports development
+and tests using deterministic fixtures. Production uses the existing Firebase
+project on the Spark plan; production web hosting runs on Vercel. Firestore
+Security Rules deploy separately from the web application. Do not enable Blaze
+or paid Firebase services.
 
-## Out of scope
+## Product boundaries
 
-- Accounts, profiles, or authentication for public members.
-- Multiple officer accounts or granular officer roles in the proof of concept; it uses one shared officer account.
-- Runtime AI or LLM features, prompt engineering, coding model providers, model API keys, or generated explanations.
-- Automatic or manual code translation, source-language selection, parsers, Tree-sitter, AST translation, intermediate representations, emitters, or transpilers.
-- Code execution, compilers, interpreters, online judging, test runners, or sandboxing.
-- Browser `localStorage` as canonical persistence; Firestore is the source of truth.
-- Unrelated general-purpose IDE capabilities or arbitrary application translation.
+- No public Member accounts, profiles, submissions, or member writes.
+- No separate Intro, General, or ICPC applications or workflows.
+- No runtime AI, LLM, code generation, translation, or explanation generation.
+- No compilers, interpreters, execution, online judging, test runners, or
+  sandboxing.
+- No browser `localStorage` as canonical persistence; Firestore is authoritative.
+- No Firebase App Hosting or paid Firebase services.
 
-## Product principle
-
-New work should help CIC officers present prepared solutions clearly and help members follow live sessions safely and readably.
+This scope describes implemented behavior and current product decisions. Future
+work remains planned until it is implemented and verified; track it in [GitHub
+Issues](https://github.com/ehuerta6/cappy-code/issues).
