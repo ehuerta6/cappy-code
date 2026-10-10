@@ -1072,7 +1072,11 @@ describe('Officer Sessions surface', () => {
     fireEvent.blur(title);
     expect(api.updateProblem).not.toHaveBeenCalled();
     expect(screen.queryByRole('alert')).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Save Problem and Solution changes',
+      }),
+    );
     await screen.findByRole('alert');
     expect(
       (
@@ -1122,7 +1126,11 @@ describe('Officer Sessions surface', () => {
     });
     expect((backButton as HTMLButtonElement).disabled).toBe(true);
     expect(api.updateSolution).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Save Problem and Solution changes',
+      }),
+    );
     fireEvent.click(backButton);
     expect(screen.getByLabelText('Session problems')).toBeTruthy();
     await waitFor(() =>
@@ -1185,7 +1193,11 @@ describe('Officer Sessions surface', () => {
     ).toBeNull();
     expect(api.duplicateSession).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Save Problem and Solution changes',
+      }),
+    );
     await waitFor(() =>
       expect(api.updateSolution).toHaveBeenCalledWith(
         'session-id',
@@ -1253,7 +1265,11 @@ describe('Officer Sessions surface', () => {
     expect(api.updateProblem).not.toHaveBeenCalled();
     expect(api.updateSolution).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Save Problem and Solution changes',
+      }),
+    );
     await screen.findByText(/Java Solution could not be saved/);
     expect(api.updateProblem).toHaveBeenCalledOnce();
     expect(api.updateProblem).toHaveBeenCalledWith('session-id', 'problem', {
@@ -1335,7 +1351,11 @@ describe('Officer Sessions surface', () => {
       target: { value: 'changed source' },
     });
     expect(api.updateSolution).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Save Problem and Solution changes',
+      }),
+    );
     await waitFor(() =>
       expect(api.updateSolution).toHaveBeenCalledWith(
         'session-id',
@@ -1475,7 +1495,7 @@ describe('Officer Sessions surface', () => {
     window.history.replaceState(null, '', '/');
   });
 
-  it('saves metadata and Problem edits together while keeping a failed Solution dirty', async () => {
+  it('saves Session and Problem edits separately while keeping a failed Solution dirty', async () => {
     api.listProblems.mockResolvedValue([
       {
         id: 'problem',
@@ -1502,15 +1522,13 @@ describe('Officer Sessions surface', () => {
     fireEvent.change(screen.getByLabelText('Python Solution, editable'), {
       target: { value: 'print(1)' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
-    await waitFor(() =>
-      expect(api.updateSession).toHaveBeenCalledWith('session-id', {
-        branch: 'intro',
-        title: 'Updated Session',
-        date: '2026-10-08',
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Save Problem and Solution changes',
       }),
     );
     await waitFor(() => expect(api.updateProblem).toHaveBeenCalled());
+    expect(api.updateSession).not.toHaveBeenCalled();
     expect(await screen.findByText('Save failed — Retry')).toBeTruthy();
     expect(
       (
@@ -1519,7 +1537,18 @@ describe('Officer Sessions surface', () => {
         ) as HTMLTextAreaElement
       ).value,
     ).not.toBe('');
-    fireEvent.click(screen.getByRole('button', { name: 'Retry save' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Save Session changes' }),
+    );
+    await waitFor(() =>
+      expect(api.updateSession).toHaveBeenCalledWith('session-id', {
+        branch: 'intro',
+        title: 'Updated Session',
+        date: '2026-10-08',
+      }),
+    );
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
     await screen.findByText('Saved ✓');
     expect(api.updateSession).toHaveBeenCalledTimes(1);
     expect(api.updateProblem).toHaveBeenCalledTimes(1);

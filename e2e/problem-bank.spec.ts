@@ -101,7 +101,7 @@ test('Officer edits and reuses a bank Problem as an independent Session snapshot
     await officer
       .getByRole('listitem')
       .filter({ hasText: bankTitle })
-      .getByRole('button', { name: 'Add to Session' })
+      .getByRole('button', { name: `Add ${bankTitle} to Session` })
       .click();
     await expect(officer.getByLabel('Problem title')).toHaveValue(bankTitle);
     await expect(officer.getByLabel('Problem category')).toHaveValue(

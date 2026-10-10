@@ -118,15 +118,6 @@ export default function SessionEditor({
     };
   }, [workspaceDirty]);
 
-  async function saveWorkspace() {
-    if (workspaceSaving) return;
-    const outcomes = await Promise.all([
-      dirty ? save() : Promise.resolve(true),
-      contentSaveState?.dirty ? contentSaveState.save() : Promise.resolve(true),
-    ]);
-    return outcomes.every(Boolean);
-  }
-
   useEffect(() => {
     if (!readinessWarnings) return;
     readinessDialog.current?.focus();
@@ -484,22 +475,27 @@ export default function SessionEditor({
             aria-label="Session actions"
           >
             {saveStatus()}
-            <Button
-              variant="primary"
-              disabled={
-                !workspaceDirty ||
-                workspaceSaving ||
-                deleting ||
-                transitionPending
-              }
-              onClick={() => void saveWorkspace()}
-            >
-              {workspaceSaving
-                ? 'Saving…'
-                : saveError || contentSaveState?.error
-                  ? 'Retry save'
-                  : 'Save changes'}
-            </Button>
+            {(dirty || saving || saveError) && (
+              <Button
+                variant={
+                  problemsOpen && contentSaveState?.dirty
+                    ? 'secondary'
+                    : 'primary'
+                }
+                disabled={saving || deleting || transitionPending}
+                onClick={() => void save()}
+              >
+                {saving
+                  ? 'Saving…'
+                  : saveError
+                    ? problemsOpen
+                      ? 'Retry Session save'
+                      : 'Retry save'
+                    : problemsOpen
+                      ? 'Save Session changes'
+                      : 'Save changes'}
+              </Button>
+            )}
             {(status === 'live' || status === 'ended') && (
               <Link
                 className="ui-button ui-button--quiet text-sm"
@@ -608,14 +604,9 @@ export default function SessionEditor({
         >
           {saveStatus()}
           <Button
-            variant="primary"
-            disabled={
-              !workspaceDirty ||
-              workspaceSaving ||
-              deleting ||
-              transitionPending
-            }
-            onClick={() => void saveWorkspace()}
+            variant={dirty ? 'primary' : 'secondary'}
+            disabled={!dirty || saving || deleting || transitionPending}
+            onClick={() => void save()}
           >
             {workspaceSaving
               ? 'Saving…'
@@ -741,7 +732,22 @@ export default function SessionEditor({
         />
       </label>
       <Button
-        variant="primary"
+        variant={
+          dirty ||
+          (status === 'draft' &&
+            problemCount.status === 'ready' &&
+            problemCount.count > 0)
+            ? 'quiet'
+            : 'primary'
+        }
+        className={
+          dirty ||
+          (status === 'draft' &&
+            problemCount.status === 'ready' &&
+            problemCount.count > 0)
+            ? contextualButtonClass
+            : undefined
+        }
         disabled={saving || deleting || transitionPending}
         onClick={() => setProblemsOpen(true)}
       >

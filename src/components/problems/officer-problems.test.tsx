@@ -398,7 +398,7 @@ describe('Officer Problem workspace', () => {
     );
     bankApi.addBankProblemToSession.mockRejectedValueOnce(new Error('offline'));
     fireEvent.click(
-      await screen.findByRole('button', { name: 'Add to Session' }),
+      await screen.findByRole('button', { name: 'Add Two Sum to Session' }),
     );
     expect(
       await screen.findByText(
@@ -406,6 +406,44 @@ describe('Officer Problem workspace', () => {
       ),
     ).toBeTruthy();
     expect(screen.getAllByRole('tab')).toHaveLength(2);
+  });
+
+  it('searches Bank Problems by name and uses readable categories', async () => {
+    bankApi.listOfficerBankProblems.mockResolvedValue([
+      { id: 'two-sum', title: 'Two Sum', category: 'interview-style' },
+      { id: 'grid', title: 'Grid Walk', category: 'competitive-programming' },
+    ]);
+    await loaded();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Add from Problem Bank' }),
+    );
+
+    expect(await screen.findByText('Interview-style')).toBeTruthy();
+    const picker = screen.getByRole('region', {
+      name: 'Choose a bank Problem',
+    });
+    expect(within(picker).getByText('Competitive Programming')).toBeTruthy();
+    fireEvent.change(
+      screen.getByRole('searchbox', { name: 'Search Problem Bank by name' }),
+      {
+        target: { value: 'grid' },
+      },
+    );
+
+    expect(screen.getByText('Grid Walk')).toBeTruthy();
+    expect(within(picker).queryByText('Two Sum')).toBeNull();
+    expect(
+      screen.getByRole('button', { name: 'Add Grid Walk to Session' }),
+    ).toBeTruthy();
+    fireEvent.change(
+      screen.getByRole('searchbox', { name: 'Search Problem Bank by name' }),
+      {
+        target: { value: 'missing' },
+      },
+    );
+    expect(screen.getByRole('status').textContent).toBe(
+      'No Problems match that name.',
+    );
   });
 
   it('distinguishes loading, failed reads with retry and empty state', async () => {
@@ -461,6 +499,15 @@ describe('Officer Problem workspace', () => {
     await loaded();
     expect(await screen.findAllByText('Needs prep')).toHaveLength(2);
     expect(await screen.findByText('Hash Map: C++ not prepared')).toBeTruthy();
+  });
+  it('does not show routine positive readiness messaging', async () => {
+    await loaded();
+    await waitFor(() => expect(api.getApproaches).toHaveBeenCalled());
+    expect(
+      screen.queryByText(
+        /has useful Problem content and at least one prepared language/,
+      ),
+    ).toBeNull();
   });
   it('reveals answers only after confirmation and hides only the selected problem', async () => {
     start('live');

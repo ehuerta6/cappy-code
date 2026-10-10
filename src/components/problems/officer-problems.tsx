@@ -18,7 +18,7 @@ import {
   type ProblemRecord,
 } from '@/lib/firebase/problems';
 import type { ProblemCountState } from '@/lib/firebase/sessions';
-import type { Problem, SessionStatus } from '@/lib/domain';
+import type { Problem, ProblemCategory, SessionStatus } from '@/lib/domain';
 import type { SolutionApproach } from '@/lib/domain';
 import { getApproaches } from '@/lib/firebase/solutions';
 import { problemPath } from '@/lib/firebase/paths';
@@ -38,6 +38,11 @@ import type {
 import { sessionProblemWorkspaceClass } from './session-problem-workspace';
 
 const buttonClass = 'ui-button ui-button--secondary';
+const categoryLabels: Record<ProblemCategory, string> = {
+  custom: 'Custom',
+  'interview-style': 'Interview-style',
+  'competitive-programming': 'Competitive Programming',
+};
 
 export default function OfficerProblems({
   sessionId,
@@ -78,6 +83,7 @@ export default function OfficerProblems({
     | { status: 'closed' | 'loading' | 'error' }
     | { status: 'ready'; records: BankProblemRecord[] }
   >({ status: 'closed' });
+  const [bankSearch, setBankSearch] = useState('');
   const lock = useRef(false);
   const tabs = useRef(new Map<string, HTMLButtonElement>());
   const addButton = useRef<HTMLButtonElement>(null);
@@ -117,6 +123,12 @@ export default function OfficerProblems({
     sessionStatus === 'draft' &&
     selected?.problem.bankCopyPending === true &&
     selected.problem.title !== 'Untitled Problem';
+  const filteredBankProblems =
+    bankPicker.status === 'ready'
+      ? bankPicker.records.filter((record) =>
+          record.title.toLowerCase().includes(bankSearch.trim().toLowerCase()),
+        )
+      : [];
   const saveWorkspace = useCallback(async () => {
     if (workspaceSaving) return false;
     setMaterializationError(null);
@@ -304,6 +316,7 @@ export default function OfficerProblems({
     });
   }
   async function openBankPicker() {
+    setBankSearch('');
     setBankPicker({ status: 'loading' });
     try {
       setBankPicker({
@@ -433,7 +446,7 @@ export default function OfficerProblems({
               bankCopyReadyToCreate ||
               materializationError) && (
               <button
-                className={buttonClass}
+                className="ui-button ui-button--primary"
                 disabled={workspaceSaving || operation !== null}
                 onClick={() => void saveWorkspace()}
               >
@@ -464,6 +477,18 @@ export default function OfficerProblems({
             Adding a Problem copies its current content and Solutions into this
             Session.
           </p>
+          {bankPicker.status === 'ready' && bankPicker.records.length > 0 && (
+            <label className="mb-3 flex max-w-xl flex-col gap-1.5 text-sm font-medium">
+              Search by Problem name
+              <input
+                className="ui-field"
+                type="search"
+                value={bankSearch}
+                onChange={(event) => setBankSearch(event.target.value)}
+                aria-label="Search Problem Bank by name"
+              />
+            </label>
+          )}
           {bankPicker.status === 'loading' ? (
             <p role="status">Loading bank Problems…</p>
           ) : null}
@@ -480,28 +505,35 @@ export default function OfficerProblems({
           ) : null}
           {bankPicker.status === 'ready' &&
             (bankPicker.records.length ? (
-              <ul className="m-0 list-none p-0">
-                {bankPicker.records.map((entry) => (
-                  <li
-                    key={entry.id}
-                    className="flex flex-wrap items-center justify-between gap-2 border-t border-border-soft py-2"
-                  >
-                    <span>
-                      <strong>{entry.title}</strong>
-                      <span className="ml-2 text-sm text-muted">
-                        {entry.category}
-                      </span>
-                    </span>
-                    <button
-                      className={buttonClass}
-                      disabled={blocked || sessionStatus !== 'draft'}
-                      onClick={() => addFromBank(entry)}
+              filteredBankProblems.length ? (
+                <ul className="m-0 grid list-none gap-2 p-0 sm:grid-cols-2">
+                  {filteredBankProblems.map((entry) => (
+                    <li
+                      key={entry.id}
+                      className="flex min-w-0 flex-col items-start justify-between gap-2 rounded-md border border-border-soft bg-raised px-3 py-2 sm:flex-row sm:items-center"
                     >
-                      Add to Session
-                    </button>
-                  </li>
-                ))}
-              </ul>
+                      <span className="min-w-0">
+                        <strong className="block break-words">
+                          {entry.title}
+                        </strong>
+                        <span className="text-sm text-muted">
+                          {categoryLabels[entry.category]}
+                        </span>
+                      </span>
+                      <button
+                        className={`${buttonClass} shrink-0`}
+                        aria-label={`Add ${entry.title} to Session`}
+                        disabled={blocked || sessionStatus !== 'draft'}
+                        onClick={() => addFromBank(entry)}
+                      >
+                        Add to Session
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p role="status">No Problems match that name.</p>
+              )
             ) : (
               <p>No reusable Problems yet.</p>
             ))}
@@ -533,12 +565,7 @@ export default function OfficerProblems({
                 ))}
               </ul>
             </section>
-          ) : (
-            <p className="mb-4 text-sm text-muted" role="status">
-              {selected.problem.title} has useful Problem content and at least
-              one prepared language per Approach.
-            </p>
-          );
+          ) : null;
         })()}
       {workspaceError && (
         <p className="mb-3 text-sm text-danger" role="alert">
