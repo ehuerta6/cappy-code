@@ -124,6 +124,24 @@ describe('Officer Problem Bank discovery', () => {
     expect(screen.queryByRole('link', { name: 'Two Sum' })).toBeNull();
   });
 
+  it('omits Officer category groups with no matching Problems', async () => {
+    renderBank();
+    await screen.findByRole('link', { name: 'Two Sum' });
+
+    fireEvent.change(
+      screen.getByRole('searchbox', { name: 'Search Problems' }),
+      { target: { value: 'grid' } },
+    );
+
+    expect(
+      screen.getByRole('heading', { name: 'Competitive Programming' }),
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole('heading', { name: 'Interview-style' }),
+    ).toBeNull();
+    expect(screen.queryByText('No Problems in this category.')).toBeNull();
+  });
+
   it('creates a Bank Problem and navigates to its editor', async () => {
     renderBank();
     await screen.findByRole('link', { name: 'Two Sum' });

@@ -418,14 +418,14 @@ describe('public member UI scaffold', () => {
     ).toBeNull();
   });
 
-  it('renders Markdown in description and examples while keeping constraints plain text', () => {
+  it('renders Markdown in descriptions while keeping examples and constraints literal', () => {
     const load = vi.fn().mockResolvedValue(solutions);
     const markdownProblem: PublicProblem = {
       ...problems[0],
       description:
         'Use **bold**, *italic*, and `nums`.\n\n- first item\n- second item\n\n[Reference](https://example.com)',
-      exampleInput: '```html\n<script>alert(1)</script>\n```',
-      exampleOutput: '1. first\n2. second',
+      exampleInput: '```html\n<script>alert(1)</script>\n```\n**literal**',
+      exampleOutput: '1. first\n2. second\n<tag> & value',
       constraints: '**This remains literal text.**',
     };
     const { container } = render(
@@ -437,18 +437,17 @@ describe('public member UI scaffold', () => {
     expect(screen.getByText('nums').tagName).toBe('CODE');
     expect(
       screen.getAllByRole('listitem').map((item) => item.textContent),
-    ).toEqual(['first item', 'second item', 'first', 'second']);
+    ).toEqual(['first item', 'second item']);
     const reference = screen.getByRole('link', { name: 'Reference' });
     expect(reference.getAttribute('target')).toBe('_blank');
     expect(reference.getAttribute('rel')).toBe('noopener noreferrer');
-    expect(container.querySelector('pre code')?.textContent).toBe(
-      '<script>alert(1)</script>\n',
-    );
-    expect(
-      Array.from(container.querySelectorAll('ol li')).map(
-        (item) => item.textContent,
-      ),
-    ).toEqual(['first', 'second']);
+    const examples = Array.from(container.querySelectorAll('pre'));
+    expect(examples.map((example) => example.textContent)).toEqual([
+      '```html\n<script>alert(1)</script>\n```\n**literal**',
+      '1. first\n2. second\n<tag> & value',
+    ]);
+    expect(container.querySelector('pre script')).toBeNull();
+    expect(container.querySelector('pre strong')).toBeNull();
     expect(screen.getByText('**This remains literal text.**')).toBeTruthy();
   });
 

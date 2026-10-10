@@ -75,11 +75,12 @@ export default function ProblemBankBrowser({
           </button>
         </p>
       ) : (
-        <div className="mt-6 grid min-w-0 gap-7 md:grid-cols-3">
+        <div className="mt-6 grid min-w-0 gap-7 sm:grid-cols-2 xl:grid-cols-3">
           {problemCategories.map((category) => {
             const categoryRecords = records.filter(
               (record) => record.category === category,
             );
+            if (categoryRecords.length === 0) return null;
             return (
               <section
                 className="min-w-0"
@@ -92,39 +93,33 @@ export default function ProblemBankBrowser({
                 >
                   {categoryLabels[category]}
                 </h2>
-                {categoryRecords.length ? (
-                  <ul className="m-0 list-none p-0">
-                    {categoryRecords.map((record) => (
-                      <li
-                        className="min-w-0 border-b border-border-soft"
-                        key={record.id}
+                <ul className="m-0 list-none p-0">
+                  {categoryRecords.map((record) => (
+                    <li
+                      className="min-w-0 border-b border-border-soft"
+                      key={record.id}
+                    >
+                      <Link
+                        className="flex min-h-12 min-w-0 items-center rounded px-3 py-2 font-semibold text-ink no-underline hover:bg-hover hover:text-accent-hover hover:underline focus-visible:relative focus-visible:z-10"
+                        href={hrefForProblem(record.id)}
                       >
-                        <Link
-                          className="flex min-h-12 min-w-0 items-center rounded px-3 py-2 font-semibold text-ink no-underline hover:bg-hover hover:text-accent-hover hover:underline focus-visible:relative focus-visible:z-10"
-                          href={hrefForProblem(record.id)}
-                        >
-                          <span className="break-words">{record.title}</span>
-                        </Link>
-                        <div
-                          className="flex min-w-0 flex-wrap items-center gap-1.5 px-3 pb-3"
-                          role="group"
-                          aria-label={`${record.title} classification`}
-                        >
-                          <ProblemDifficultyBadge
-                            difficulty={record.difficulty}
-                          />
-                          <ProblemApproachTags
-                            tags={tagsByProblem[record.id] ?? []}
-                          />
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="m-0 text-sm text-muted">
-                    No Problems in this category.
-                  </p>
-                )}
+                        <span className="break-words">{record.title}</span>
+                      </Link>
+                      <div
+                        className="flex min-w-0 flex-wrap items-center gap-1.5 px-3 pb-3"
+                        role="group"
+                        aria-label={`${record.title} classification`}
+                      >
+                        <ProblemDifficultyBadge
+                          difficulty={record.difficulty}
+                        />
+                        <ProblemApproachTags
+                          tags={tagsByProblem[record.id] ?? []}
+                        />
+                      </div>
+                    </li>
+                  ))}
+                </ul>
               </section>
             );
           })}

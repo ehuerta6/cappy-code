@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import AppHeader from '@/components/app-header';
 import ProblemMarkdown from '@/components/member/problem-markdown';
+import ProblemExamples from '@/components/member/problem-examples';
 import MemberSolutionViewer from '@/components/solutions/member-solution-viewer';
 import {
   ProblemApproachTags,
@@ -137,7 +138,7 @@ export function MemberProblemBank() {
           Problem Bank
         </h1>
         <p className="mb-5 mt-1 text-muted">
-          Browse prepared CIC Problems and compare all three Solutions.
+          Browse prepared CIC Problems and their prepared Solutions.
         </p>
         {state.status === 'loading' ? (
           <div className="ui-loading-block mt-5 min-h-56" aria-busy="true">
@@ -353,27 +354,11 @@ export function MemberBankProblemPage({ problemId }: { problemId: string }) {
                     </p>
                   </section>
                 )}
-                <section className="mt-6" aria-label="Shared example">
-                  <h2 className="mb-3 mt-0 text-lg font-semibold">Example</h2>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div>
-                      <h3 className="mb-1 mt-0 text-sm font-semibold text-muted">
-                        Input
-                      </h3>
-                      <pre className="m-0 max-w-full overflow-x-auto rounded-md border border-border-soft bg-surface px-3 py-3 font-mono text-[15px] leading-6">
-                        {currentState.problem.exampleInput || '—'}
-                      </pre>
-                    </div>
-                    <div>
-                      <h3 className="mb-1 mt-0 text-sm font-semibold text-muted">
-                        Expected output
-                      </h3>
-                      <pre className="m-0 max-w-full overflow-x-auto rounded-md border border-border-soft bg-surface px-3 py-3 font-mono text-[15px] leading-6">
-                        {currentState.problem.exampleOutput || '—'}
-                      </pre>
-                    </div>
-                  </div>
-                </section>
+                <ProblemExamples
+                  id={problemId}
+                  input={currentState.problem.exampleInput}
+                  output={currentState.problem.exampleOutput}
+                />
               </div>
               <section
                 className="min-w-0 min-[1100px]:h-full min-[1100px]:overflow-y-auto min-[1100px]:overscroll-contain min-[1100px]:pl-5"
