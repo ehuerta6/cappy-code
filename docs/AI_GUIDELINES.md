@@ -6,7 +6,7 @@ Use the repository's canonical instructions and documentation:
 - [Project Scope](PROJECT_SCOPE.md) defines product behavior and architecture.
 - [Firebase Foundation](FIREBASE.md) documents Firebase setup and access boundaries.
 - [Git Conventions](GIT_CONVENTIONS.md) defines branch, commit, PR, and merge practices.
-- Repository-scoped workflows live in [`.codex/skills/`](../.codex/skills/).
+- Existing CappyCode workflows live in [`.codex/skills/`](../.codex/skills/); the shared `project-knowledge` skill lives in [`.agents/skills/`](../.agents/skills/) for Codex and Claude Code.
 
 Use the active issue and newest explicit project decisions to establish task scope. Existing code shows current behavior but does not override explicit requirements. Do not invent missing requirements.
 

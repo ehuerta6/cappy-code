@@ -64,6 +64,8 @@ Use the applicable skill for procedural work:
 
 Project-specific requirements override reusable defaults.
 
+For relevant durable project context, start with [knowledge/README.md](knowledge/README.md) and follow the [project-knowledge skill](.agents/skills/project-knowledge/SKILL.md). Claude Code imports this file through `CLAUDE.md`.
+
 For the repeatable process to compare and update adopted configuration against canonical `ai-setup`, follow [docs/AI_CONFIGURATION.md](docs/AI_CONFIGURATION.md).
 
 ## Git
