@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "project-knowledge": {
+      "source": "ehuerta6/ai-setup",
+      "sourceType": "github",
+      "skillPath": "skills/project-knowledge/SKILL.md",
+      "computedHash": "fe73dbed889fedeb321976fbc2a1dd5779c4d62bc7b7ff5d7aba7ef11e5be462"
+    }
+  }
+}
